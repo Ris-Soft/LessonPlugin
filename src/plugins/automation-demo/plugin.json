@@ -1,0 +1,8 @@
+{
+  "name": "AutomationDemo",
+  "icon": "ri-robot-line",
+  "description": "示例插件：演示自动化事件与后端函数",
+  "actions": [
+    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口" }
+  ]
+}

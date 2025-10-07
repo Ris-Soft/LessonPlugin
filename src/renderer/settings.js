@@ -558,8 +558,10 @@ async function initAutomationSettings() {
     nameInput.type = 'text'; nameInput.value = it.name || '';
     nameInput.placeholder = '自动化名称';
     const saveBtn = document.createElement('button'); saveBtn.className = 'btn primary'; saveBtn.innerHTML = '<i class="ri-save-3-line"></i> 保存';
+    const testBtn = document.createElement('button'); testBtn.className = 'btn secondary'; testBtn.innerHTML = '<i class="ri-play-mini-fill"></i> 测试执行';
     header.appendChild(nameInput);
     header.appendChild(saveBtn);
+    header.appendChild(testBtn);
     editorEl.appendChild(header);
 
     // 触发条件
@@ -607,7 +609,7 @@ async function initAutomationSettings() {
     topModeSel.addEventListener('change', () => { it.conditions = it.conditions || { mode: 'and', groups: [] }; it.conditions.mode = topModeSel.value; });
     secCond.appendChild(topModeSel);
     const groupsWrap = document.createElement('div');
-    const addGroupBtn = document.createElement('button'); addGroupBtn.className = 'btn secondary'; addGroupBtn.innerHTML = '<i class="ri-add-line"></i> 添加条件组';
+    const addGroupBtn = document.createElement('button'); addGroupBtn.className = 'btn secondary'; addGroupBtn.innerHTML = '<i class="ri-add-line"></i> 添加条件组'; addGroupBtn.style.marginLeft = '5px';
     const renderGroups = () => {
       groupsWrap.innerHTML = '';
       const groups = it.conditions?.groups || [];
@@ -625,8 +627,11 @@ async function initAutomationSettings() {
           condList.innerHTML = '';
           (g.items || []).forEach((c, ci) => {
             const row = document.createElement('div'); row.className = 'cond-row';
+            const statusDot = document.createElement('span'); statusDot.className = 'cond-status'; statusDot.title = '计算中…';
             const typeSel = document.createElement('select');
             [
+              ['alwaysTrue','始终为真'],
+              ['alwaysFalse','始终为假'],
               ['timeEquals','当前时间为（HH:MM）'],
               ['weekdayIn','今天是星期（1-7）'],
               ['monthIn','今天是几月（1-12）'],
@@ -641,29 +646,94 @@ async function initAutomationSettings() {
             const negate = document.createElement('label'); negate.className='negate'; negate.innerHTML = '<input type="checkbox" /> 反条件';
             negate.querySelector('input').checked = !!c.negate;
             const delBtn = document.createElement('span'); delBtn.className='del'; delBtn.innerHTML = '<i class="ri-delete-bin-line"></i>';
-            typeSel.addEventListener('change', () => { c.type = typeSel.value; });
+            // 当前状态评估（与主进程逻辑一致）
+            const evalCond = async () => {
+              const d = new Date();
+              const weekday = d.getDay() === 0 ? 7 : d.getDay();
+              const month = d.getMonth() + 1;
+              const dom = d.getDate();
+              const semStart = await (window.settingsAPI?.configGet?.('system','semesterStart'));
+              const offsetBase = await (window.settingsAPI?.configGet?.('system','offsetBaseDate'));
+              const base = semStart || offsetBase;
+              let isEvenWeek = null;
+              if (base) {
+                try {
+                  const baseDate = new Date(String(base) + 'T00:00:00');
+                  const diffDays = Math.floor((d - baseDate) / (24 * 3600 * 1000));
+                  const weekIndex = Math.floor(diffDays / 7);
+                  isEvenWeek = weekIndex % 2 === 0;
+                } catch {}
+              }
+              let ok = true;
+              switch (c.type) {
+                case 'alwaysTrue': ok = true; break;
+                case 'alwaysFalse': ok = false; break;
+                case 'timeEquals': {
+                  const hh = String(d.getHours()).padStart(2, '0');
+                  const mm = String(d.getMinutes()).padStart(2, '0');
+                  ok = (`${hh}:${mm}` === String(c.value || '')); break;
+                }
+                case 'weekdayIn': ok = Array.isArray(c.value) ? c.value.includes(weekday) : false; break;
+                case 'monthIn': ok = Array.isArray(c.value) ? c.value.includes(month) : false; break;
+                case 'dayIn': ok = Array.isArray(c.value) ? c.value.includes(dom) : false; break;
+                case 'biweek': {
+                  if (isEvenWeek == null) ok = false; else ok = (c.value === 'even') ? isEvenWeek : !isEvenWeek;
+                  break;
+                }
+                default: ok = true;
+              }
+              if (c.negate) ok = !ok;
+              return !!ok;
+            };
+            const updateStatus = async () => {
+              try {
+                const ok = await evalCond();
+                statusDot.classList.toggle('ok', ok);
+                statusDot.classList.toggle('fail', !ok);
+                statusDot.title = ok ? '当前满足' : '当前不满足';
+              } catch {}
+            };
+            typeSel.addEventListener('change', () => {
+              c.type = typeSel.value;
+              const needValue = !(c.type === 'alwaysTrue' || c.type === 'alwaysFalse');
+              valInput.disabled = !needValue; valInput.placeholder = needValue ? '值（逗号分隔或单值）' : '无需填写';
+              updateStatus();
+            });
             valInput.addEventListener('change', () => {
               if (c.type.endsWith('In')) c.value = valInput.value.split(',').map(s => parseInt(s,10)).filter(n => !isNaN(n));
               else c.value = valInput.value.trim();
+              updateStatus();
             });
-            negate.querySelector('input').addEventListener('change', (e) => { c.negate = !!e.target.checked; });
+            negate.querySelector('input').addEventListener('change', (e) => { c.negate = !!e.target.checked; updateStatus(); });
             delBtn.addEventListener('click', () => { g.items.splice(ci,1); renderConds(); });
-            row.appendChild(typeSel); row.appendChild(valInput); row.appendChild(negate); row.appendChild(delBtn);
+            // 初始禁用状态
+            valInput.disabled = (c.type === 'alwaysTrue' || c.type === 'alwaysFalse'); if (valInput.disabled) valInput.placeholder = '无需填写';
+            row.appendChild(statusDot); row.appendChild(typeSel); row.appendChild(valInput); row.appendChild(negate); row.appendChild(delBtn);
             condList.appendChild(row);
+            // 初次渲染更新一次状态
+            updateStatus();
+            // 注册到全局刷新列表
+            allCondUpdateFns.push(updateStatus);
           });
         };
         addCondBtn.addEventListener('click', () => { g.items = g.items || []; g.items.push({ type: 'timeEquals', value: '08:00', negate: false }); renderConds(); });
         delGroupBtn.addEventListener('click', () => { (it.conditions.groups || []).splice(gi,1); renderGroups(); });
         modeSel.addEventListener('change', () => { g.mode = modeSel.value; });
+        // 渲染组条件并重置定时器
         renderConds();
         box.appendChild(condList);
         groupsWrap.appendChild(box);
       });
+      try { if (condStatusTimer) clearInterval(condStatusTimer); } catch {}
+      condStatusTimer = setInterval(() => { try { allCondUpdateFns.forEach(fn => fn && fn()); } catch {} }, 30 * 1000);
     };
     addGroupBtn.addEventListener('click', () => { it.conditions = it.conditions || { mode:'and', groups:[] }; it.conditions.groups.push({ mode:'and', items: [] }); renderGroups(); });
     secCond.appendChild(addGroupBtn);
     secCond.appendChild(groupsWrap);
     // 初始渲染已有条件组
+    // 状态刷新定时器与函数列表
+    let allCondUpdateFns = [];
+    let condStatusTimer = null;
     renderGroups();
     editorEl.appendChild(secCond);
 
@@ -681,7 +751,8 @@ async function initAutomationSettings() {
           ['pluginEvent','插件功能'],
           ['power','电源功能'],
           ['openApp','打开应用程序'],
-          ['cmd','执行CMD命令']
+          ['cmd','执行CMD命令'],
+          ['wait','等待时长']
         ].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
         typeSel.value = a.type || 'pluginEvent';
         const cfg = document.createElement('div');
@@ -695,13 +766,19 @@ async function initAutomationSettings() {
             plugins.forEach(p => { const o=document.createElement('option'); o.value=p.name; o.textContent=p.name; plugSel.appendChild(o); });
             plugSel.value = a.pluginId || plugins[0]?.name || '';
             const evSel = document.createElement('select');
-            const evs = (await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value)) || [];
-            evs.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=e.title || e.name; evSel.appendChild(o); });
+            const res = await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value);
+            const evs = Array.isArray(res?.events) ? res.events : (Array.isArray(res) ? res : []);
+            evs.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=(e.desc || e.title || e.name); evSel.appendChild(o); });
             evSel.value = a.event || evs[0]?.name || '';
             const editParams = document.createElement('button'); editParams.className='btn secondary'; editParams.innerHTML = '<i class="ri-edit-2-line"></i> 编辑参数数组';
             const paramsPreview = document.createElement('div'); paramsPreview.className='muted'; paramsPreview.textContent = `参数项数：${Array.isArray(a.params)? a.params.length : 0}`;
             plugSel.addEventListener('change', async () => {
-              a.pluginId = plugSel.value; const evs2 = (await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value)) || []; evSel.innerHTML = ''; evs2.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=e.title || e.name; evSel.appendChild(o); }); a.event = evSel.value = evs2[0]?.name || '';
+              a.pluginId = plugSel.value;
+              const res2 = await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value);
+              const evs2 = Array.isArray(res2?.events) ? res2.events : (Array.isArray(res2) ? res2 : []);
+              evSel.innerHTML = '';
+              evs2.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=(e.desc || e.title || e.name); evSel.appendChild(o); });
+              a.event = evSel.value = evs2[0]?.name || '';
             });
             evSel.addEventListener('change', () => { a.event = evSel.value; });
             editParams.onclick = async () => { const res = await showParamsEditor(Array.isArray(a.params)? a.params : []); if (Array.isArray(res)) { a.params = res; paramsPreview.textContent = `参数项数：${res.length}`; } };
@@ -712,6 +789,10 @@ async function initAutomationSettings() {
             const p = document.createElement('input'); p.type='text'; p.placeholder='可执行文件路径'; p.value=a.path||''; p.addEventListener('change', () => { a.path = p.value; }); cfg.appendChild(p);
           } else if (typeSel.value === 'cmd') {
             const c = document.createElement('input'); c.type='text'; c.placeholder='命令行（将在Shell中执行）'; c.value=a.command||''; c.addEventListener('change', () => { a.command = c.value; }); cfg.appendChild(c);
+          } else if (typeSel.value === 'wait') {
+            const s = document.createElement('input'); s.type='number'; s.min='0'; s.step='1'; s.placeholder='秒数'; s.value=(Number.isFinite(a.seconds)? a.seconds : 1);
+            s.addEventListener('change', () => { const v = parseInt(s.value || '0', 10); a.seconds = Math.max(0, isNaN(v)?0:v); });
+            cfg.appendChild(s);
           }
         };
         typeSel.addEventListener('change', () => { a.type = typeSel.value; renderCfg(); });
@@ -732,6 +813,16 @@ async function initAutomationSettings() {
     const secConf = document.createElement('div'); secConf.className='section';
     secConf.innerHTML = '<div class="section-title"><i class="ri-shield-check-line"></i> 执行前确认</div>';
     const confirmRow = document.createElement('div'); confirmRow.className='inline';
+
+    // 测试执行按钮行为（忽略触发条件，仅按当前执行条件与确认流程执行）
+    testBtn.addEventListener('click', async () => {
+      try {
+        await window.settingsAPI?.automationTest?.(id);
+        await showAlert('已发起测试执行。若启用确认，将弹出确认覆盖层。');
+      } catch (e) {
+        await showAlert(e?.message || '测试执行失败');
+      }
+    });
     const confirmEnabled = document.createElement('label'); confirmEnabled.className='switch'; confirmEnabled.innerHTML = `<input type="checkbox" ${it.confirm?.enabled!==false?'checked':''}/><span class="slider"></span>`;
     const timeoutInput = document.createElement('input'); timeoutInput.type='number'; timeoutInput.step='1'; timeoutInput.value = parseInt(it.confirm?.timeout || 60,10);
     const timeoutLabel = document.createElement('label'); timeoutLabel.textContent = '确认超时时间（秒）'; timeoutLabel.style.color = 'var(--muted)';

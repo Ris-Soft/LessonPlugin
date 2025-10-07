@@ -135,6 +135,10 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
                 if (typeof impl === 'function') map.set(fn, impl);
               }
             }
+            // 自动化事件：若插件导出 automationEvents，则直接注册以便设置页可查询
+            if (mod && Array.isArray(mod.automationEvents)) {
+              module.exports.registerAutomationEvents(p.name, mod.automationEvents);
+            }
           }
         } catch {}
       } else {

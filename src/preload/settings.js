@@ -24,6 +24,16 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   automationRemove: (id) => ipcRenderer.invoke('automation:remove', id),
   automationToggle: (id, enabled) => ipcRenderer.invoke('automation:toggle', id, enabled),
   automationInvokeProtocol: (text) => ipcRenderer.invoke('automation:invokeProtocol', text),
+  automationTest: (id) => ipcRenderer.invoke('automation:test', id),
+  // 插件自动化事件查询
+  pluginAutomationListEvents: (pluginId) => ipcRenderer.invoke('plugin:automation:listEvents', pluginId),
+  // 自动化执行确认覆盖层通信
+  onAutomationConfirmInit: (handler) => {
+    ipcRenderer.on('automation:confirm:init', (_e, payload) => handler && handler(payload));
+  },
+  automationConfirm: (id, approved) => {
+    ipcRenderer.send('automation:confirm:result', id, !!approved);
+  },
   // 系统接口
   getAppInfo: () => ipcRenderer.invoke('system:getAppInfo'),
   getAutostart: () => ipcRenderer.invoke('system:getAutostart'),

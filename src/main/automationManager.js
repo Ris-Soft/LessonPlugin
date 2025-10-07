@@ -52,6 +52,14 @@ class AutomationManager {
     item.enabled = !!enabled; this.store.set('automation', 'list', this.items); return { ok: true, item };
   }
 
+  async test(id) {
+    const item = this.get(id);
+    if (!item) throw new Error('not_found');
+    // 测试执行：忽略触发条件，仅按当前配置的执行条件与确认流程运行
+    await this.tryExecute(item, { reason: 'manual_test' });
+    return { ok: true };
+  }
+
   checkTimeTriggers() {
     const d = nowDate();
     const hh = String(d.getHours()).padStart(2, '0');
@@ -60,7 +68,12 @@ class AutomationManager {
     for (const item of this.items) {
       if (!item.enabled) continue;
       const hit = (item.triggers || []).some((t) => t?.type === 'time' && t?.at === cur);
-      if (hit) this.tryExecute(item, { reason: 'time', now: d });
+      // 避免同一分钟内重复触发（定时器每30秒检查一次，会命中两次）
+      if (hit) {
+        if (item._lastTimeMinute === cur) continue;
+        item._lastTimeMinute = cur;
+        this.tryExecute(item, { reason: 'time', now: d });
+      }
     }
   }
 
@@ -96,6 +109,14 @@ class AutomationManager {
       const negate = !!c.negate;
       let ok = true;
       switch (c.type) {
+        case 'alwaysTrue': {
+          ok = true;
+          break;
+        }
+        case 'alwaysFalse': {
+          ok = false;
+          break;
+        }
         case 'timeEquals': {
           const hh = String(d.getHours()).padStart(2, '0');
           const mm = String(d.getMinutes()).padStart(2, '0');
@@ -145,6 +166,12 @@ class AutomationManager {
         webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js') } // 复用API能力
       });
       win.loadFile(path.join(__dirname, '..', 'renderer', 'automation-confirm.html'));
+      // 将自动化条目基本信息传递给渲染页
+      try {
+        win.webContents.once('did-finish-load', () => {
+          try { win.webContents.send('automation:confirm:init', { id: item.id, name: item.name, timeout }); } catch {}
+        });
+      } catch {}
       const timeout = Math.max(5, parseInt(item?.confirm?.timeout || 60, 10));
       let done = false;
       const finish = async (ok) => {
@@ -180,6 +207,13 @@ class AutomationManager {
           if (act.path) shell.openPath(act.path);
         } else if (act.type === 'cmd') {
           if (act.command) spawn(act.command, { shell: true });
+        } else if (act.type === 'wait') {
+          let secVal = 0;
+          if (act.seconds != null) secVal = Number(act.seconds);
+          else if (act.sec != null) secVal = Number(act.sec);
+          else if (act.ms != null) secVal = Number(act.ms) / 1000;
+          const sec = Math.max(0, isNaN(secVal) ? 0 : secVal);
+          await new Promise((resolve) => setTimeout(resolve, Math.round(sec * 1000)));
         }
       } catch {}
     }

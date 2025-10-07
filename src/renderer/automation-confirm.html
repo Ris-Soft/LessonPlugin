@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>自动化执行确认</title>
+  <link rel="stylesheet" href="./remixicon-local.css" />
+  <style>
+    :root { --accent: #22c55e; --bg: rgba(2,6,23,0.7); --panel: #0b1324; --border: #1f2937; --text: #e5e7eb; --muted: #94a3b8; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background: transparent; color: var(--text); }
+    .overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(6px); }
+    .panel { width: 840px; max-width: 92vw; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 80px rgba(0,0,0,0.45); }
+    header { display:flex; align-items:center; justify-content:space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    header .left { display:flex; align-items:center; gap: 10px; }
+    header .left i { color: var(--accent); }
+    header .title { font-size: 16px; font-weight: 600; }
+    main { padding: 16px; }
+    .desc { color: var(--muted); margin-bottom: 12px; }
+    .timer { display:flex; align-items:center; gap:8px; color: var(--muted); }
+    .bar { height: 6px; border-radius: 999px; background: #0f172a; border: 1px solid var(--border); overflow: hidden; }
+    .bar > div { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s linear; }
+    .actions { display:flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+    .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: #111827; color: var(--text); cursor: pointer; }
+    .btn.primary { border-color: var(--accent); color: #c3f1cf; }
+    .btn:hover { border-color: var(--accent); }
+  </style>
+  <script>
+    let state = { id: null, name: '未命名自动化', timeout: 60 };
+    function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+    function initTimer() {
+      const total = Math.max(5, parseInt(state.timeout || 60, 10));
+      let left = total;
+      setText('timeout', String(left));
+      const bar = document.getElementById('bar');
+      const tick = () => {
+        left -= 1; if (left < 0) left = 0;
+        setText('timeout', String(left));
+        const p = Math.max(0, Math.min(100, Math.round(((total - left) / total) * 100)));
+        if (bar) bar.style.width = p + '%';
+        if (left <= 0) { try { window.settingsAPI?.automationConfirm?.(state.id, true); } catch {} }
+      };
+      setInterval(tick, 1000);
+    }
+    window.addEventListener('DOMContentLoaded', () => {
+      window.settingsAPI?.onAutomationConfirmInit?.((payload) => {
+        state = { ...state, ...(payload || {}) };
+        setText('title', '是否执行自动化：' + (state.name || '未命名自动化'));
+        initTimer();
+      });
+      document.getElementById('btn-approve').addEventListener('click', () => {
+        window.settingsAPI?.automationConfirm?.(state.id, true);
+      });
+      document.getElementById('btn-cancel').addEventListener('click', () => {
+        window.settingsAPI?.automationConfirm?.(state.id, false);
+      });
+    });
+  </script>
+  </head>
+<body>
+  <div class="overlay">
+    <div class="panel">
+      <header>
+        <div class="left"><i class="ri-shield-check-line"></i><div class="title" id="title">是否执行自动化</div></div>
+        <div class="timer"><i class="ri-time-line"></i> 自动执行倒计时：<span id="timeout">—</span> 秒</div>
+      </header>
+      <main>
+        <div class="desc">即将执行已配置的自动化动作。你可以选择立即执行或取消。本提示在倒计时结束后将自动执行。</div>
+        <div class="bar"><div id="bar"></div></div>
+        <div class="actions">
+          <button class="btn" id="btn-cancel"><i class="ri-close-line"></i> 取消</button>
+          <button class="btn primary" id="btn-approve"><i class="ri-check-line"></i> 立即执行</button>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

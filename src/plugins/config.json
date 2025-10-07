@@ -1,6 +1,7 @@
 {
   "enabled": {
     "ExamplePlugin": true,
-    "UtilPlugin": true
+    "UtilPlugin": true,
+    "AutomationDemo": true
   }
 }
