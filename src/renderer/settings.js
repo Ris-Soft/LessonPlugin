@@ -1,0 +1,774 @@
+async function fetchPlugins() {
+  if (!window.settingsAPI) {
+    return [
+      { name: 'ExamplePlugin', npm: null, local: './src/plugins/example-plugin', enabled: true, icon: 'ri-puzzle-line', description: '示例插件，演示窗口与接口', actions: [ { id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }, { id: 'installNpm', icon: 'ri-download-2-line', text: '安装NPM' } ] }
+    ];
+  }
+  return await window.settingsAPI.getPlugins();
+}
+
+function renderPlugin(item) {
+  const el = document.createElement('div');
+  el.className = 'plugin-card';
+  el.innerHTML = `
+    <div class="card-header">
+      <i class="${item.icon || 'ri-puzzle-line'}"></i>
+      <div>
+        <div class="card-title">${item.name}</div>
+        <div class="card-desc">${item.description || ''}</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" ${item.enabled ? 'checked' : ''} />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="card-actions">
+      ${Array.isArray(item.actions) ? item.actions.map(a => `<button class="action-btn" data-action="${a.id}"><i class="${a.icon || ''}"></i> ${a.text || ''}</button>`).join('') : ''}
+    </div>
+  `;
+
+  const checkbox = el.querySelector('input[type="checkbox"]');
+  checkbox.addEventListener('change', async (e) => {
+    await window.settingsAPI?.togglePlugin(item.name, e.target.checked);
+  });
+
+  el.querySelectorAll('.action-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const act = btn.dataset.action;
+      if (act === 'openWindow') {
+        await window.settingsAPI?.openPluginWindow(item.name);
+      } else if (act === 'installNpm') {
+        btn.disabled = true; btn.textContent = '安装中...';
+        await window.settingsAPI?.installNpm(item.name);
+        btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装NPM`;
+      }
+    });
+  });
+  return el;
+}
+
+// 自绘提示框：Alert / Confirm
+function showModal({ title = '提示', message = '', confirmText = '确定', cancelText = null }) {
+  return new Promise((resolve) => {
+    const old = document.querySelector('.modal-overlay');
+    if (old) old.remove();
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
+    const msg = document.createElement('div'); msg.className = 'modal-message'; msg.textContent = message;
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = confirmText || '确定';
+    ok.addEventListener('click', () => { overlay.remove(); resolve(true); });
+    actions.appendChild(ok);
+    if (cancelText) {
+      const cancel = document.createElement('button'); cancel.className = 'btn secondary'; cancel.textContent = cancelText;
+      cancel.addEventListener('click', () => { overlay.remove(); resolve(false); });
+      actions.appendChild(cancel);
+    }
+    box.appendChild(t); box.appendChild(msg); box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); resolve(!!cancelText ? false : true); } };
+    document.addEventListener('keydown', onKey);
+  });
+}
+function showAlert(message, title = '提示') { return showModal({ title, message, confirmText: '好的' }); }
+function showConfirm(message, title = '确认') { return showModal({ title, message, confirmText: '确认', cancelText: '取消' }); }
+
+// 参数数组编辑对话框（结构化编辑，不使用广域文本框）
+async function showParamsEditor(initial) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑参数数组';
+    const body = document.createElement('div'); body.className = 'modal-body';
+    const help = document.createElement('div'); help.className = 'muted'; help.textContent = '支持类型：字符串、数字、布尔、对象JSON、数组JSON';
+    const list = document.createElement('div');
+    let items = Array.isArray(initial) ? initial.map((x) => x) : [];
+
+    const typeOfVal = (v) => {
+      if (Array.isArray(v)) return 'array';
+      const t = typeof v;
+      return t === 'object' && v !== null ? 'object' : t; // string/number/boolean/object
+    };
+    const stringifyByType = (type, v) => {
+      if (type === 'object' || type === 'array') return JSON.stringify(v ?? (type === 'array' ? [] : {}));
+      if (type === 'boolean') return v ? 'true' : 'false';
+      if (type === 'number') return String(Number(v || 0));
+      return String(v ?? '');
+    };
+    const parseByType = (type, str) => {
+      switch (type) {
+        case 'string': return String(str || '');
+        case 'number': { const n = Number(str); if (!Number.isFinite(n)) throw new Error('数字格式错误'); return n; }
+        case 'boolean': { const s = String(str).trim().toLowerCase(); return s === 'true' || s === '1' || s === 'yes'; }
+        case 'object': { const o = JSON.parse(str || '{}'); if (Array.isArray(o) || typeof o !== 'object' || o === null) throw new Error('对象必须为JSON Object'); return o; }
+        case 'array': { const a = JSON.parse(str || '[]'); if (!Array.isArray(a)) throw new Error('数组必须为JSON Array'); return a; }
+        default: return String(str || '');
+      }
+    };
+
+    const renderItems = () => {
+      list.innerHTML = '';
+      items.forEach((val, i) => {
+        const row = document.createElement('div'); row.className = 'inline';
+        const typeSel = document.createElement('select');
+        [['string','字符串'],['number','数字'],['boolean','布尔'],['object','对象JSON'],['array','数组JSON']]
+          .forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
+        const curType = typeOfVal(val);
+        typeSel.value = curType === 'object' ? 'object' : (curType === 'array' ? 'array' : curType);
+        const input = document.createElement('input'); input.type = 'text'; input.value = stringifyByType(typeSel.value, val);
+        const del = document.createElement('button'); del.className='btn secondary'; del.innerHTML = '<i class="ri-delete-bin-line"></i>';
+        del.onclick = () => { items.splice(i,1); renderItems(); };
+        typeSel.onchange = () => { try { input.value = stringifyByType(typeSel.value, parseByType(typeSel.value, input.value)); } catch { input.value = stringifyByType(typeSel.value, typeSel.value==='array'?[]:{}); } };
+        row.appendChild(typeSel); row.appendChild(input); row.appendChild(del);
+        list.appendChild(row);
+      });
+    };
+    renderItems();
+
+    const addBar = document.createElement('div'); addBar.className='array-actions';
+    const addBtn = document.createElement('button'); addBtn.className='btn secondary'; addBtn.innerHTML = '<i class="ri-add-line"></i> 添加参数';
+    addBtn.onclick = () => { items.push(''); renderItems(); };
+    addBar.appendChild(addBtn);
+
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='取消';
+    cancel.onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    const save = document.createElement('button'); save.className='btn primary'; save.textContent='保存';
+    save.onclick = async () => {
+      try {
+        const result = [];
+        for (const row of Array.from(list.children)) {
+          const typeSel = row.querySelector('select');
+          const input = row.querySelector('input');
+          const val = parseByType(typeSel.value, input.value || '');
+          result.push(val);
+        }
+        document.body.removeChild(overlay);
+        resolve(result);
+      } catch (e) {
+        await showAlert(e?.message || '参数格式错误，请检查');
+      }
+    };
+
+    const desc = document.createElement('div'); desc.className='modal-desc muted'; desc.textContent='提示：对象/数组请输入合法JSON；布尔值输入 true/false';
+    box.appendChild(title); box.appendChild(body); box.appendChild(help); box.appendChild(list); box.appendChild(addBar); box.appendChild(desc);
+    actions.appendChild(cancel); actions.appendChild(save);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
+async function main() {
+  // 左侧导航切换
+  const navItems = document.querySelectorAll('.nav-item');
+  const pages = {
+    plugins: document.getElementById('page-plugins'),
+    general: document.getElementById('page-general'),
+    automation: document.getElementById('page-automation'),
+    about: document.getElementById('page-about'),
+    npm: document.getElementById('page-npm')
+  };
+  navItems.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      navItems.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const page = btn.dataset.page;
+      for (const key of Object.keys(pages)) {
+        pages[key].hidden = key !== page;
+      }
+      if (page === 'npm') {
+        renderInstalled();
+      } else if (page === 'general') {
+        initGeneralSettings();
+      } else if (page === 'automation') {
+        initAutomationSettings();
+      } else if (page === 'about') {
+        initAboutPage();
+      }
+    });
+  });
+
+  // 渲染插件列表
+  const container = document.getElementById('plugins');
+  const list = await fetchPlugins();
+  container.innerHTML = '';
+  list.forEach((p) => container.appendChild(renderPlugin(p)));
+
+  // 自定义标题栏按钮
+  document.querySelectorAll('.win-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      const act = b.dataset.act;
+      window.settingsAPI?.windowControl(act);
+    });
+  });
+
+  // NPM 管理逻辑（仅展示已安装列表）
+  const installedEl = document.getElementById('npm-installed');
+  async function renderInstalled() {
+    installedEl.innerHTML = '加载已安装模块...';
+    const res = await window.settingsAPI?.npmListInstalled();
+    if (!res?.ok) {
+      installedEl.innerHTML = `<div class="panel">获取失败：${res?.error || '未知错误'}</div>`;
+      return;
+    }
+    const { packages } = res;
+    installedEl.innerHTML = '';
+    packages.forEach((pkg) => {
+      const div = document.createElement('div');
+      div.className = 'pkg';
+      div.innerHTML = `
+        <div class="pkg-header">
+          <div class="pkg-name"><i class="ri-box-3-line"></i> ${pkg.name}</div>
+          <div class="count">${pkg.versions.length} 个版本</div>
+        </div>
+        <div class="versions">${pkg.versions.map(v => `<span class="pill">v${v}</span>`).join(' ')}</div>
+      `;
+      installedEl.appendChild(div);
+    });
+  }
+  // 初次进入NPM页面时加载
+  const activeNav = document.querySelector('.nav-item.active');
+  if (activeNav?.dataset.page === 'npm') {
+    renderInstalled();
+  }
+
+  // 拖拽安装ZIP
+  const drop = document.getElementById('drop-install');
+  const modal = document.getElementById('install-modal');
+  const btnCancel = document.getElementById('install-cancel');
+  const btnConfirm = document.getElementById('install-confirm');
+  let pendingZipPath = null;
+  ['dragenter','dragover'].forEach(evt => drop.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(evt => drop.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover'); }));
+  drop.addEventListener('drop', (e) => {
+    const files = e.dataTransfer?.files || [];
+    const file = files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) { showAlert('请拖入ZIP插件安装包'); return; }
+    // 在Electron环境中file.path可用
+    pendingZipPath = file.path || null;
+    if (!pendingZipPath) { showAlert('无法获取文件路径，请在应用中拖拽'); return; }
+    modal.hidden = false;
+  });
+  btnCancel?.addEventListener('click', () => { pendingZipPath = null; modal.hidden = true; });
+  btnConfirm?.addEventListener('click', async () => {
+    if (!pendingZipPath) return;
+    btnConfirm.disabled = true; btnConfirm.innerHTML = '<i class="ri-loader-4-line"></i> 安装中...';
+    const res = await window.settingsAPI?.installPluginZip(pendingZipPath);
+    btnConfirm.disabled = false; btnConfirm.innerHTML = '<i class="ri-checkbox-circle-line"></i> 确认安装';
+    if (!res?.ok) {
+      showAlert(`安装失败：${res?.error || '未知错误'}\n如需手动导入Node模块，请将对应包拷贝至 src/npm_store/<name>/<version>/node_modules/<name>`);
+      return;
+    }
+    modal.hidden = true; pendingZipPath = null;
+    // 重新刷新插件列表
+    const container = document.getElementById('plugins');
+    const list = await fetchPlugins();
+    container.innerHTML = '';
+    list.forEach((p) => container.appendChild(renderPlugin(p)));
+  });
+}
+
+function initAboutPage() {
+  const vEl = document.getElementById('about-version');
+  const eEl = document.getElementById('about-electron');
+  // 优先通过主进程API获取版本信息；否则从UA解析Electron版本
+  (async () => {
+    try {
+      const info = await window.settingsAPI?.getAppInfo?.();
+      if (info?.appVersion) vEl.textContent = info.appVersion;
+      const ev = info?.electronVersion || (navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—');
+      eEl.textContent = ev;
+    } catch {
+      vEl.textContent = '—';
+      eEl.textContent = navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—';
+    }
+  })();
+}
+
+// 通用设置：启动页与名言、基础设置
+async function initGeneralSettings() {
+  // 子夹（子页面）导航切换
+  const subItems = document.querySelectorAll('.sub-item');
+  const subpages = {
+    splash: document.getElementById('general-splash'),
+    basic: document.getElementById('general-basic')
+  };
+  subItems.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      subItems.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const page = btn.dataset.sub;
+      for (const key of Object.keys(subpages)) {
+        subpages[key].hidden = key !== page;
+      }
+    });
+  });
+  // 默认显示“基础”子页
+  for (const key of Object.keys(subpages)) subpages[key].hidden = key !== 'basic';
+  subItems.forEach((b) => b.classList.toggle('active', b.dataset.sub === 'basic'));
+
+  const defaults = {
+    quoteSource: 'hitokoto',
+    quoteApiUrl: 'https://v1.hitokoto.cn/',
+    localQuotes: [],
+    splashEnabled: true,
+    splashQuoteEnabled: true,
+    autostartEnabled: false,
+    autostartHigh: false,
+    preciseTimeEnabled: false,
+    timeOffset: 0,
+    autoOffsetDaily: 0,
+    offsetBaseDate: new Date().toISOString().slice(0, 10),
+    semesterStart: new Date().toISOString().slice(0, 10)
+  };
+  await window.settingsAPI?.configEnsureDefaults('system', defaults);
+  const cfg = await window.settingsAPI?.configGetAll('system');
+
+  // 启动页与名言相关控件
+  const splashEnabled = document.getElementById('splash-enabled');
+  const splashQuoteEnabled = document.getElementById('splash-quote-enabled');
+  splashEnabled.checked = !!cfg.splashEnabled;
+  splashQuoteEnabled.checked = !!cfg.splashQuoteEnabled;
+  splashEnabled.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'splashEnabled', !!splashEnabled.checked);
+  });
+  splashQuoteEnabled.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'splashQuoteEnabled', !!splashQuoteEnabled.checked);
+  });
+
+  const radios = document.querySelectorAll('input[name="quoteSource"]');
+  const fieldApi = document.getElementById('field-api');
+  const fieldLocal = document.getElementById('field-local');
+  const apiUrl = document.getElementById('api-url');
+  const apiTest = document.getElementById('api-test');
+  const apiSample = document.getElementById('api-sample');
+  const openArrayEditor = document.getElementById('open-array-editor');
+
+  radios.forEach((r) => { r.checked = r.value === (cfg.quoteSource || 'hitokoto'); });
+  apiUrl.value = cfg.quoteApiUrl || 'https://v1.hitokoto.cn/';
+  const switchSource = (val) => { fieldApi.hidden = val !== 'hitokoto'; fieldLocal.hidden = val !== 'local'; };
+  switchSource(cfg.quoteSource || 'hitokoto');
+
+  radios.forEach((r) => {
+    r.addEventListener('change', async () => {
+      if (!r.checked) return;
+      await window.settingsAPI?.configSet('system', 'quoteSource', r.value);
+      switchSource(r.value);
+    });
+  });
+
+  apiUrl.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'quoteApiUrl', apiUrl.value.trim());
+  });
+
+  apiTest.addEventListener('click', async () => {
+    const url = apiUrl.value.trim() || 'https://v1.hitokoto.cn/';
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const txt = `「${data.hitokoto}」—— ${data.from || ''}`;
+      apiSample.textContent = txt;
+    } catch (e) {
+      apiSample.textContent = '获取失败，请检查API地址或网络。';
+    }
+  });
+
+  openArrayEditor.addEventListener('click', async () => {
+    const modal = document.getElementById('array-modal');
+    const listEl = document.getElementById('array-list');
+    const addBtn = document.getElementById('array-add');
+    const importInput = document.getElementById('array-import');
+    const saveBtn = document.getElementById('array-save');
+    const cancelBtn = document.getElementById('array-cancel');
+
+    const renderItems = (items) => {
+      listEl.innerHTML = '';
+      items.forEach((val, idx) => {
+        const row = document.createElement('div');
+        row.className = 'array-item';
+        // 文本列
+        const inputText = document.createElement('input');
+        inputText.type = 'text';
+        inputText.placeholder = '文本';
+        inputText.value = typeof val === 'string' ? val : (val?.text || '');
+        inputText.addEventListener('change', () => {
+          const current = items[idx];
+          items[idx] = typeof current === 'object' ? { ...current, text: inputText.value } : { text: inputText.value, from: '' };
+        });
+        // 来源列
+        const inputFrom = document.createElement('input');
+        inputFrom.type = 'text';
+        inputFrom.placeholder = '来源';
+        inputFrom.value = typeof val === 'object' ? (val?.from || '') : '';
+        inputFrom.addEventListener('change', () => {
+          const current = items[idx];
+          items[idx] = typeof current === 'object' ? { ...current, from: inputFrom.value } : { text: inputText.value, from: inputFrom.value };
+        });
+        const del = document.createElement('button');
+        del.innerHTML = '<i class="ri-delete-bin-line"></i> 删除';
+        del.addEventListener('click', () => { items.splice(idx, 1); renderItems(items); });
+        row.appendChild(inputText);
+        row.appendChild(inputFrom);
+        row.appendChild(del);
+        listEl.appendChild(row);
+      });
+    };
+
+    // 每次打开从配置读取最新值，避免保存后无效的问题
+    const latest = await window.settingsAPI?.configGet('system', 'localQuotes');
+    let items = Array.isArray(latest) ? [...latest] : [];
+    renderItems(items);
+
+    addBtn.onclick = () => { items.push({ text: '', from: '' }); renderItems(items); };
+    importInput.onchange = () => {
+      const file = importInput.files && importInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || '');
+        const lines = text.split(/\r?\n/).map((s) => s.trim()).filter((s) => s.length);
+        items = lines.map((line) => {
+          const parts = line.split(/[\|\t]/);
+          const t = (parts[0] || '').trim();
+          const f = (parts[1] || '').trim();
+          return { text: t, from: f };
+        });
+        renderItems(items);
+      };
+      reader.readAsText(file, 'utf-8');
+    };
+    saveBtn.onclick = async () => {
+      await window.settingsAPI?.configSet('system', 'localQuotes', items);
+      // 更新内存中的cfg以便再次打开时显示最新
+      cfg.localQuotes = items;
+      modal.hidden = true;
+    };
+    cancelBtn.onclick = () => { modal.hidden = true; };
+
+    modal.hidden = false;
+  });
+
+  // 基础设置：自启动、精确时间与偏移
+  const autostartEnabled = document.getElementById('autostart-enabled');
+  const autostartHigh = document.getElementById('autostart-high');
+  const preciseTime = document.getElementById('precise-time');
+  const semesterStart = document.getElementById('semester-start');
+  const timeOffset = document.getElementById('time-offset');
+  const autoOffsetDaily = document.getElementById('auto-offset-daily');
+
+  autostartEnabled.checked = !!cfg.autostartEnabled;
+  autostartHigh.checked = !!cfg.autostartHigh;
+  preciseTime.checked = !!cfg.preciseTimeEnabled;
+  semesterStart.value = String(cfg.semesterStart || cfg.offsetBaseDate || new Date().toISOString().slice(0, 10));
+  timeOffset.value = Number(cfg.timeOffset || 0);
+  autoOffsetDaily.value = Number(cfg.autoOffsetDaily || 0);
+
+  autostartEnabled.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'autostartEnabled', !!autostartEnabled.checked);
+    await window.settingsAPI?.setAutostart?.(!!autostartEnabled.checked, !!autostartHigh.checked);
+  });
+  autostartHigh.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'autostartHigh', !!autostartHigh.checked);
+    await window.settingsAPI?.setAutostart?.(!!autostartEnabled.checked, !!autostartHigh.checked);
+  });
+  preciseTime.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'preciseTimeEnabled', !!preciseTime.checked);
+  });
+  semesterStart.addEventListener('change', async () => {
+    const val = String(semesterStart.value || '').slice(0, 10);
+    await window.settingsAPI?.configSet('system', 'semesterStart', val);
+  });
+  timeOffset.addEventListener('change', async () => {
+    const val = Number(timeOffset.value || 0);
+    await window.settingsAPI?.configSet('system', 'timeOffset', val);
+  });
+  autoOffsetDaily.addEventListener('change', async () => {
+    const val = Number(autoOffsetDaily.value || 0);
+    await window.settingsAPI?.configSet('system', 'autoOffsetDaily', val);
+  });
+}
+
+// 自动执行：列表与编辑器
+async function initAutomationSettings() {
+  const listEl = document.getElementById('auto-list');
+  const editorEl = document.getElementById('auto-editor');
+  const addBtn = document.getElementById('auto-add');
+
+  const summarize = (item) => {
+    const triggers = (item.triggers || []).map((t) => t.type === 'time' ? `时间 ${t.at}` : (t.type === 'protocol' ? `协议 ${t.text}` : t.type)).join('，');
+    return triggers || '未设置触发条件';
+  };
+
+  const renderList = async (selectedId) => {
+    const items = await window.settingsAPI?.automationList?.() || [];
+    listEl.innerHTML = '';
+    items.forEach((it) => {
+      const row = document.createElement('div');
+      row.className = 'auto-item';
+      row.innerHTML = `
+        <div>
+          <div class="title">${it.name || '未命名自动化'}</div>
+          <div class="desc">${summarize(it)}</div>
+        </div>
+        <div class="actions">
+          <label class="switch toggle">
+            <input type="checkbox" ${it.enabled ? 'checked' : ''} />
+            <span class="slider"></span>
+          </label>
+          <button class="btn secondary del"><i class="ri-delete-bin-line"></i></button>
+        </div>
+      `;
+      const toggle = row.querySelector('input[type="checkbox"]');
+      toggle.addEventListener('click', async (e) => {
+        await window.settingsAPI?.automationToggle?.(it.id, !!e.target.checked);
+      });
+      const delBtn = row.querySelector('.del');
+      delBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const ok = await showConfirm('确定删除该自动化吗？');
+        if (ok) {
+          await window.settingsAPI?.automationRemove?.(it.id);
+          renderList();
+          editorEl.innerHTML = '从左侧选择任务或新建';
+          editorEl.className = 'auto-editor muted';
+        }
+      });
+      row.addEventListener('click', () => renderEditor(it.id));
+      listEl.appendChild(row);
+    });
+    if (selectedId) {
+      const idx = items.findIndex((x) => x.id === selectedId);
+      if (idx >= 0) renderEditor(selectedId);
+    }
+  };
+
+  const renderEditor = async (id) => {
+    const it = await window.settingsAPI?.automationGet?.(id);
+    if (!it) { editorEl.textContent = '未找到该自动化'; editorEl.className = 'auto-editor muted'; return; }
+    editorEl.className = 'auto-editor';
+    editorEl.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'auto-editor-header';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text'; nameInput.value = it.name || '';
+    nameInput.placeholder = '自动化名称';
+    const saveBtn = document.createElement('button'); saveBtn.className = 'btn primary'; saveBtn.innerHTML = '<i class="ri-save-3-line"></i> 保存';
+    header.appendChild(nameInput);
+    header.appendChild(saveBtn);
+    editorEl.appendChild(header);
+
+    // 触发条件
+    const secTrig = document.createElement('div'); secTrig.className = 'section';
+    secTrig.innerHTML = '<div class="section-title"><i class="ri-timer-line"></i> 触发条件</div>';
+    const trigList = document.createElement('div');
+    const addTime = document.createElement('button'); addTime.className = 'btn secondary'; addTime.innerHTML = '<i class="ri-time-line"></i> 添加时间触发';
+    const addProtocol = document.createElement('button'); addProtocol.className = 'btn secondary'; addProtocol.innerHTML = '<i class="ri-link-m"></i> 添加协议触发';
+    const updateTrigList = () => {
+      trigList.innerHTML = '';
+      (it.triggers || []).forEach((t, idx) => {
+        const row = document.createElement('div'); row.className = 'action-row';
+        const typeSel = document.createElement('select');
+        [['time','时间'],['protocol','协议']].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
+        typeSel.value = t.type || 'time';
+        const input = document.createElement('input'); input.type = 'text'; input.placeholder = t.type === 'protocol' ? '条件文本' : 'HH:MM'; input.value = t.type === 'protocol' ? (t.text || '') : (t.at || '');
+        const del = document.createElement('button'); del.className = 'btn secondary'; del.innerHTML = '<i class="ri-delete-bin-line"></i>';
+        typeSel.addEventListener('change', () => {
+          t.type = typeSel.value;
+          input.placeholder = t.type === 'protocol' ? '条件文本' : 'HH:MM';
+          input.value = '';
+        });
+        input.addEventListener('change', () => {
+          if (t.type === 'protocol') t.text = input.value; else t.at = input.value;
+        });
+        del.addEventListener('click', () => { it.triggers.splice(idx,1); updateTrigList(); });
+        row.appendChild(typeSel); row.appendChild(input); row.appendChild(del);
+        trigList.appendChild(row);
+      });
+    };
+    addTime.addEventListener('click', () => { it.triggers = it.triggers || []; it.triggers.push({ type: 'time', at: '08:00' }); updateTrigList(); });
+    addProtocol.addEventListener('click', () => { it.triggers = it.triggers || []; it.triggers.push({ type: 'protocol', text: '' }); updateTrigList(); });
+    const trigActions = document.createElement('div'); trigActions.className = 'inline'; trigActions.appendChild(addTime); trigActions.appendChild(addProtocol);
+    secTrig.appendChild(trigActions);
+    secTrig.appendChild(trigList);
+    // 初始渲染已有触发器
+    updateTrigList();
+    editorEl.appendChild(secTrig);
+
+    // 执行条件
+    const secCond = document.createElement('div'); secCond.className = 'section';
+    secCond.innerHTML = '<div class="section-title"><i class="ri-equalizer-line"></i> 执行条件</div>';
+    const topModeSel = document.createElement('select'); ['且（AND）','或（OR）'].forEach((l, i) => { const o=document.createElement('option'); o.value = i===0?'and':'or'; o.textContent=l; topModeSel.appendChild(o); });
+    topModeSel.value = it.conditions?.mode === 'or' ? 'or' : 'and';
+    topModeSel.addEventListener('change', () => { it.conditions = it.conditions || { mode: 'and', groups: [] }; it.conditions.mode = topModeSel.value; });
+    secCond.appendChild(topModeSel);
+    const groupsWrap = document.createElement('div');
+    const addGroupBtn = document.createElement('button'); addGroupBtn.className = 'btn secondary'; addGroupBtn.innerHTML = '<i class="ri-add-line"></i> 添加条件组';
+    const renderGroups = () => {
+      groupsWrap.innerHTML = '';
+      const groups = it.conditions?.groups || [];
+      groups.forEach((g, gi) => {
+        const box = document.createElement('div'); box.className = 'group';
+        const header = document.createElement('div'); header.className = 'group-header';
+        const modeSel = document.createElement('select'); ['且（AND）','或（OR）'].forEach((l, i) => { const o=document.createElement('option'); o.value=i===0?'and':'or'; o.textContent=l; modeSel.appendChild(o); });
+        modeSel.value = g.mode === 'or' ? 'or' : 'and';
+        const addCondBtn = document.createElement('button'); addCondBtn.className='btn secondary'; addCondBtn.innerHTML = '<i class="ri-add-line"></i> 添加条件';
+        const delGroupBtn = document.createElement('button'); delGroupBtn.className='btn secondary'; delGroupBtn.innerHTML = '<i class="ri-delete-bin-line"></i>';
+        header.appendChild(modeSel); header.appendChild(addCondBtn); header.appendChild(delGroupBtn);
+        box.appendChild(header);
+        const condList = document.createElement('div');
+        const renderConds = () => {
+          condList.innerHTML = '';
+          (g.items || []).forEach((c, ci) => {
+            const row = document.createElement('div'); row.className = 'cond-row';
+            const typeSel = document.createElement('select');
+            [
+              ['timeEquals','当前时间为（HH:MM）'],
+              ['weekdayIn','今天是星期（1-7）'],
+              ['monthIn','今天是几月（1-12）'],
+              ['dayIn','今天是几号（1-31）'],
+              ['biweek','单双周（需设置学期开始日期）'],
+              // ['selectedWindowName','当前选中窗口名称包含'],
+              // ['selectedProcess','当前选中窗口进程为']
+            ].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
+            typeSel.value = c.type || 'timeEquals';
+            const valInput = document.createElement('input'); valInput.type = 'text'; valInput.placeholder = '值（逗号分隔或单值）';
+            if (Array.isArray(c.value)) valInput.value = c.value.join(','); else valInput.value = c.value || '';
+            const negate = document.createElement('label'); negate.className='negate'; negate.innerHTML = '<input type="checkbox" /> 反条件';
+            negate.querySelector('input').checked = !!c.negate;
+            const delBtn = document.createElement('span'); delBtn.className='del'; delBtn.innerHTML = '<i class="ri-delete-bin-line"></i>';
+            typeSel.addEventListener('change', () => { c.type = typeSel.value; });
+            valInput.addEventListener('change', () => {
+              if (c.type.endsWith('In')) c.value = valInput.value.split(',').map(s => parseInt(s,10)).filter(n => !isNaN(n));
+              else c.value = valInput.value.trim();
+            });
+            negate.querySelector('input').addEventListener('change', (e) => { c.negate = !!e.target.checked; });
+            delBtn.addEventListener('click', () => { g.items.splice(ci,1); renderConds(); });
+            row.appendChild(typeSel); row.appendChild(valInput); row.appendChild(negate); row.appendChild(delBtn);
+            condList.appendChild(row);
+          });
+        };
+        addCondBtn.addEventListener('click', () => { g.items = g.items || []; g.items.push({ type: 'timeEquals', value: '08:00', negate: false }); renderConds(); });
+        delGroupBtn.addEventListener('click', () => { (it.conditions.groups || []).splice(gi,1); renderGroups(); });
+        modeSel.addEventListener('change', () => { g.mode = modeSel.value; });
+        renderConds();
+        box.appendChild(condList);
+        groupsWrap.appendChild(box);
+      });
+    };
+    addGroupBtn.addEventListener('click', () => { it.conditions = it.conditions || { mode:'and', groups:[] }; it.conditions.groups.push({ mode:'and', items: [] }); renderGroups(); });
+    secCond.appendChild(addGroupBtn);
+    secCond.appendChild(groupsWrap);
+    // 初始渲染已有条件组
+    renderGroups();
+    editorEl.appendChild(secCond);
+
+    // 执行动作
+    const secAct = document.createElement('div'); secAct.className = 'section';
+    secAct.innerHTML = '<div class="section-title"><i class="ri-flashlight-line"></i> 执行动作</div>';
+    const actList = document.createElement('div');
+    const addActBtn = document.createElement('button'); addActBtn.className='btn secondary'; addActBtn.innerHTML = '<i class="ri-add-line"></i> 添加动作';
+    const renderActs = () => {
+      actList.innerHTML = '';
+      (it.actions || []).forEach((a, ai) => {
+        const row = document.createElement('div'); row.className='action-row';
+        const typeSel = document.createElement('select');
+        [
+          ['pluginEvent','插件功能'],
+          ['power','电源功能'],
+          ['openApp','打开应用程序'],
+          ['cmd','执行CMD命令']
+        ].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
+        typeSel.value = a.type || 'pluginEvent';
+        const cfg = document.createElement('div');
+        const delBtn = document.createElement('button'); delBtn.className='btn secondary'; delBtn.innerHTML = '<i class="ri-delete-bin-line"></i>';
+
+        const renderCfg = async () => {
+          cfg.innerHTML = '';
+          if (typeSel.value === 'pluginEvent') {
+            const plugSel = document.createElement('select');
+            const plugins = await window.settingsAPI?.getPlugins?.() || [];
+            plugins.forEach(p => { const o=document.createElement('option'); o.value=p.name; o.textContent=p.name; plugSel.appendChild(o); });
+            plugSel.value = a.pluginId || plugins[0]?.name || '';
+            const evSel = document.createElement('select');
+            const evs = (await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value)) || [];
+            evs.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=e.title || e.name; evSel.appendChild(o); });
+            evSel.value = a.event || evs[0]?.name || '';
+            const editParams = document.createElement('button'); editParams.className='btn secondary'; editParams.innerHTML = '<i class="ri-edit-2-line"></i> 编辑参数数组';
+            const paramsPreview = document.createElement('div'); paramsPreview.className='muted'; paramsPreview.textContent = `参数项数：${Array.isArray(a.params)? a.params.length : 0}`;
+            plugSel.addEventListener('change', async () => {
+              a.pluginId = plugSel.value; const evs2 = (await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value)) || []; evSel.innerHTML = ''; evs2.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=e.title || e.name; evSel.appendChild(o); }); a.event = evSel.value = evs2[0]?.name || '';
+            });
+            evSel.addEventListener('change', () => { a.event = evSel.value; });
+            editParams.onclick = async () => { const res = await showParamsEditor(Array.isArray(a.params)? a.params : []); if (Array.isArray(res)) { a.params = res; paramsPreview.textContent = `参数项数：${res.length}`; } };
+            cfg.appendChild(plugSel); cfg.appendChild(evSel); cfg.appendChild(editParams); cfg.appendChild(paramsPreview);
+          } else if (typeSel.value === 'power') {
+            const opSel = document.createElement('select'); [['shutdown','关机'],['restart','重启'],['logoff','注销']].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; opSel.appendChild(o); }); opSel.value = a.op || 'shutdown'; opSel.addEventListener('change', () => { a.op = opSel.value; }); cfg.appendChild(opSel);
+          } else if (typeSel.value === 'openApp') {
+            const p = document.createElement('input'); p.type='text'; p.placeholder='可执行文件路径'; p.value=a.path||''; p.addEventListener('change', () => { a.path = p.value; }); cfg.appendChild(p);
+          } else if (typeSel.value === 'cmd') {
+            const c = document.createElement('input'); c.type='text'; c.placeholder='命令行（将在Shell中执行）'; c.value=a.command||''; c.addEventListener('change', () => { a.command = c.value; }); cfg.appendChild(c);
+          }
+        };
+        typeSel.addEventListener('change', () => { a.type = typeSel.value; renderCfg(); });
+        delBtn.addEventListener('click', () => { it.actions.splice(ai,1); renderActs(); });
+        row.appendChild(typeSel); row.appendChild(cfg); row.appendChild(delBtn);
+        actList.appendChild(row);
+        renderCfg();
+      });
+    };
+    addActBtn.addEventListener('click', () => { it.actions = it.actions || []; it.actions.push({ type:'pluginEvent', pluginId:'', event:'', params:[] }); renderActs(); });
+    secAct.appendChild(addActBtn);
+    secAct.appendChild(actList);
+    // 初始渲染已有动作
+    renderActs();
+    editorEl.appendChild(secAct);
+
+    // 执行前确认
+    const secConf = document.createElement('div'); secConf.className='section';
+    secConf.innerHTML = '<div class="section-title"><i class="ri-shield-check-line"></i> 执行前确认</div>';
+    const confirmRow = document.createElement('div'); confirmRow.className='inline';
+    const confirmEnabled = document.createElement('label'); confirmEnabled.className='switch'; confirmEnabled.innerHTML = `<input type="checkbox" ${it.confirm?.enabled!==false?'checked':''}/><span class="slider"></span>`;
+    const timeoutInput = document.createElement('input'); timeoutInput.type='number'; timeoutInput.step='1'; timeoutInput.value = parseInt(it.confirm?.timeout || 60,10);
+    const timeoutLabel = document.createElement('label'); timeoutLabel.textContent = '确认超时时间（秒）'; timeoutLabel.style.color = 'var(--muted)';
+    confirmRow.appendChild(confirmEnabled); confirmRow.appendChild(timeoutLabel); confirmRow.appendChild(timeoutInput);
+    secConf.appendChild(confirmRow);
+    editorEl.appendChild(secConf);
+
+    // 保存
+    saveBtn.addEventListener('click', async () => {
+      const patched = {
+        name: nameInput.value || it.name,
+        triggers: it.triggers || [],
+        conditions: it.conditions || { mode:'and', groups:[] },
+        actions: it.actions || [],
+        confirm: { enabled: confirmEnabled.querySelector('input').checked, timeout: parseInt(timeoutInput.value||60,10) }
+      };
+      const res = await window.settingsAPI?.automationUpdate?.(it.id, patched);
+      if (!res?.ok) { showAlert('保存失败'); return; }
+      await renderList(it.id);
+    });
+  };
+
+  // 防止重复绑定导致一次点击创建多条任务
+  if (!addBtn.dataset.bound) {
+    addBtn.dataset.bound = '1';
+    addBtn.addEventListener('click', async () => {
+      try {
+        addBtn.disabled = true;
+        const created = await window.settingsAPI?.automationCreate?.({ name: '新建自动化' });
+        if (created?.id) { await renderList(created.id); }
+      } finally {
+        addBtn.disabled = false;
+      }
+    });
+  }
+
+  await renderList();
+}
+
+main();

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>插件设置</title>
+  <link rel="stylesheet" href="./settings.css" />
+  <link rel="stylesheet" href="./remixicon-local.css" />
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">
+        <img src="../../icon.ico" alt="Logo" />
+        <span>LessonPlugin</span>
+      </div>
+      <nav>
+        <button class="nav-item active" data-page="plugins"><i class="ri-puzzle-line"></i> 插件管理</button>
+        <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
+        <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
+        <button class="nav-item" data-page="npm"><i class="ri-box-3-line"></i> 依赖管理</button>
+        <button class="nav-item" data-page="about"><i class="ri-information-line"></i> 关于软件</button>
+      </nav>
+    </aside>
+    <div class="main-col">
+      <div class="titlebar">
+        <div class="drag"></div>
+        <div class="window-actions">
+          <button class="win-btn" data-act="minimize" title="最小化"><i style="font-size: 18px;"
+              class="ri-subtract-line"></i></button>
+          <button class="win-btn" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+          <button class="win-btn close" data-act="close" title="关闭"><i style="font-size: 18px;"
+              class="ri-close-line"></i></button>
+        </div>
+      </div>
+      <main id="content">
+        <section id="page-plugins">
+          <header>
+            <h1>插件管理</h1>
+            <p>对已安装的插件进行管理或配置</p>
+          </header>
+          <div id="drop-install" class="drop-install">
+            <i class="ri-folder-zip-line"></i>
+            拖入插件ZIP安装包以开始安装
+          </div>
+          <div id="plugins" class="plugins"></div>
+        </section>
+        <section id="page-general" hidden>
+          <header>
+            <h1>通用设置</h1>
+            <p>应用基础设置、启动页与名言配置</p>
+          </header>
+          <!-- 子夹（子页面）导航 -->
+          <div class="subnav">
+            <button class="sub-item active" data-sub="basic"><i class="ri-settings-2-line"></i> 基本设置</button>
+            <button class="sub-item" data-sub="splash"><i class="ri-window-line"></i> 启动页面</button>
+          </div>
+
+          <!-- 启动页与名言设置（合并） -->
+          <div id="general-splash" class="panel" hidden>
+            <div class="form">
+              <!-- 启动页开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-window-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">启用启动页</div>
+                  <div class="setting-desc">开启后应用启动时显示加载页面。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="splash-enabled" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 显示名言开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-quill-pen-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">显示名言</div>
+                  <div class="setting-desc">关闭后不显示名言，启动页高度减小。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="splash-quote-enabled" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 名言来源选择（按钮组样式） -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-chat-quote-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">名言来源</div>
+                  <div class="setting-desc">可从 API 获取或使用本地列表。</div>
+                  <div class="options" role="group" aria-label="名言来源">
+                    <input type="radio" id="quote-hitokoto" name="quoteSource" value="hitokoto" />
+                    <label for="quote-hitokoto"><i class="ri-link-m"></i> 一言 API</label>
+                    <input type="radio" id="quote-local" name="quoteSource" value="local" />
+                    <label for="quote-local"><i class="ri-file-text-line"></i> 本地列表</label>
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+
+              <!-- API 设置 -->
+              <div class="setting-item" id="field-api">
+                <div class="setting-icon"><i class="ri-link-m"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">API 地址</div>
+                  <div class="setting-desc">默认 https://v1.hitokoto.cn/</div>
+                  <div class="inline">
+                    <input id="api-url" type="text" placeholder="https://v1.hitokoto.cn/" />
+                    <button id="api-test" class="btn primary"><i class="ri-refresh-line"></i> 测试获取</button>
+                  </div>
+                  <div id="api-sample" class="muted"></div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+
+              <!-- 本地列表编辑 -->
+              <div class="setting-item" id="field-local">
+                <div class="setting-icon"><i class="ri-file-text-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">本地名言列表</div>
+                  <div class="setting-desc">以“文本 | 来源”两列编辑，支持从TXT导入。</div>
+                  <button id="open-array-editor" class="btn secondary"><i class="ri-edit-2-line"></i> 编辑列表</button>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 基础设置子页 -->
+          <div id="general-basic" class="panel">
+            <div class="form">
+              <!-- 自启动开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-play-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">开机自启动</div>
+                  <div class="setting-desc">系统登录后自动启动应用。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="autostart-enabled" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 高优先级自启动 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-rocket-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">高优先级自启动</div>
+                  <div class="setting-desc">以隐藏模式启动并提高启动优先级。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="autostart-high" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 精确时间开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-time-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">使用精确时间</div>
+                  <div class="setting-desc">为插件提供精确当前时间接口（可设置偏移）。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="precise-time" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 学期开始日期（用于单双周判断与偏移基准） -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-calendar-event-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">学期开始日期</div>
+                  <div class="setting-desc">用于单双周判断与时间偏移基准。</div>
+                  <div class="inline">
+                    <input id="semester-start" type="date" />
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+
+              <!-- 时间偏移值（秒） -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-slideshow-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">时间偏移值</div>
+                  <div class="setting-desc">对当前时间进行加减（单位：秒，负数为减）。</div>
+                  <div class="inline">
+                    <input id="time-offset" type="number" step="1" />
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+
+              <!-- 自动时间偏移（每天叠加秒数） -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-calendar-2-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">自动时间偏移</div>
+                  <div class="setting-desc">每天自动叠加该偏移值（单位：秒，负数为减）。</div>
+                  <div class="inline">
+                    <input id="auto-offset-daily" type="number" step="1" />
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 本地列表编辑器模态框 -->
+          <div id="array-modal" class="modal" hidden>
+            <div class="modal-backdrop"></div>
+            <div class="modal-dialog">
+              <div class="modal-title"><i class="ri-table-2"></i> 编辑名言列表（文本 + 来源）</div>
+              <div class="modal-body">
+                <div id="array-list" class="array-list"></div>
+                <div class="array-actions">
+                  <button id="array-add" class="btn secondary"><i class="ri-add-line"></i> 添加一条</button>
+                  <label class="btn secondary">
+                    <i class="ri-file-text-line"></i> 从TXT导入（每行：文本|来源）
+                    <input id="array-import" type="file" accept=".txt" hidden />
+                  </label>
+                </div>
+              </div>
+              <div class="modal-actions">
+                <button id="array-cancel" class="btn secondary">取消</button>
+                <button id="array-save" class="btn primary">保存</button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- 自动执行页面 -->
+        <section id="page-automation" hidden>
+          <header>
+            <h1>自动执行</h1>
+            <p>根据触发与条件自动执行任务</p>
+          </header>
+          <div class="panel automation">
+            <div class="auto-left">
+              <div class="auto-topbar">
+                <button id="auto-add" class="btn primary"><i class="ri-add-line"></i> 新建任务</button>
+              </div>
+              <div id="auto-list" class="auto-list"></div>
+            </div>
+            <div class="auto-right">
+              <div id="auto-editor" class="auto-editor muted">从左侧选择任务或新建</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 关于页面 -->
+        <section id="page-about" hidden>
+          <header>
+            <h1>关于</h1>
+            <p>LessonPlugin — 插件化大屏课堂辅助工具</p>
+          </header>
+          <div class="panel">
+            <div class="about">
+              <div><i class="ri-information-line"></i> 版本：<span id="about-version">—</span></div>
+              <div><i class="ri-computer-line"></i> Electron 版本：<span id="about-electron">—</span></div>
+              <div><i class="ri-git-repository-line"></i> 仓库：本地开发环境</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="contributors">
+              <div class="section-title"><i class="ri-team-line"></i> 贡献者</div>
+              <ul class="contributors-list">
+                <li><span class="name">PYLXU</span> — 主程序开发</li>
+                <li><span class="name">风吟残歌</span> — 主程序开发</li>
+                <li><span class="name">小震</span> — LOGO设计</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+        </section>
+        <section id="page-npm" hidden>
+          <header>
+            <h1>依赖管理</h1>
+            <p>仅展示已安装的Node模块及其版本（安装随插件进行）</p>
+          </header>
+          <div class="panel">
+            <div id="npm-installed" class="npm-installed"></div>
+          </div>
+        </section>
+        <!-- 安装确认模态框 -->
+        <div id="install-modal" class="modal" hidden>
+          <div class="modal-backdrop"></div>
+          <div class="modal-dialog">
+            <div class="modal-title"><i class="ri-shield-keyhole-line"></i> 安装安全提示</div>
+            <div class="modal-body">
+              <p>您正在安装第三方插件。插件可运行代码并访问应用接口，请只安装可信来源。</p>
+              <p>若插件声明需要的 Node 模块未在本地存储，系统将尝试连接镜像站下载。无法连接时将提示无法安装，并提供手动导入指引。</p>
+            </div>
+            <div class="modal-actions">
+              <button id="install-cancel" class="btn secondary"><i class="ri-close-line"></i> 取消</button>
+              <button id="install-confirm" class="btn primary"><i class="ri-checkbox-circle-line"></i> 确认安装</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="./settings.js"></script>
+</body>
+
+</html>

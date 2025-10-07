@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Example Plugin</title>
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../renderer/titlebar.css" />
+    <style>
+      :root { --bg:#071a12; --fg:#d7f3e5; --muted:#9bd6b8; --panel:rgba(255,255,255,0.06); --accent:#22c55e; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Microsoft YaHei", sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+      .wrap { padding: 20px; }
+      h1 { margin: 0 0 8px 0; color: var(--accent); }
+      p { color: var(--muted); }
+      .box { margin-top: 16px; padding: 12px; border-radius: 8px; background: var(--panel); }
+      /* 标题栏样式已统一由 ../../renderer/titlebar.css 提供 */
+    </style>
+  </head>
+  <body>
+    <div class="titlebar">
+      <div class="drag">示例插件</div>
+      <div class="window-actions">
+        <button class="win-btn" data-act="minimize" title="最小化"><i class="ri-subtract-line"></i></button>
+        <button class="win-btn" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+        <button class="win-btn close" data-act="close" title="关闭"><i class="ri-close-line"></i></button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>示例插件窗口</h1>
+      <p>这是一个演示插件，展示独立窗口能力与接口设计。</p>
+      <div class="box">
+        <strong>功能建议：</strong>
+        <ul>
+          <li>显示课堂计时或提醒</li>
+          <li>展示课件或互动题目</li>
+          <li>与主进程通信获取数据</li>
+        </ul>
+      </div>
+      <div class="box">
+        <button id="btn-register" class="action"><i class="ri-plug-line"></i> 注册功能</button>
+        <button id="btn-emit" class="action"><i class="ri-notification-line"></i> 发送事件 ExamplePlugin:helloEvent</button>
+        <button id="btn-call" class="action"><i class="ri-exchange-line"></i> 调用 UtilPlugin.getTime</button>
+      </div>
+      <div class="box" id="log"></div>
+    </div>
+    <script>
+      const log = (msg) => { const el = document.getElementById('log'); const p = document.createElement('div'); p.textContent = msg; el.appendChild(p); };
+      document.querySelectorAll('.win-btn').forEach((b) => {
+        b.addEventListener('click', () => {
+          const act = b.dataset.act;
+          window.pluginAPI?.windowControl(act);
+        });
+      });
+
+      // 当被其他插件调用时执行
+      window.pluginAPI?.onInvoke(async (fn, args) => {
+        if (fn === 'hello') {
+          return `Hello ${args?.[0] || ''}!`;
+        }
+        throw new Error('未知函数: ' + fn);
+      });
+      window.pluginAPI?.onEvent((name, payload) => { log(`[事件] ${name}: ${JSON.stringify(payload)}`); });
+
+      document.getElementById('btn-register').addEventListener('click', () => {
+        window.pluginAPI?.register('ExamplePlugin', ['hello']);
+        log('已注册函数: hello');
+      });
+      document.getElementById('btn-emit').addEventListener('click', async () => {
+        const res = await window.pluginAPI?.emit('ExamplePlugin:helloEvent', { msg: 'Hello from ExamplePlugin' });
+        log('事件发送完成: ' + JSON.stringify(res));
+      });
+      document.getElementById('btn-call').addEventListener('click', async () => {
+        const res = await window.pluginAPI?.call('UtilPlugin', 'getTime', []);
+        log('调用 UtilPlugin.getTime: ' + JSON.stringify(res));
+      });
+    </script>
+  </body>
+  </html>

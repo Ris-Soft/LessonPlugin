@@ -1,0 +1,17 @@
+/* 统一插件窗口标题栏样式 */
+.titlebar {
+  position: sticky;
+  top: 0;
+  height: 34px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  z-index: 5;
+}
+.titlebar .drag { -webkit-app-region: drag; height: auto; }
+.window-actions { display: flex; gap: 0; height: 100%; }
+.win-btn { -webkit-app-region: no-drag; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: #d7f3e5; border: none; border-radius: 0; width: 38px; height: 100%; cursor: pointer; }
+.win-btn:hover, .win-btn:active { background: rgba(34, 197, 94, 0.18); }

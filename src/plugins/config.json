@@ -1,0 +1,6 @@
+{
+  "enabled": {
+    "ExamplePlugin": true,
+    "UtilPlugin": true
+  }
+}

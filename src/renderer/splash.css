@@ -1,0 +1,89 @@
+:root {
+  --bg: #071a12; /* 深色偏绿背景 */
+  --fg: #d7f3e5; /* 微绿的前景色 */
+  --muted: #9bd6b8; /* 次级文字颜色 */
+  --accent: #22c55e; /* 绿色强调 */
+}
+html, body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Microsoft YaHei", sans-serif;
+  background: radial-gradient(900px 520px at 50% -200px, #0b2a1d, var(--bg));
+  color: var(--fg);
+  overflow: hidden; /* 隐藏滚动条，避免出现滚动 */
+}
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  /* padding: 16px 16px 24px; */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.quote {
+  text-align: center;
+  font-size: 26px;
+  line-height: 1.9;
+  margin: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+h1 {
+  margin: 0 0 6px 0;
+  letter-spacing: 1px;
+  font-size: 24px;
+}
+h1 {
+  margin: 0 0 8px 0;
+  letter-spacing: 1px;
+}
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+.bottom {
+  margin-top: auto;
+  margin-bottom: 0; /* 取消与底部的外边距，使其贴底 */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  border-radius: 0; /* 取消圆角 */
+  padding: 10px 12px;
+}
+.status-wrap { display: inline-flex; align-items: center; gap: 8px; }
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 16px; /* 加载状态文字大小 */
+}
+.status .stage { color: var(--accent); font-weight: 600; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand img { width: 72px; height: 72px; }
+/* 按钮样式 */
+.btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+.btn.primary { background: #15803d; color: #fff; }
+.btn.secondary { background: #14532d; color: #fff; }
+/* 图标按钮（仅显示最小化图标） */
+.btn.icon-only { padding: 6px; border-radius: 999px; }
+.btn.icon-only i { font-size: 16px; }
+/* 顶部右侧关闭按钮 */
+.close-btn { position: absolute; top: 10px; right: 10px; }

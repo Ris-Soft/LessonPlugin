@@ -1,0 +1,29 @@
+{
+  "name": "lessonplugin",
+  "version": "1.0.0",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "node scripts/dev-server.js",
+    "build": "electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "基于Electron的以JavaScript为核心的插件化大屏课堂辅助工具",
+  "build": {
+    "asar": false,
+    "appId": "com.lesson.plugin",
+    "productName": "LessonPlugin",
+    "win": {
+      "icon": "icon.ico"
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.2.1",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0"
+  }
+}

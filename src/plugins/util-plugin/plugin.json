@@ -1,0 +1,8 @@
+{
+  "name": "UtilPlugin",
+  "icon": "ri-tools-line",
+  "description": "提供时间查询与事件演示",
+  "actions": [
+    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口" }
+  ]
+}
