@@ -6,11 +6,14 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   openPluginWindow: (name) => ipcRenderer.invoke('plugin:openWindow', name),
   installNpm: (name) => ipcRenderer.invoke('plugin:install', name),
   installPluginZip: (zipPath) => ipcRenderer.invoke('plugin:installZip', zipPath),
+  installPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:installZipData', fileName, data),
   windowControl: (action) => ipcRenderer.invoke('window:control', action),
   npmGetVersions: (name) => ipcRenderer.invoke('npm:versions', name),
   npmDownload: (name, version) => ipcRenderer.invoke('npm:download', name, version),
   npmSwitch: (pluginName, name, version) => ipcRenderer.invoke('npm:switch', pluginName, name, version)
   ,npmListInstalled: () => ipcRenderer.invoke('npm:installed'),
+  // 档案管理：列定义
+  profilesGetColumnDefs: () => ipcRenderer.invoke('profiles:columnDefs'),
   // 统一配置存储 API
   configGetAll: (scope) => ipcRenderer.invoke('config:getAll', scope),
   configGet: (scope, key) => ipcRenderer.invoke('config:get', scope, key),

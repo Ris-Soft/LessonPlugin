@@ -522,8 +522,8 @@ select,
 
 select:focus {
   outline: none;
-  border-color: rgba(34, 197, 94, 0.45);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 select option {
@@ -978,6 +978,20 @@ label {
   border-radius: 999px;
   padding: 4px 8px;
   font-size: 12px;
+  margin-top: 5px;
+}
+
+/* 版本徽标：更紧凑并与标题对齐 */
+.pill.small {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.card-title .plugin-version {
+  margin-left: 0px;
+  vertical-align: middle;
+  opacity: 0.85;
+  font-size: 8px;
 }
 
 .version-item {
@@ -1030,9 +1044,12 @@ label {
   align-items: center;
   gap: 8px;
 }
-.cond-row select, .cond-row input {
+
+.cond-row select,
+.cond-row input {
   height: 28px;
 }
+
 .cond-status {
   width: 10px;
   height: 10px;
@@ -1040,5 +1057,74 @@ label {
   background: var(--muted);
   display: inline-block;
 }
-.cond-status.ok { background: #22c55e; }
-.cond-status.fail { background: #ef4444; }
+
+.cond-status.ok {
+  background: #22c55e;
+}
+
+.cond-status.fail {
+  background: #ef4444;
+}
+
+/* 档案管理样式 */
+.profiles-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.profiles-import { margin: 8px 0; }
+.profiles-import textarea { width: 100%; min-height: 120px; resize: vertical; }
+.profiles-import .import-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.profiles-filters { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+.profiles-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+.profiles-table { width: max-content; min-width: 720px; border-collapse: collapse; }
+.profiles-table th, .profiles-table td { border-bottom: 1px solid #eee; padding: 8px; border-left: none; border-right: none; }
+.profiles-table thead th { text-align: left; color: #555; font-weight: 600; }
+.profiles-table .col-required { width: 64px; text-align: center; }
+.profiles-table .col-gender { width: 120px; }
+.profiles-table .col-index { width: 64px; text-align: right; color: #666; }
+.profiles-table .col-actions { width: 100px; }
+.profiles-table .col-name { min-width: 180px; }
+.profiles-table input[type="text"] { width: 160px; max-width: 220px; }
+.profiles-table select { width: 120px; }
+.profiles-table .col-actions .btn { min-width: 72px; }
+
+/* 固定/置顶列：序号固定左侧，操作固定右侧 */
+.profiles-table th.col-index, .profiles-table td.col-index { position: sticky; left: 0; background: var(--panel); z-index: 2; }
+.profiles-table th.col-actions, .profiles-table td.col-actions { position: sticky; right: 0; background: var(--panel); z-index: 2; }
+/* 取消纵向分割线效果 */
+.profiles-table th.col-index { box-shadow: none; }
+.profiles-table th.col-actions { box-shadow: none; }
+
+/* 自定义横向滚动条样式，仅作用于表格容器 */
+.profiles-table-wrap::-webkit-scrollbar { height: 10px; }
+.profiles-table-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 6px; }
+.profiles-table-wrap::-webkit-scrollbar-thumb { background: rgba(34,197,94,0.35); border-radius: 6px; }
+.profiles-table-wrap::-webkit-scrollbar-thumb:hover { background: rgba(34,197,94,0.5); }
+
+/* 限制档案管理页整体不出现页面级横向滚动，仅表格容器滚动 */
+#page-profiles .panel { overflow: hidden; }
+
+/* 框选焦点统一（移除黄色/高亮边框），并与通用输入样式保持一致 */
+#page-profiles input:focus,
+#page-profiles select:focus,
+#page-profiles textarea:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--border);
+}
+
+#page-profiles input[type="text"],
+#page-profiles select,
+#page-profiles textarea {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  padding: 6px 8px;
+}
+
+/* 全局移除输入框选中后的黄色边框（不影响键盘 focus-visible 样式） */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--border);
+}

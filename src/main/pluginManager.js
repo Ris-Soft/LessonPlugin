@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const extract = require('extract-zip');
 const { v4: uuidv4 } = require('uuid');
 
 let manifestPath = '';
@@ -50,6 +51,12 @@ module.exports.init = function init(paths) {
       if (fs.existsSync(metaPath)) {
         meta = readJsonSafe(metaPath, {});
       }
+      // 尝试从 package.json 读取版本
+      let detectedVersion = meta.version || null;
+      const pkgPath = path.join(full, 'package.json');
+      if (!detectedVersion && fs.existsSync(pkgPath)) {
+        try { const pkg = readJsonSafe(pkgPath, {}); detectedVersion = pkg.version || null; } catch {}
+      }
       // 计算相对路径（用于 local 字段）
       const rel = path.relative(pluginsRoot, full).replace(/\\/g, '/');
       // 填充插件信息（name 来自 meta 或 index.js 导出）
@@ -70,7 +77,9 @@ module.exports.init = function init(paths) {
         icon: meta.icon || null,
         description: meta.description || '',
         actions: Array.isArray(meta.actions) ? meta.actions : [],
-        packages: Array.isArray(meta.packages) ? meta.packages : undefined
+        packages: Array.isArray(meta.packages) ? meta.packages : undefined,
+        version: detectedVersion,
+        studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
       });
     }
   } catch {}
@@ -94,7 +103,9 @@ module.exports.getPlugins = function getPlugins() {
     enabled: !!config.enabled[p.name],
     icon: p.icon || null,
     description: p.description || '',
-    actions: Array.isArray(p.actions) ? p.actions : []
+    actions: Array.isArray(p.actions) ? p.actions : [],
+    version: p.version || (config.npmSelection[p.name]?.version || null),
+    studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : []
   }));
 };
 
@@ -301,18 +312,34 @@ module.exports.listInstalledPackages = async function listInstalledPackages() {
   }
 };
 
+// -------- 档案管理：学生列表列定义（聚合） --------
+module.exports.getStudentColumnDefs = function getStudentColumnDefs() {
+  try {
+    const defs = [];
+    const seen = new Set();
+    for (const p of manifest.plugins) {
+      const cols = Array.isArray(p.studentColumns) ? p.studentColumns : [];
+      for (const c of cols) {
+        const key = String(c?.key || '').trim();
+        const label = String(c?.label || key).trim();
+        if (!key) continue;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        defs.push({ key, label });
+      }
+    }
+    return { ok: true, columns: defs };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
 // -------- ZIP 安装插件 --------
 function expandZip(zipPath, dest) {
-  return new Promise((resolve) => {
-    // 使用 PowerShell Expand-Archive 以避免额外依赖
-    const child = spawn('powershell', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${dest}' -Force`], { shell: true });
-    let err = '';
-    child.stderr.on('data', (d) => (err += String(d)));
-    child.on('close', (code) => {
-      if (code === 0) resolve({ ok: true });
-      else resolve({ ok: false, error: err || 'Expand-Archive 失败' });
-    });
-  });
+  // 使用纯 Node 依赖 extract-zip，避免外部命令依赖（如 PowerShell）
+  return extract(zipPath, { dir: dest })
+    .then(() => ({ ok: true }))
+    .catch((e) => ({ ok: false, error: e?.message || String(e) }));
 }
 
 module.exports.installFromZip = async function installFromZip(zipPath) {
@@ -329,6 +356,12 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
     const metaPath = path.join(dest, 'plugin.json');
     if (fs.existsSync(metaPath)) {
       meta = readJsonSafe(metaPath, {});
+    }
+    // 尝试读取版本
+    let detectedVersion = meta.version || null;
+    const pkgPath = path.join(dest, 'package.json');
+    if (!detectedVersion && fs.existsSync(pkgPath)) {
+      try { const pkg = readJsonSafe(pkgPath, {}); detectedVersion = pkg.version || null; } catch {}
     }
     const indexPath = path.join(dest, 'index.js');
     if (!fs.existsSync(indexPath)) {
@@ -354,7 +387,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
     // 更新内存清单（下次启动会通过目录扫描重建，无需写入集中式文件）
     const rel = path.relative(path.dirname(manifestPath), dest).replace(/\\/g, '/');
-    manifest.plugins.push({ name: pluginName, local: rel, enabled: true, icon: meta.icon || null, description: meta.description || '', actions: meta.actions || [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }], packages: meta.packages });
+    manifest.plugins.push({ name: pluginName, local: rel, enabled: true, icon: meta.icon || null, description: meta.description || '', actions: meta.actions || [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }], packages: meta.packages, version: detectedVersion, studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [] });
     if (typeof config.enabled[pluginName] !== 'boolean') {
       config.enabled[pluginName] = true;
       writeJsonSafe(configPath, config);

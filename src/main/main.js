@@ -185,6 +185,21 @@ ipcMain.handle('plugin:install', async (event, name) => {
 ipcMain.handle('plugin:installZip', async (_e, zipPath) => {
   return pluginManager.installFromZip(zipPath);
 });
+ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
+  try {
+    const tmpDir = path.join(app.getPath('temp'), 'LessonPlugin');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const safeName = String(fileName || 'plugin.zip').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const tmpPath = path.join(tmpDir, `${Date.now()}_${safeName}`);
+    const buf = Buffer.from(data);
+    fs.writeFileSync(tmpPath, buf);
+    const res = await pluginManager.installFromZip(tmpPath);
+    try { fs.unlinkSync(tmpPath); } catch {}
+    return res;
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
 
 // 窗口控制（用于自定义标题栏按钮）
 ipcMain.handle('window:control', async (event, action) => {
@@ -221,6 +236,11 @@ ipcMain.handle('npm:switch', async (_e, pluginName, name, version) => {
 });
 ipcMain.handle('npm:installed', async () => {
   return pluginManager.listInstalledPackages();
+});
+
+// 档案管理：学生列定义（从插件清单聚合）
+ipcMain.handle('profiles:columnDefs', async () => {
+  return pluginManager.getStudentColumnDefs();
 });
 
 // 插件 API / 事件总线 IPC
@@ -308,7 +328,6 @@ ipcMain.handle('system:getAutostart', async () => {
 ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
   try {
     app.setLoginItemSettings({ openAtLogin: !!enabled });
-    // 在Windows上无法设置隐藏启动；在macOS可用openAsHidden，这里保持简化
     store.set('system', 'autostartEnabled', !!enabled);
     store.set('system', 'autostartHigh', !!highPriority);
     return { ok: true };

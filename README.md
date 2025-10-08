@@ -2,6 +2,10 @@
 
 基于 Electron 的以 JavaScript 为核心的插件化大屏课堂辅助工具。
 
+> [!IMPORTANT]
+> 本项目仍在开发中，功能与接口可能会有变动。
+> 插件安装/依赖管理 等未经测试，当前版本仅供尝鲜
+
 ## 功能特性
 
 - 精美启动页：展示插件加载状态日志。
@@ -9,19 +13,19 @@
 - 插件管理：
   - 通过 `src/plugins/插件名称/plugin.json` 定义插件清单。
   - 支持本地插件加载与独立窗口创建。
-  - 支持清单定义 NPM 包（在设置页点击安装）。
+  - 支持清单定义 NPM 包（未测试因此暂不显示）。
 - 打包配置：使用 `electron-builder` 并禁用 ASAR（便于插件动态加载）。
 
 ## 插件清单格式（`src/plugins/插件名称/plugin.json`）
 
 ```json
 {
-    
-      "name": "ExamplePlugin",
-      "npm": null,
-      "local": "./src/plugins/example-plugin",
-      "enabled": true
-
+  "name": "ExamplePlugin",
+  "icon": "ri-puzzle-line",
+  "description": "示例插件，演示窗口与接口",
+  "actions": [
+    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口" }
+  ]
 }
 ```
 
@@ -63,7 +67,6 @@ module.exports = {
 - 主进程：`src/main` 负责窗口、托盘、IPC、自动化与配置存储。
 - 预加载：`src/preload` 暴露设置页可调用的 API（如配置读写、系统信息）。
 - 插件：`src/plugins` 放置本地插件与配置清单。
-- 预览服务：`scripts/dev-server.js` 用于本地预览设置页。
 
 ## 开发与预览
 
@@ -73,18 +76,9 @@ module.exports = {
   ```bash
   npm install
   ```
-- 启动预览服务器：
+- 启动程序：
   ```bash
-  node scripts/dev-server.js
-  ```
-  在浏览器访问 `http://localhost:8080/src/renderer/settings.html`。
-- 或使用静态服务器：
-  ```bash
-  npx http-server src/renderer -p 5500 -c-1
-  ```
-  访问 `http://127.0.0.1:5500/settings.html`。
-
-说明：完整 Electron 运行需补充打包与依赖配置，当前侧重渲染层联调与主进程逻辑对接。
+  npm run start
 
 ## 统一配置存储
 
@@ -104,13 +98,6 @@ module.exports = {
   - 打开应用程序：指定可执行文件路径。
   - CMD：在 Shell 中执行命令。
 - 执行前确认：可启用确认与超时（秒）。
-
-## 主要界面特性
-
-- 深色背景 + 统一绿色主题（`--accent: #22c55e`）。
-- 自定义 `showAlert` / `showConfirm` 弹窗，替代原生 `alert/confirm`。
-- 下拉框在深色模式下具备清晰的选中与悬停样式。
-- 参数数组模态编辑器，避免宽文本框带来的输入错误。
 
 ## 贡献者
 

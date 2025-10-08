@@ -20,8 +20,9 @@
       <nav>
         <button class="nav-item active" data-page="plugins"><i class="ri-puzzle-line"></i> 插件管理</button>
         <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
+        <button class="nav-item" data-page="profiles"><i class="ri-archive-line"></i> 档案管理</button>
         <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
-        <button class="nav-item" data-page="npm"><i class="ri-box-3-line"></i> 依赖管理</button>
+        <button class="nav-item" data-page="npm" style="display: none;"><i class="ri-box-3-line"></i> 依赖管理</button>
         <button class="nav-item" data-page="about"><i class="ri-information-line"></i> 关于软件</button>
       </nav>
     </aside>
@@ -155,7 +156,7 @@
               </div>
 
               <!-- 高优先级自启动 -->
-              <div class="setting-item">
+              <div class="setting-item" style="display: none;">
                 <div class="setting-icon"><i class="ri-rocket-line"></i></div>
                 <div class="setting-main">
                   <div class="setting-title">高优先级自启动</div>
@@ -249,6 +250,40 @@
 
         </section>
 
+        <!-- 档案管理页面 -->
+        <section id="page-profiles" hidden>
+          <header>
+            <h1>档案管理</h1>
+            <p>维护学生列表，支持文本导入与筛选</p>
+          </header>
+          <!-- 子夹（子页面）导航，与通用设置相同结构 -->
+          <div class="subnav">
+            <button class="sub-item active" data-sub="students"><i class="ri-user-3-line"></i> 学生列表</button>
+          </div>
+          <div id="profiles-students" class="panel">
+            <div class="profiles-toolbar">
+              <button id="profiles-import-toggle" class="btn secondary"><i class="ri-file-text-line"></i> 文本导入</button>
+              <button id="profiles-add" class="btn secondary"><i class="ri-add-line"></i> 新增学生</button>
+              <button id="profiles-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
+              <span class="muted" style="margin-left: 8px;">提示：建议直接复制 Excel 中纵向学生列表并粘贴，默认性别为未选择</span>
+            </div>
+            <div id="profiles-import" class="profiles-import" hidden>
+              <textarea id="profiles-import-text" placeholder="每行一个学生姓名"></textarea>
+              <div class="import-actions">
+                <button id="profiles-import-apply" class="btn primary"><i class="ri-download-2-line"></i> 导入到列表</button>
+                <button id="profiles-import-cancel" class="btn secondary"><i class="ri-close-line"></i> 关闭</button>
+              </div>
+            </div>
+            <div id="profiles-filters" class="profiles-filters"></div>
+        <div class="profiles-table-wrap">
+          <table class="profiles-table">
+            <thead id="profiles-thead"></thead>
+            <tbody id="profiles-tbody"></tbody>
+          </table>
+        </div>
+          </div>
+        </section>
+
         <!-- 自动执行页面 -->
         <section id="page-automation" hidden>
           <header>
@@ -308,8 +343,8 @@
           <div class="modal-dialog">
             <div class="modal-title"><i class="ri-shield-keyhole-line"></i> 安装安全提示</div>
             <div class="modal-body">
-              <p>您正在安装第三方插件。插件可运行代码并访问应用接口，请只安装可信来源。</p>
-              <p>若插件声明需要的 Node 模块未在本地存储，系统将尝试连接镜像站下载。无法连接时将提示无法安装，并提供手动导入指引。</p>
+              <p>您正在安装第三方插件。插件可运行代码并访问应用接口，请确保其来自可信来源。</p>
+              <!-- <p>若插件声明需要的 Node 模块未在本地存储，系统将尝试连接镜像站下载。无法连接时将提示无法安装，并提供手动导入指引。</p> -->
             </div>
             <div class="modal-actions">
               <button id="install-cancel" class="btn secondary"><i class="ri-close-line"></i> 取消</button>

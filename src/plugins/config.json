@@ -2,6 +2,7 @@
   "enabled": {
     "ExamplePlugin": true,
     "UtilPlugin": true,
-    "AutomationDemo": true
+    "AutomationDemo": true,
+    "student-columns-demo": true
   }
 }
