@@ -84,6 +84,7 @@ async function showParamsEditor(initial) {
     const body = document.createElement('div'); body.className = 'modal-body';
     const help = document.createElement('div'); help.className = 'muted'; help.textContent = '支持类型：字符串、数字、布尔、对象JSON、数组JSON';
     const list = document.createElement('div');
+    list.className = 'array-list';
     let items = Array.isArray(initial) ? initial.map((x) => x) : [];
 
     const typeOfVal = (v) => {
@@ -111,7 +112,7 @@ async function showParamsEditor(initial) {
     const renderItems = () => {
       list.innerHTML = '';
       items.forEach((val, i) => {
-        const row = document.createElement('div'); row.className = 'inline';
+        const row = document.createElement('div'); row.className = 'array-item';
         const typeSel = document.createElement('select');
         [['string','字符串'],['number','数字'],['boolean','布尔'],['object','对象JSON'],['array','数组JSON']]
           .forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
@@ -153,7 +154,12 @@ async function showParamsEditor(initial) {
     };
 
     const desc = document.createElement('div'); desc.className='modal-desc muted'; desc.textContent='提示：对象/数组请输入合法JSON；布尔值输入 true/false';
-    box.appendChild(title); box.appendChild(body); box.appendChild(help); box.appendChild(list); box.appendChild(addBar); box.appendChild(desc);
+    box.appendChild(title);
+    body.appendChild(help);
+    body.appendChild(list);
+    body.appendChild(addBar);
+    body.appendChild(desc);
+    box.appendChild(body);
     actions.appendChild(cancel); actions.appendChild(save);
     box.appendChild(actions);
     overlay.appendChild(box);
@@ -817,8 +823,28 @@ async function initAutomationSettings() {
     // 测试执行按钮行为（忽略触发条件，仅按当前执行条件与确认流程执行）
     testBtn.addEventListener('click', async () => {
       try {
-        await window.settingsAPI?.automationTest?.(id);
-        await showAlert('已发起测试执行。若启用确认，将弹出确认覆盖层。');
+        // 在测试前先保存当前编辑配置，确保以最新配置执行
+        const patched = {
+          name: nameInput.value || it.name,
+          triggers: it.triggers || [],
+          conditions: it.conditions || { mode:'and', groups:[] },
+          actions: it.actions || [],
+          confirm: { enabled: confirmEnabled.querySelector('input').checked, timeout: parseInt(timeoutInput.value||60,10) }
+        };
+        const upd = await window.settingsAPI?.automationUpdate?.(it.id, patched);
+        if (!upd?.ok) { await showAlert('保存当前配置失败，无法测试'); return; }
+
+        const res = await window.settingsAPI?.automationTest?.(id);
+        if (!res?.ok) { await showAlert(res?.error || '测试执行失败'); return; }
+        if (res.executed) {
+          await showAlert('测试执行完成。已执行配置的动作。');
+        } else if (res.reason === 'conditions_not_met') {
+          await showAlert('当前执行条件不满足，未执行。');
+        } else if (res.reason === 'cancelled') {
+          await showAlert('已取消执行。');
+        } else {
+          await showAlert('未执行。');
+        }
       } catch (e) {
         await showAlert(e?.message || '测试执行失败');
       }

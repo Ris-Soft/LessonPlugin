@@ -268,7 +268,12 @@ ipcMain.handle('automation:remove', async (_e, id) => automationManager.remove(i
 ipcMain.handle('automation:toggle', async (_e, id, enabled) => automationManager.toggle(id, enabled));
 ipcMain.handle('automation:invokeProtocol', async (_e, text) => automationManager.invokeProtocol(text));
 ipcMain.handle('automation:test', async (_e, id) => {
-  try { await automationManager.test(id); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  try {
+    const res = await automationManager.test(id);
+    return res;
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 });
 
 // 系统与时间相关 IPC

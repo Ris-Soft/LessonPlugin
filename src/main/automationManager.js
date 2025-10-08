@@ -56,8 +56,15 @@ class AutomationManager {
     const item = this.get(id);
     if (!item) throw new Error('not_found');
     // 测试执行：忽略触发条件，仅按当前配置的执行条件与确认流程运行
-    await this.tryExecute(item, { reason: 'manual_test' });
-    return { ok: true };
+    const canRun = this.evaluateConditions(item);
+    if (!canRun) return { ok: true, executed: false, reason: 'conditions_not_met' };
+    if (item?.confirm?.enabled) {
+      const approved = await this.showConfirmOverlay(item, { reason: 'manual_test' });
+      // 注意：showConfirmOverlay 内部已在批准时执行动作，这里不重复执行
+      return { ok: true, executed: !!approved, reason: approved ? null : 'cancelled' };
+    }
+    await this.executeActions(item.actions || [], { reason: 'manual_test' });
+    return { ok: true, executed: true };
   }
 
   checkTimeTriggers() {
@@ -166,13 +173,13 @@ class AutomationManager {
         webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js') } // 复用API能力
       });
       win.loadFile(path.join(__dirname, '..', 'renderer', 'automation-confirm.html'));
+      const timeout = Math.max(5, parseInt(item?.confirm?.timeout || 60, 10));
       // 将自动化条目基本信息传递给渲染页
       try {
         win.webContents.once('did-finish-load', () => {
           try { win.webContents.send('automation:confirm:init', { id: item.id, name: item.name, timeout }); } catch {}
         });
       } catch {}
-      const timeout = Math.max(5, parseInt(item?.confirm?.timeout || 60, 10));
       let done = false;
       const finish = async (ok) => {
         if (done) return; done = true; try { if (!win.isDestroyed()) win.destroy(); } catch {}
@@ -199,6 +206,8 @@ class AutomationManager {
       try {
         if (act.type === 'pluginEvent') {
           await this.pluginManager.callFunction(act.pluginId, act.event, act.params || []);
+          console.log(act);
+          console.log(`Plugin ${act.pluginId} event ${act.event} called with params ${JSON.stringify(act.params || [])}`);
         } else if (act.type === 'power') {
           if (act.op === 'shutdown') spawn('shutdown', ['/s', '/t', '0'], { shell: true });
           else if (act.op === 'restart') spawn('shutdown', ['/r', '/t', '0'], { shell: true });

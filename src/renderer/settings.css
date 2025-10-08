@@ -328,6 +328,26 @@ main {
   padding: 8px;
 }
 
+/* 参数编辑对话框下拉框优化 */
+.array-item select {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  padding: 8px;
+  min-width: 140px;
+}
+
+/* 参数编辑对话框内容区域统一内边距 */
+.modal-box .modal-body,
+.modal-box .muted,
+.modal-box .array-actions,
+.modal-box .modal-desc,
+.modal-box .array-list {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
 .array-item button {
   background: rgba(220, 38, 38, 0.25);
   color: #fff;
