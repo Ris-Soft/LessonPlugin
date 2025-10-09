@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "description": "提供时间查询与事件演示",
   "actions": [
-    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口" }
+    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口", "target": "openWindow" }
   ]
 }

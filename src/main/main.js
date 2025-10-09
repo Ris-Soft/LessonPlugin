@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const dgram = require('dgram');
 
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
@@ -175,10 +176,6 @@ ipcMain.handle('plugin:toggle', async (event, name, enabled) => {
   return pluginManager.toggle(name, enabled);
 });
 
-ipcMain.handle('plugin:openWindow', async (event, name) => {
-  return pluginManager.openWindow(name, BrowserWindow, app);
-});
-
 ipcMain.handle('plugin:install', async (event, name) => {
   return pluginManager.installNpm(name, (status) => sendSplashProgress(status));
 });
@@ -297,21 +294,56 @@ ipcMain.handle('automation:test', async (_e, id) => {
 });
 
 // 系统与时间相关 IPC
+// 简易NTP查询（UDP），失败时返回null
+async function queryNtpTime(server, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    try {
+      const socket = dgram.createSocket('udp4');
+      const packet = Buffer.alloc(48);
+      packet[0] = 0x1B; // LI=0, VN=3, Mode=3 (client)
+      let done = false;
+      const finish = (value) => { if (!done) { done = true; try { socket.close(); } catch (_) {} resolve(value); } };
+      const timer = setTimeout(() => finish(null), timeoutMs);
+      socket.once('error', () => { clearTimeout(timer); finish(null); });
+      socket.on('message', (msg) => {
+        clearTimeout(timer);
+        try {
+          const secs = msg.readUInt32BE(40);
+          const frac = msg.readUInt32BE(44);
+          const NTP_UNIX_OFFSET = 2208988800; // seconds between 1900-01-01 and 1970-01-01
+          const unixSecs = secs - NTP_UNIX_OFFSET;
+          const ms = unixSecs * 1000 + Math.floor(frac * 1000 / 0x100000000);
+          finish(ms);
+        } catch (e) {
+          finish(null);
+        }
+      });
+      socket.send(packet, 0, packet.length, 123, server, (err) => {
+        if (err) { clearTimeout(timer); finish(null); }
+      });
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
 ipcMain.handle('system:getTime', async () => {
   const cfg = store.getAll('system') || {};
-  const nowMs = Date.now();
-  if (!cfg.preciseTimeEnabled) {
-    return { nowMs, iso: new Date(nowMs).toISOString() };
+  let baseMs = Date.now();
+  if (cfg.preciseTimeEnabled) {
+    const server = String(cfg.ntpServer || 'ntp.aliyun.com').trim();
+    const ntpMs = await queryNtpTime(server).catch(() => null);
+    if (typeof ntpMs === 'number' && Number.isFinite(ntpMs)) baseMs = ntpMs;
   }
   // 计算天数差
-  const baseDateStr = cfg.offsetBaseDate || new Date().toISOString().slice(0, 10);
+  const baseDateStr = cfg.semesterStart || cfg.offsetBaseDate || new Date().toISOString().slice(0, 10);
   const todayStr = new Date().toISOString().slice(0, 10);
   // 将日期转为UTC日开始，计算差值
-  const baseMs = Date.parse(baseDateStr + 'T00:00:00Z');
-  const todayMs = Date.parse(todayStr + 'T00:00:00Z');
-  const days = Math.max(0, Math.floor((todayMs - baseMs) / (24 * 3600 * 1000)));
+  const baseMsDay = Date.parse(baseDateStr + 'T00:00:00Z');
+  const todayMsDay = Date.parse(todayStr + 'T00:00:00Z');
+  const days = Math.max(0, Math.floor((todayMsDay - baseMsDay) / (24 * 3600 * 1000)));
   const effectiveOffsetSec = Number(cfg.timeOffset || 0) + days * Number(cfg.autoOffsetDaily || 0);
-  const adjMs = nowMs + effectiveOffsetSec * 1000;
+  const adjMs = baseMs + effectiveOffsetSec * 1000;
   return { nowMs: adjMs, iso: new Date(adjMs).toISOString(), offsetSec: effectiveOffsetSec, daysFromBase: days };
 });
 ipcMain.handle('system:getAppInfo', async () => {

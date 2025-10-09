@@ -2,12 +2,11 @@ const path = require('path');
 const { BrowserWindow } = require('electron');
 
 const functions = {
-  hello: (from) => `Hello ${from || ''}!`,
   openWindow: async () => {
     const win = new BrowserWindow({
-      width: 800,
-      height: 500,
-      title: 'Example Plugin',
+      width: 980,
+      height: 640,
+      title: '学生列表示例',
       frame: false,
       titleBarStyle: 'hidden',
       webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false }
@@ -19,16 +18,16 @@ const functions = {
 };
 
 const init = async (api) => {
-  api.splash.setStatus('plugin:init', '初始化桌面组件');
-  // 执行耗时初始化任务
-  await new Promise(r => setTimeout(r, 1500));
-  api.splash.setStatus('plugin:init', '桌面组件加载完成');
-  await new Promise(r => setTimeout(r, 1500));
+  // 在真实启动阶段报告初始化状态到启动页
+  api.splash.setStatus('plugin:init', '初始化学生列表示例');
+  await new Promise(r => setTimeout(r, 600));
+  api.splash.progress('plugin:init', '学生列表示例就绪');
 };
 
 module.exports = {
-  name: 'ExamplePlugin',
+  name: 'student-list-demo',
   version: '1.0.0',
+  description: '演示调用学生列表、编辑档案与精准时间',
   init,
   functions
 };

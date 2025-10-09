@@ -36,9 +36,14 @@ function renderPlugin(item) {
   el.querySelectorAll('.action-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const act = btn.dataset.action;
-      if (act === 'openWindow') {
-        await window.settingsAPI?.openPluginWindow(item.name);
-      } else if (act === 'installNpm') {
+      const meta = (item.actions || []).find(a => a.id === act);
+      // 若 actions 配置了 target（指向插件 index.js 的 functions 中的函数），则直接调用
+      if (meta && typeof meta.target === 'string' && meta.target) {
+        await window.settingsAPI?.pluginCall?.(item.name, meta.target, Array.isArray(meta.args) ? meta.args : []);
+        return;
+      }
+      // 保留内置动作：安装NPM
+      if (act === 'installNpm') {
         btn.disabled = true; btn.textContent = '安装中...';
         await window.settingsAPI?.installNpm(item.name);
         btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装NPM`;
@@ -501,6 +506,7 @@ async function initGeneralSettings() {
     autostartEnabled: false,
     autostartHigh: false,
     preciseTimeEnabled: false,
+    ntpServer: 'ntp.aliyun.com',
     timeOffset: 0,
     autoOffsetDaily: 0,
     offsetBaseDate: new Date().toISOString().slice(0, 10),
@@ -647,6 +653,16 @@ async function initGeneralSettings() {
   semesterStart.value = String(cfg.semesterStart || cfg.offsetBaseDate || new Date().toISOString().slice(0, 10));
   timeOffset.value = Number(cfg.timeOffset || 0);
   autoOffsetDaily.value = Number(cfg.autoOffsetDaily || 0);
+
+  // NTP服务器地址绑定
+  const ntpServer = document.getElementById('ntp-server');
+  if (ntpServer) {
+    ntpServer.value = String(cfg.ntpServer || 'ntp.aliyun.com');
+    ntpServer.addEventListener('change', async () => {
+      const val = String(ntpServer.value || '').trim() || 'ntp.aliyun.com';
+      await window.settingsAPI?.configSet('system', 'ntpServer', val);
+    });
+  }
 
   autostartEnabled.addEventListener('change', async () => {
     await window.settingsAPI?.configSet('system', 'autostartEnabled', !!autostartEnabled.checked);

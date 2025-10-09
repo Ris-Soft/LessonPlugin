@@ -13,9 +13,10 @@ let windows = [];
 let pluginWindows = new Map(); // pluginId -> BrowserWindow
 let apiRegistry = new Map(); // pluginId -> Set(functionName)
 let automationEventRegistry = new Map(); // pluginId -> Array<{ id, name, desc, params, expose }>
-let backendRegistry = new Map(); // pluginId -> Map(fnName -> function)
+let functionRegistry = new Map(); // pluginId -> Map(fnName -> function)
 let eventSubscribers = new Map(); // eventName -> Set(webContentsId)
 let storeRoot = '';
+let progressReporter = null; // 供插件在初始化期间更新启动页文本
 
 function readJsonSafe(jsonPath, fallback) {
   try {
@@ -76,7 +77,10 @@ module.exports.init = function init(paths) {
         enabled: meta.enabled !== undefined ? !!meta.enabled : true,
         icon: meta.icon || null,
         description: meta.description || '',
-        actions: Array.isArray(meta.actions) ? meta.actions : [],
+        // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
+        actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
+        // 保留 functions 以备后续扩展（如声明 backend 名称等）
+        functions: typeof meta.functions === 'object' ? meta.functions : undefined,
         packages: Array.isArray(meta.packages) ? meta.packages : undefined,
         version: detectedVersion,
         studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
@@ -116,6 +120,8 @@ module.exports.toggle = function toggle(name, enabled) {
 };
 
 module.exports.loadPlugins = async function loadPlugins(onProgress) {
+  // 保存进度报告函数，供插件入口通过 API 更新启动页状态
+  progressReporter = typeof onProgress === 'function' ? onProgress : null;
   const statuses = [];
   for (const p of manifest.plugins) {
     const status = { name: p.name, stage: 'checking', message: '检查插件...' };
@@ -139,16 +145,31 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
           const modPath = path.resolve(localPath, 'index.js');
           if (fs.existsSync(modPath)) {
             const mod = require(modPath);
-            if (mod && mod.backend && typeof mod.backend === 'object') {
-              if (!backendRegistry.has(p.name)) backendRegistry.set(p.name, new Map());
-              const map = backendRegistry.get(p.name);
-              for (const [fn, impl] of Object.entries(mod.backend)) {
+            // 仅从 functions 中注册函数，排除 actions
+            const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
+            if (fnObj) {
+              if (!functionRegistry.has(p.name)) functionRegistry.set(p.name, new Map());
+              const map = functionRegistry.get(p.name);
+              for (const [fn, impl] of Object.entries(fnObj)) {
+                if (fn === 'actions') continue;
                 if (typeof impl === 'function') map.set(fn, impl);
               }
             }
             // 自动化事件：若插件导出 automationEvents，则直接注册以便设置页可查询
             if (mod && Array.isArray(mod.automationEvents)) {
               module.exports.registerAutomationEvents(p.name, mod.automationEvents);
+            }
+            // 允许插件入口在主进程侧使用 API；若 init 为异步，则等待完成
+            if (mod && typeof mod.init === 'function') {
+              try {
+                // 报告插件初始化开始
+                progressReporter && progressReporter({ stage: 'plugin:init', message: `初始化插件 ${p.name}...` });
+                await Promise.resolve(mod.init(createPluginApi(p.name)));
+                // 报告插件初始化结束
+                progressReporter && progressReporter({ stage: 'plugin:init', message: `插件 ${p.name} 初始化完成` });
+              } catch (e) {
+                progressReporter && progressReporter({ stage: 'plugin:error', message: `插件 ${p.name} 初始化失败：${e?.message || e}` });
+              }
             }
           }
         } catch {}
@@ -160,47 +181,6 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
     }
   }
   return statuses;
-};
-
-module.exports.openWindow = async function openWindow(name, BrowserWindow, app) {
-  const p = manifest.plugins.find((x) => x.name === name);
-  if (!p || !config.enabled[name]) {
-    return { ok: false, error: '插件未启用或不存在' };
-  }
-  try {
-    let mod;
-    if (p.local) {
-      const modPath = path.resolve(path.dirname(manifestPath), p.local, 'index.js');
-      mod = require(modPath);
-    } else if (p.npm) {
-      if (typeof p.npm === 'string') {
-        mod = require(p.npm);
-      } else if (p.npm && p.npm.name) {
-        const sel = config.npmSelection[name] || p.npm;
-        const pkgPath = path.join(storeRoot, sel.name, sel.version, 'node_modules', sel.name);
-        if (fs.existsSync(pkgPath)) {
-          mod = require(pkgPath);
-        } else {
-          throw new Error(`未找到已下载包：${sel.name}@${sel.version}`);
-        }
-      }
-    }
-    if (mod && typeof mod.openWindow === 'function') {
-      const win = await mod.openWindow({ BrowserWindow, app, path });
-      if (win) {
-        windows.push(win);
-        pluginWindows.set(p.name, win);
-        win.on('closed', () => {
-          windows = windows.filter((w) => w !== win);
-          pluginWindows.delete(p.name);
-        });
-      }
-      return { ok: true };
-    }
-    return { ok: false, error: '插件不支持打开窗口' };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
 };
 
 module.exports.installNpm = async function installNpm(name, onProgress) {
@@ -387,7 +367,18 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
     // 更新内存清单（下次启动会通过目录扫描重建，无需写入集中式文件）
     const rel = path.relative(path.dirname(manifestPath), dest).replace(/\\/g, '/');
-    manifest.plugins.push({ name: pluginName, local: rel, enabled: true, icon: meta.icon || null, description: meta.description || '', actions: meta.actions || [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }], packages: meta.packages, version: detectedVersion, studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [] });
+    manifest.plugins.push({
+      name: pluginName,
+      local: rel,
+      enabled: true,
+      icon: meta.icon || null,
+      description: meta.description || '',
+      actions: (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : (Array.isArray(meta.actions) ? meta.actions : [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }])),
+      functions: typeof meta.functions === 'object' ? meta.functions : undefined,
+      packages: meta.packages,
+      version: detectedVersion,
+      studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
+    });
     if (typeof config.enabled[pluginName] !== 'boolean') {
       config.enabled[pluginName] = true;
       writeJsonSafe(configPath, config);
@@ -430,11 +421,11 @@ module.exports.listAutomationEvents = function listAutomationEvents(pluginId) {
 
 module.exports.callFunction = function callFunction(targetPluginId, fnName, args) {
   return new Promise(async (resolve) => {
-    // 优先后端函数，无需窗口
-    const backendMap = backendRegistry.get(targetPluginId);
-    if (backendMap && backendMap.has(fnName)) {
+    // 优先主进程注册的函数，无需窗口
+    const fnMap = functionRegistry.get(targetPluginId);
+    if (fnMap && fnMap.has(fnName)) {
       try {
-        const result = await Promise.resolve(backendMap.get(fnName)(...(Array.isArray(args) ? args : [])));
+        const result = await Promise.resolve(fnMap.get(fnName)(...(Array.isArray(args) ? args : [])));
         return resolve({ ok: true, result });
       } catch (e) {
         return resolve({ ok: false, error: e.message });
@@ -455,6 +446,24 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
     wc.send('plugin:invoke', { id: reqId, fn: fnName, args: Array.isArray(args) ? args : [] });
   });
 };
+
+// 为插件入口提供主进程侧可用的 API
+function createPluginApi(pluginId) {
+  return {
+    call: (targetPluginId, fnName, args) => module.exports.callFunction(targetPluginId, fnName, args),
+    emit: (eventName, payload) => module.exports.emitEvent(eventName, payload),
+    registerAutomationEvents: (events) => module.exports.registerAutomationEvents(pluginId, events),
+    // 启动页文本控制：插件可在初始化期间更新启动页状态文本
+    splash: {
+      setStatus: (stage, message) => {
+        try { progressReporter && progressReporter({ stage, message }); } catch {}
+      },
+      progress: (stage, message) => {
+        try { progressReporter && progressReporter({ stage, message }); } catch {}
+      }
+    }
+  };
+}
 
 module.exports.subscribeEvent = function subscribeEvent(eventName, senderWC) {
   if (!eventSubscribers.has(eventName)) eventSubscribers.set(eventName, new Set());

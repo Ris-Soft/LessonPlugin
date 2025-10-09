@@ -223,6 +223,19 @@
                 </div>
                 <div class="setting-action"></div>
               </div>
+
+              <!-- NTP服务器地址设置 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-signal-tower-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">NTP 服务器地址</div>
+                  <div class="setting-desc">启用精确时间后，将从该 NTP 服务获取时间。</div>
+                  <div class="inline">
+                    <input id="ntp-server" type="text" placeholder="ntp.aliyun.com" />
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
             </div>
           </div>
 
@@ -265,7 +278,7 @@
               <button id="profiles-import-toggle" class="btn secondary"><i class="ri-file-text-line"></i> 文本导入</button>
               <button id="profiles-add" class="btn secondary"><i class="ri-add-line"></i> 新增学生</button>
               <button id="profiles-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
-              <span class="muted" style="margin-left: 8px;">提示：建议直接复制 Excel 中纵向学生列表并粘贴，默认性别为未选择</span>
+              <span class="muted" style="margin-left: 8px;">提示：可直接复制 Excel 中纵向学生列表并粘贴</span>
             </div>
             <div id="profiles-import" class="profiles-import" hidden>
               <textarea id="profiles-import-text" placeholder="每行一个学生姓名"></textarea>

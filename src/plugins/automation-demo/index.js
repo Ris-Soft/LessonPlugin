@@ -1,20 +1,21 @@
 const path = require('path');
+const { BrowserWindow } = require('electron');
 
-async function openWindow({ BrowserWindow, path: pathMod }) {
-  const win = new BrowserWindow({
-    width: 600,
-    height: 420,
-    title: 'Automation Demo',
-    frame: false,
-    titleBarStyle: 'hidden',
-    webPreferences: { preload: pathMod.join(__dirname, 'preload.js'), nodeIntegration: false }
-  });
-  win.loadFile(path.join(__dirname, 'index.html'));
-  return win;
-}
-
-// 后端函数：无需窗口即可执行，适合自动化
-const backend = {
+// 插件函数统一放到 functions 中（不使用 backend 关键字）
+const functions = {
+  // 允许通过 actions.target 调用以打开窗口
+  openWindow: async () => {
+    const win = new BrowserWindow({
+      width: 600,
+      height: 420,
+      title: 'Automation Demo',
+      frame: false,
+      titleBarStyle: 'hidden',
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false }
+    });
+    win.loadFile(path.join(__dirname, 'index.html'));
+    return true;
+  },
   notify: (title = '自动化示例', body = '') => {
     try {
       const { Notification } = require('electron');
@@ -46,7 +47,6 @@ const automationEvents = [
 module.exports = {
   name: 'AutomationDemo',
   version: '1.0.0',
-  openWindow,
-  backend,
+  functions,
   automationEvents
 };

@@ -3,7 +3,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('settingsAPI', {
   getPlugins: () => ipcRenderer.invoke('plugin:list'),
   togglePlugin: (name, enabled) => ipcRenderer.invoke('plugin:toggle', name, enabled),
-  openPluginWindow: (name) => ipcRenderer.invoke('plugin:openWindow', name),
   installNpm: (name) => ipcRenderer.invoke('plugin:install', name),
   installPluginZip: (zipPath) => ipcRenderer.invoke('plugin:installZip', zipPath),
   installPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:installZipData', fileName, data),
@@ -30,6 +29,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   automationTest: (id) => ipcRenderer.invoke('automation:test', id),
   // 插件自动化事件查询
   pluginAutomationListEvents: (pluginId) => ipcRenderer.invoke('plugin:automation:listEvents', pluginId),
+  // 直接调用插件函数（用于 actions 目标指向 functions 中的函数）
+  pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
   // 自动化执行确认覆盖层通信
   onAutomationConfirmInit: (handler) => {
     ipcRenderer.on('automation:confirm:init', (_e, payload) => handler && handler(payload));

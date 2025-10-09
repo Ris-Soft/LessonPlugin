@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "description": "示例插件：演示自动化事件与后端函数",
   "actions": [
-    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口" }
+    {
+      "id": "openWindow",
+      "icon": "ri-window-line",
+      "text": "打开窗口",
+      "target": "openWindow"
+    }
   ]
 }

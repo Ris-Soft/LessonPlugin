@@ -72,6 +72,17 @@ h1 {
   font-size: 16px; /* 加载状态文字大小 */
 }
 .status .stage { color: var(--accent); font-weight: 600; }
+.timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 16px;
+}
 .brand {
   display: flex;
   align-items: center;
@@ -85,5 +96,5 @@ h1 {
 /* 图标按钮（仅显示最小化图标） */
 .btn.icon-only { padding: 6px; border-radius: 999px; }
 .btn.icon-only i { font-size: 16px; }
-/* 顶部右侧关闭按钮 */
-.close-btn { position: absolute; top: 10px; right: 10px; }
+/* 顶部右侧控制区域（关闭按钮 + 倒计时） */
+.top-controls { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 8px; }

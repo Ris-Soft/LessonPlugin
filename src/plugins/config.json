@@ -3,6 +3,7 @@
     "ExamplePlugin": true,
     "UtilPlugin": true,
     "AutomationDemo": true,
-    "student-columns-demo": true
+    "student-columns-demo": true,
+    "student-list-demo": true
   }
 }
