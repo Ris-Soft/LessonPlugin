@@ -58,6 +58,8 @@
           <div class="subnav">
             <button class="sub-item active" data-sub="basic"><i class="ri-settings-2-line"></i> 基本设置</button>
             <button class="sub-item" data-sub="splash"><i class="ri-window-line"></i> 启动页面</button>
+            <button class="sub-item" data-sub="time"><i class="ri-time-line"></i> 时间与日期</button>
+            <button class="sub-item" data-sub="data"><i class="ri-folder-line"></i> 数据目录</button>
           </div>
 
           <!-- 启动页与名言设置（合并） -->
@@ -137,7 +139,7 @@
             </div>
           </div>
 
-          <!-- 基础设置子页 -->
+          <!-- 基础设置子页（仅保留启动相关） -->
           <div id="general-basic" class="panel">
             <div class="form">
               <!-- 自启动开关 -->
@@ -169,7 +171,12 @@
                   </label>
                 </div>
               </div>
+            </div>
+          </div>
 
+          <!-- 时间与数据 子页 -->
+          <div id="general-time" class="panel" hidden>
+            <div class="form">
               <!-- 精确时间开关 -->
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-time-line"></i></div>
@@ -191,11 +198,17 @@
                 <div class="setting-main">
                   <div class="setting-title">学期开始日期</div>
                   <div class="setting-desc">用于单双周判断与时间偏移基准。</div>
+                </div>
+                <div class="setting-action">
                   <div class="inline">
                     <input id="semester-start" type="date" />
+                    <label class="switch" title="从下周开始（反转单双周）" style="margin-left:12px;">
+                      <input id="biweek-offset" type="checkbox" />
+                      <span class="slider"></span>
+                    </label>
+                    <span class="muted" style="margin-left:6px;">单双周偏移</span>
                   </div>
                 </div>
-                <div class="setting-action"></div>
               </div>
 
               <!-- 时间偏移值（秒） -->
@@ -204,11 +217,12 @@
                 <div class="setting-main">
                   <div class="setting-title">时间偏移值</div>
                   <div class="setting-desc">对当前时间进行加减（单位：秒，负数为减）。</div>
+                </div>
+                <div class="setting-action">
                   <div class="inline">
                     <input id="time-offset" type="number" step="1" />
                   </div>
                 </div>
-                <div class="setting-action"></div>
               </div>
 
               <!-- 自动时间偏移（每天叠加秒数） -->
@@ -217,11 +231,12 @@
                 <div class="setting-main">
                   <div class="setting-title">自动时间偏移</div>
                   <div class="setting-desc">每天自动叠加该偏移值（单位：秒，负数为减）。</div>
+                </div>
+                <div class="setting-action">
                   <div class="inline">
                     <input id="auto-offset-daily" type="number" step="1" />
                   </div>
                 </div>
-                <div class="setting-action"></div>
               </div>
 
               <!-- NTP服务器地址设置 -->
@@ -230,11 +245,47 @@
                 <div class="setting-main">
                   <div class="setting-title">NTP 服务器地址</div>
                   <div class="setting-desc">启用精确时间后，将从该 NTP 服务获取时间。</div>
+                </div>
+                <div class="setting-action">
                   <div class="inline">
                     <input id="ntp-server" type="text" placeholder="ntp.aliyun.com" />
                   </div>
                 </div>
-                <div class="setting-action"></div>
+              </div>
+
+              
+            </div>
+          </div>
+
+          <!-- 数据目录 子页（从插件页面移回通用设置） -->
+          <div id="general-data" class="panel" hidden>
+            <div class="form">
+              <!-- 数据目录操作 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-folder-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">数据目录</div>
+                  <div class="setting-desc">打开或更改应用数据目录（插件、配置等）。</div>
+                  <div class="muted" id="user-data-path" style="margin-top:8px; word-break: break-all;"></div>
+                </div>
+                <div class="setting-action">
+                  <div class="inline">
+                    <button id="open-user-data" class="btn secondary"><i class="ri-folder-open-line"></i> 打开数据目录</button>
+                    <button id="change-user-data" class="btn"><i class="ri-pencil-line"></i> 更改数据目录</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 清理用户数据（卸载前可选） -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-delete-bin-6-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">清理用户数据</div>
+                  <div class="setting-desc">删除插件与配置等用户数据（建议卸载前执行）。</div>
+                </div>
+                <div class="setting-action">
+                  <button id="cleanup-user-data" class="btn danger"><i class="ri-eraser-line"></i> 清理插件与配置</button>
+                </div>
               </div>
             </div>
           </div>

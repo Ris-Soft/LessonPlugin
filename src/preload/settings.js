@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   installNpm: (name) => ipcRenderer.invoke('plugin:install', name),
   installPluginZip: (zipPath) => ipcRenderer.invoke('plugin:installZip', zipPath),
   installPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:installZipData', fileName, data),
+  uninstallPlugin: (name) => ipcRenderer.invoke('plugin:uninstall', name),
   windowControl: (action) => ipcRenderer.invoke('window:control', action),
   npmGetVersions: (name) => ipcRenderer.invoke('npm:versions', name),
   npmDownload: (name, version) => ipcRenderer.invoke('npm:download', name, version),
@@ -43,4 +44,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getAutostart: () => ipcRenderer.invoke('system:getAutostart'),
   setAutostart: (enabled, highPriority) => ipcRenderer.invoke('system:setAutostart', enabled, highPriority),
   getCurrentTime: () => ipcRenderer.invoke('system:getTime')
+  ,cleanupUserData: () => ipcRenderer.invoke('system:cleanupUserData')
+  ,getUserDataPath: () => ipcRenderer.invoke('system:getUserDataPath')
+  ,openUserData: () => ipcRenderer.invoke('system:openUserData')
+  ,changeUserData: () => ipcRenderer.invoke('system:changeUserData')
 });

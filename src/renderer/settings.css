@@ -188,6 +188,9 @@ body {
   border-radius: 6px;
   padding: 8px 12px;
   cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: transparent;
+  color: var(--fg);
 }
 
 .btn.primary {
@@ -197,6 +200,11 @@ body {
 
 .btn.secondary {
   background: #14532d;
+  color: #fff;
+}
+
+.btn.danger {
+  background: #dc2626;
   color: #fff;
 }
 
@@ -387,7 +395,7 @@ main {
 }
 
 .card-title {
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .card-desc {
@@ -401,6 +409,16 @@ main {
   justify-content: space-between;
   padding: 0 12px 12px;
 }
+
+/* 插件卡片操作区：左侧为操作提示或按钮，右侧为卸载按钮 */
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+.card-actions .muted { color: var(--muted); }
 
 /* 自动执行页面 */
 .automation {
@@ -619,6 +637,14 @@ body {
   border-color: #2a2f3a;
   color: #e5e7eb;
 }
+
+.btn.danger {
+  background: #dc2626;
+  border-color: transparent;
+  color: #fff;
+}
+
+
 
 header h1,
 .setting-title,
@@ -1126,3 +1152,33 @@ select:focus {
   box-shadow: none;
   border-color: var(--border);
 }
+/* 覆盖插件卡片操作区：固定在卡片底部并左右分布 */
+.plugin-card {
+  display: flex;
+  flex-direction: column;
+}
+.plugin-card .card-actions {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px dashed var(--border);
+}
+.plugin-card .card-actions .muted { color: var(--muted); }
+
+/* 右侧小图标按钮，无文字无背景，仅图标 */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.icon-btn i { font-size: 18px; }
+.icon-btn:hover { color: #fca5a5; }

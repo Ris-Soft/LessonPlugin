@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>插件开发示例</title>
+  <link rel="stylesheet" href="../example-plugin/index.css" />
+</head>
+<body>
+  <div class="titlebar">
+    <div class="drag"></div>
+    <div class="window-actions">
+      <button class="win-btn close" data-act="close" title="关闭"><i class="ri-close-line"></i></button>
+    </div>
+  </div>
+  <div class="wrap">
+    <h1>插件开发示例</h1>
+    <p>演示：注册函数、事件订阅、跨插件调用。</p>
+    <div class="box">
+      <button id="btn-register" class="action"><i class="ri-plug-line"></i> 注册函数</button>
+      <button id="btn-call" class="action"><i class="ri-exchange-line"></i> 调用 UtilPlugin.getTime</button>
+      <button id="btn-emit" class="action"><i class="ri-broadcast-line"></i> 广播事件 demo.notify</button>
+    </div>
+    <div class="box" id="log"></div>
+  </div>
+  <script>
+    const log = (msg) => { const el = document.getElementById('log'); const p = document.createElement('div'); p.textContent = msg; el.appendChild(p); };
+    document.querySelectorAll('.win-btn').forEach((b) => {
+      b.addEventListener('click', () => { const act = b.dataset.act; window.pluginAPI?.windowControl(act); });
+    });
+
+    window.pluginAPI?.onInvoke(async (fn, args) => {
+      if (fn === 'hello') return { ok: true, message: '你好，插件！' };
+      throw new Error('未知函数: ' + fn);
+    });
+    window.pluginAPI?.onEvent((name, payload) => { log(`[事件] ${name}: ${JSON.stringify(payload)}`); });
+
+    document.getElementById('btn-register').addEventListener('click', () => {
+      window.pluginAPI?.register('插件开发示例', ['hello', 'logTime']);
+      log('已注册函数: hello, logTime');
+    });
+    document.getElementById('btn-call').addEventListener('click', async () => {
+      const res = await window.pluginAPI?.call('UtilPlugin', 'getTime', []);
+      log('调用 UtilPlugin.getTime 返回: ' + JSON.stringify(res));
+    });
+    document.getElementById('btn-emit').addEventListener('click', async () => {
+      window.pluginAPI?.emit('demo.notify', { text: 'Hello from 插件开发示例' });
+      log('已发送事件 demo.notify');
+    });
+  </script>
+</body>
+</html>

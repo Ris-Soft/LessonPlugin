@@ -11,6 +11,9 @@ function renderPlugin(item) {
   const el = document.createElement('div');
   el.className = 'plugin-card';
   const versionText = item.version ? `v${item.version}` : '未知版本';
+  const actionsHtml = Array.isArray(item.actions) && item.actions.length
+    ? item.actions.map(a => `<button class="action-btn" data-action="${a.id}"><i class="${a.icon || ''}"></i> ${a.text || ''}</button>`).join('')
+    : '<span class="muted">无操作</span>';
   el.innerHTML = `
     <div class="card-header">
       <i class="${item.icon || 'ri-puzzle-line'}"></i>
@@ -24,13 +27,15 @@ function renderPlugin(item) {
       </label>
     </div>
     <div class="card-actions">
-      ${Array.isArray(item.actions) ? item.actions.map(a => `<button class="action-btn" data-action="${a.id}"><i class="${a.icon || ''}"></i> ${a.text || ''}</button>`).join('') : ''}
+      <div class="actions-left">${actionsHtml}</div>
+      <div class="actions-right"><button class="icon-btn uninstall-btn" title="卸载"><i class="ri-delete-bin-line"></i></button></div>
     </div>
   `;
 
   const checkbox = el.querySelector('input[type="checkbox"]');
   checkbox.addEventListener('change', async (e) => {
-    await window.settingsAPI?.togglePlugin(item.name, e.target.checked);
+    const key = item.id || item.name;
+    await window.settingsAPI?.togglePlugin(key, e.target.checked);
   });
 
   el.querySelectorAll('.action-btn').forEach((btn) => {
@@ -39,16 +44,34 @@ function renderPlugin(item) {
       const meta = (item.actions || []).find(a => a.id === act);
       // 若 actions 配置了 target（指向插件 index.js 的 functions 中的函数），则直接调用
       if (meta && typeof meta.target === 'string' && meta.target) {
-        await window.settingsAPI?.pluginCall?.(item.name, meta.target, Array.isArray(meta.args) ? meta.args : []);
+        const key = item.id || item.name;
+        await window.settingsAPI?.pluginCall?.(key, meta.target, Array.isArray(meta.args) ? meta.args : []);
+        console.log(key, meta.target, meta.args);
         return;
       }
       // 保留内置动作：安装NPM
       if (act === 'installNpm') {
         btn.disabled = true; btn.textContent = '安装中...';
-        await window.settingsAPI?.installNpm(item.name);
+        const key = item.id || item.name;
+        await window.settingsAPI?.installNpm(key);
         btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装NPM`;
       }
     });
+  });
+  const uninstallBtn = el.querySelector('.uninstall-btn');
+  uninstallBtn?.addEventListener('click', async () => {
+    const res = await showModal({ title: '卸载插件', message: `确认卸载插件：${item.name}？\n这将删除其目录与相关文件。`, confirmText: '卸载', cancelText: '取消' });
+    console.log('卸载插件确认结果:', res);
+    if (!res) return;
+    const key = item.id || item.name;
+    const out = await window.settingsAPI?.uninstallPlugin?.(key);
+    console.log('卸载插件结果:', out);
+    if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
+    // 重新刷新插件列表
+    const container = document.getElementById('plugins');
+    const list = await fetchPlugins();
+    container.innerHTML = '';
+    list.forEach((p) => container.appendChild(renderPlugin(p)));
   });
   return el;
 }
@@ -477,11 +500,13 @@ function initAboutPage() {
 
 // 通用设置：启动页与名言、基础设置
 async function initGeneralSettings() {
-  // 子夹（子页面）导航切换
-  const subItems = document.querySelectorAll('.sub-item');
+  // 子夹（子页面）导航切换（限定在通用设置页面内）
+  const subItems = document.querySelectorAll('#page-general .sub-item');
   const subpages = {
     splash: document.getElementById('general-splash'),
-    basic: document.getElementById('general-basic')
+    basic: document.getElementById('general-basic'),
+    time: document.getElementById('general-time'),
+    data: document.getElementById('general-data')
   };
   subItems.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -510,7 +535,8 @@ async function initGeneralSettings() {
     timeOffset: 0,
     autoOffsetDaily: 0,
     offsetBaseDate: new Date().toISOString().slice(0, 10),
-    semesterStart: new Date().toISOString().slice(0, 10)
+    semesterStart: new Date().toISOString().slice(0, 10),
+    biweekOffset: false
   };
   await window.settingsAPI?.configEnsureDefaults('system', defaults);
   const cfg = await window.settingsAPI?.configGetAll('system');
@@ -644,6 +670,7 @@ async function initGeneralSettings() {
   const autostartHigh = document.getElementById('autostart-high');
   const preciseTime = document.getElementById('precise-time');
   const semesterStart = document.getElementById('semester-start');
+  const biweekOffset = document.getElementById('biweek-offset');
   const timeOffset = document.getElementById('time-offset');
   const autoOffsetDaily = document.getElementById('auto-offset-daily');
 
@@ -651,6 +678,7 @@ async function initGeneralSettings() {
   autostartHigh.checked = !!cfg.autostartHigh;
   preciseTime.checked = !!cfg.preciseTimeEnabled;
   semesterStart.value = String(cfg.semesterStart || cfg.offsetBaseDate || new Date().toISOString().slice(0, 10));
+  if (biweekOffset) biweekOffset.checked = !!cfg.biweekOffset;
   timeOffset.value = Number(cfg.timeOffset || 0);
   autoOffsetDaily.value = Number(cfg.autoOffsetDaily || 0);
 
@@ -661,6 +689,21 @@ async function initGeneralSettings() {
     ntpServer.addEventListener('change', async () => {
       const val = String(ntpServer.value || '').trim() || 'ntp.aliyun.com';
       await window.settingsAPI?.configSet('system', 'ntpServer', val);
+    });
+  }
+
+  // 清理用户数据：提示确认后调用主进程删除用户数据目录
+  const cleanupBtn = document.getElementById('cleanup-user-data');
+  if (cleanupBtn) {
+    cleanupBtn.addEventListener('click', async () => {
+      const confirmed = window.confirm('确认删除所有插件与配置等用户数据？此操作不可恢复。');
+      if (!confirmed) return;
+      const res = await window.settingsAPI?.cleanupUserData?.();
+      if (res?.ok) {
+        alert('已清理用户数据。您现在可以从系统中卸载应用。');
+      } else {
+        alert('清理失败：' + (res?.error || '未知错误'));
+      }
     });
   }
 
@@ -679,6 +722,11 @@ async function initGeneralSettings() {
     const val = String(semesterStart.value || '').slice(0, 10);
     await window.settingsAPI?.configSet('system', 'semesterStart', val);
   });
+  if (biweekOffset) {
+    biweekOffset.addEventListener('change', async () => {
+      await window.settingsAPI?.configSet('system', 'biweekOffset', !!biweekOffset.checked);
+    });
+  }
   timeOffset.addEventListener('change', async () => {
     const val = Number(timeOffset.value || 0);
     await window.settingsAPI?.configSet('system', 'timeOffset', val);
@@ -687,6 +735,34 @@ async function initGeneralSettings() {
     const val = Number(autoOffsetDaily.value || 0);
     await window.settingsAPI?.configSet('system', 'autoOffsetDaily', val);
   });
+
+  // 数据目录：显示当前路径并绑定打开/更改
+  const userDataPathEl = document.getElementById('user-data-path');
+  const openUserDataBtn = document.getElementById('open-user-data');
+  const changeUserDataBtn = document.getElementById('change-user-data');
+  if (userDataPathEl && window.settingsAPI?.getUserDataPath) {
+    try {
+      const p = await window.settingsAPI.getUserDataPath();
+      userDataPathEl.textContent = String(p || '');
+    } catch {}
+  }
+  if (openUserDataBtn) {
+    openUserDataBtn.addEventListener('click', async () => {
+      try { await window.settingsAPI?.openUserData?.(); } catch {}
+    });
+  }
+  if (changeUserDataBtn) {
+    changeUserDataBtn.addEventListener('click', async () => {
+      const res = await window.settingsAPI?.changeUserData?.();
+      if (res?.ok) {
+        const p = await window.settingsAPI?.getUserDataPath?.();
+        if (userDataPathEl) userDataPathEl.textContent = String(p || '');
+        alert('已更改数据目录。重启应用后生效。');
+      } else if (res && res.error) {
+        alert('更改失败：' + res.error);
+      }
+    });
+  }
 }
 
 // 自动执行：列表与编辑器
@@ -851,6 +927,7 @@ async function initAutomationSettings() {
               const dom = d.getDate();
               const semStart = await (window.settingsAPI?.configGet?.('system','semesterStart'));
               const offsetBase = await (window.settingsAPI?.configGet?.('system','offsetBaseDate'));
+              const biweekOff = await (window.settingsAPI?.configGet?.('system','biweekOffset'));
               const base = semStart || offsetBase;
               let isEvenWeek = null;
               if (base) {
@@ -859,6 +936,7 @@ async function initAutomationSettings() {
                   const diffDays = Math.floor((d - baseDate) / (24 * 3600 * 1000));
                   const weekIndex = Math.floor(diffDays / 7);
                   isEvenWeek = weekIndex % 2 === 0;
+                  if (biweekOff) isEvenWeek = !isEvenWeek;
                 } catch {}
               }
               let ok = true;
@@ -960,8 +1038,8 @@ async function initAutomationSettings() {
           if (typeSel.value === 'pluginEvent') {
             const plugSel = document.createElement('select');
             const plugins = await window.settingsAPI?.getPlugins?.() || [];
-            plugins.forEach(p => { const o=document.createElement('option'); o.value=p.name; o.textContent=p.name; plugSel.appendChild(o); });
-            plugSel.value = a.pluginId || plugins[0]?.name || '';
+            plugins.forEach(p => { const o=document.createElement('option'); o.value=(p.id || p.name); o.textContent=p.name; plugSel.appendChild(o); });
+            plugSel.value = a.pluginId || (plugins[0]?.id || plugins[0]?.name) || '';
             const evSel = document.createElement('select');
             const res = await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value);
             const evs = Array.isArray(res?.events) ? res.events : (Array.isArray(res) ? res : []);

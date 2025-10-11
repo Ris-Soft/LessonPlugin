@@ -1,0 +1,12 @@
+directories:
+  output: dist
+  buildResources: build
+asar: false
+appId: com.lesson.plugin
+productName: LessonPlugin
+win:
+  icon: icon.ico
+nsis:
+  deleteAppDataOnUninstall: false
+files: []
+electronVersion: 38.2.2

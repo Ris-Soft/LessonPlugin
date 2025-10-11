@@ -17,6 +17,9 @@
     "productName": "LessonPlugin",
     "win": {
       "icon": "icon.ico"
+    },
+    "nsis": {
+      "deleteAppDataOnUninstall": false
     }
   },
   "devDependencies": {

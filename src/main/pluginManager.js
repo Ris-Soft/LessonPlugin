@@ -9,6 +9,7 @@ let pluginsRoot = '';
 let configPath = '';
 let manifest = { plugins: [] };
 let config = { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} };
+let nameToId = new Map(); // 兼容旧行为：允许通过中文名查找
 let windows = [];
 let pluginWindows = new Map(); // pluginId -> BrowserWindow
 let apiRegistry = new Map(); // pluginId -> Set(functionName)
@@ -70,7 +71,14 @@ module.exports.init = function init(paths) {
       }
       if (!name) name = entry; // 回退到目录名
 
+      // 生成稳定 id：优先 meta.id，否则根据 name 生成 slug；若 slug 为空则回退到目录名或随机
+      const rawId = String(meta.id || '').trim();
+      const slugFromName = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      let id = rawId || slugFromName || String(entry).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      if (!id) id = `plugin_${Date.now()}`;
+
       manifest.plugins.push({
+        id,
         name,
         npm: meta.npm || null,
         local: rel,
@@ -85,6 +93,7 @@ module.exports.init = function init(paths) {
         version: detectedVersion,
         studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
       });
+      nameToId.set(name, id);
     }
   } catch {}
   config = readJsonSafe(configPath, { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} });
@@ -92,8 +101,12 @@ module.exports.init = function init(paths) {
   if (!fs.existsSync(storeRoot)) fs.mkdirSync(storeRoot, { recursive: true });
 
   for (const p of manifest.plugins) {
-    if (typeof config.enabled[p.name] !== 'boolean') {
-      config.enabled[p.name] = !!p.enabled;
+    // 兼容旧配置：优先使用 id 键，其次回退 name 键
+    if (typeof config.enabled[p.id] !== 'boolean' && typeof config.enabled[p.name] === 'boolean') {
+      config.enabled[p.id] = !!config.enabled[p.name];
+    }
+    if (typeof config.enabled[p.id] !== 'boolean') {
+      config.enabled[p.id] = !!p.enabled;
     }
   }
   writeJsonSafe(configPath, config);
@@ -101,22 +114,31 @@ module.exports.init = function init(paths) {
 
 module.exports.getPlugins = function getPlugins() {
   return manifest.plugins.map((p) => ({
+    id: p.id,
     name: p.name,
     npm: p.npm || null,
     local: p.local || null,
-    enabled: !!config.enabled[p.name],
+    enabled: !!(config.enabled[p.id] ?? config.enabled[p.name]),
     icon: p.icon || null,
     description: p.description || '',
     actions: Array.isArray(p.actions) ? p.actions : [],
-    version: p.version || (config.npmSelection[p.name]?.version || null),
+    version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
     studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : []
   }));
 };
 
-module.exports.toggle = function toggle(name, enabled) {
-  config.enabled[name] = !!enabled;
+function findPluginByIdOrName(key) {
+  return manifest.plugins.find((p) => p.id === key || p.name === key);
+}
+
+module.exports.toggle = function toggle(idOrName, enabled) {
+  const p = findPluginByIdOrName(idOrName);
+  if (!p) return { ok: false, error: 'not_found' };
+  config.enabled[p.id] = !!enabled;
+  // 兼容旧键
+  config.enabled[p.name] = !!enabled;
   writeJsonSafe(configPath, config);
-  return { name, enabled: !!enabled };
+  return { id: p.id, name: p.name, enabled: !!enabled };
 };
 
 module.exports.loadPlugins = async function loadPlugins(onProgress) {
@@ -148,8 +170,8 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
             // 仅从 functions 中注册函数，排除 actions
             const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
             if (fnObj) {
-              if (!functionRegistry.has(p.name)) functionRegistry.set(p.name, new Map());
-              const map = functionRegistry.get(p.name);
+              if (!functionRegistry.has(p.id)) functionRegistry.set(p.id, new Map());
+              const map = functionRegistry.get(p.id);
               for (const [fn, impl] of Object.entries(fnObj)) {
                 if (fn === 'actions') continue;
                 if (typeof impl === 'function') map.set(fn, impl);
@@ -157,14 +179,14 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
             }
             // 自动化事件：若插件导出 automationEvents，则直接注册以便设置页可查询
             if (mod && Array.isArray(mod.automationEvents)) {
-              module.exports.registerAutomationEvents(p.name, mod.automationEvents);
+              module.exports.registerAutomationEvents(p.id, mod.automationEvents);
             }
             // 允许插件入口在主进程侧使用 API；若 init 为异步，则等待完成
             if (mod && typeof mod.init === 'function') {
               try {
                 // 报告插件初始化开始
                 progressReporter && progressReporter({ stage: 'plugin:init', message: `初始化插件 ${p.name}...` });
-                await Promise.resolve(mod.init(createPluginApi(p.name)));
+                await Promise.resolve(mod.init(createPluginApi(p.id)));
                 // 报告插件初始化结束
                 progressReporter && progressReporter({ stage: 'plugin:init', message: `插件 ${p.name} 初始化完成` });
               } catch (e) {
@@ -183,8 +205,8 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
   return statuses;
 };
 
-module.exports.installNpm = async function installNpm(name, onProgress) {
-  const p = manifest.plugins.find((x) => x.name === name);
+module.exports.installNpm = async function installNpm(idOrName, onProgress) {
+  const p = findPluginByIdOrName(idOrName);
   if (!p) return { ok: false, error: '插件不存在' };
 
   const jobs = [];
@@ -314,6 +336,38 @@ module.exports.getStudentColumnDefs = function getStudentColumnDefs() {
   }
 };
 
+// -------- 卸载本地插件（仅 local 插件） --------
+module.exports.uninstall = function uninstall(idOrName) {
+  try {
+    const idx = manifest.plugins.findIndex((p) => p.id === idOrName || p.name === idOrName);
+    if (idx < 0) return { ok: false, error: 'not_found' };
+    const p = manifest.plugins[idx];
+    // 仅支持卸载本地插件
+    if (!p.local) return { ok: false, error: 'not_local_plugin' };
+    const fullDir = path.join(path.dirname(manifestPath), p.local);
+    try {
+      // 关闭该插件可能打开的窗口
+      const win = pluginWindows.get(p.id) || pluginWindows.get(p.name);
+      if (win?.webContents?.id) {
+        try { win.webContents.destroy(); } catch {}
+      }
+      pluginWindows.delete(p.id);
+      pluginWindows.delete(p.name);
+    } catch {}
+    try {
+      if (fs.existsSync(fullDir)) fs.rmSync(fullDir, { recursive: true, force: true });
+    } catch {}
+    // 从清单与配置移除
+    manifest.plugins.splice(idx, 1);
+    try { delete config.enabled[p.id]; } catch {}
+    try { delete config.enabled[p.name]; } catch {}
+    writeJsonSafe(configPath, config);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
 // -------- ZIP 安装插件 --------
 function expandZip(zipPath, dest) {
   // 使用纯 Node 依赖 extract-zip，避免外部命令依赖（如 PowerShell）
@@ -367,7 +421,13 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
     // 更新内存清单（下次启动会通过目录扫描重建，无需写入集中式文件）
     const rel = path.relative(path.dirname(manifestPath), dest).replace(/\\/g, '/');
+    // 生成 id：优先 meta.id，否则基于名称生成 slug
+    const rawId = String(meta.id || '').trim();
+    const slugFromName = String(pluginName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const pluginId = rawId || slugFromName || tempId;
+
     manifest.plugins.push({
+      id: pluginId,
       name: pluginName,
       local: rel,
       enabled: true,
@@ -379,11 +439,14 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       version: detectedVersion,
       studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
     });
-    if (typeof config.enabled[pluginName] !== 'boolean') {
+    nameToId.set(pluginName, pluginId);
+    if (typeof config.enabled[pluginId] !== 'boolean') {
+      config.enabled[pluginId] = true;
+      // 兼容旧键
       config.enabled[pluginName] = true;
       writeJsonSafe(configPath, config);
     }
-    return { ok: true, name: pluginName };
+    return { ok: true, id: pluginId, name: pluginName };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -391,20 +454,22 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
 // -------- 插件 API / 事件总线 --------
 module.exports.registerFunctions = function registerFunctions(pluginId, functions, senderWC) {
-  if (!apiRegistry.has(pluginId)) apiRegistry.set(pluginId, new Set());
-  const set = apiRegistry.get(pluginId);
+  const canonId = nameToId.get(pluginId) || pluginId;
+  if (!apiRegistry.has(canonId)) apiRegistry.set(canonId, new Set());
+  const set = apiRegistry.get(canonId);
   for (const fn of functions) set.add(fn);
   // 将 webContents 记录，供路由调用
-  const win = pluginWindows.get(pluginId);
+  const win = pluginWindows.get(canonId);
   if (!win || win.webContents.id !== senderWC.id) {
     // 如果调用来自不同 webContents（异常情况），仍以最新 sender 为准
-    pluginWindows.set(pluginId, { webContents: senderWC, isProxy: true });
+    pluginWindows.set(canonId, { webContents: senderWC, isProxy: true });
   }
   return { ok: true };
 };
 
 // 自动化事件注册/查询
 module.exports.registerAutomationEvents = function registerAutomationEvents(pluginId, events) {
+  const canonId = nameToId.get(pluginId) || pluginId;
   if (!Array.isArray(events)) return { ok: false, error: 'events_invalid' };
   const filtered = events.filter((e) => e && e.expose !== false).map((e) => ({
     id: e.id || e.name,
@@ -412,17 +477,19 @@ module.exports.registerAutomationEvents = function registerAutomationEvents(plug
     desc: e.desc || '',
     params: Array.isArray(e.params) ? e.params : []
   }));
-  automationEventRegistry.set(pluginId, filtered);
+  automationEventRegistry.set(canonId, filtered);
   return { ok: true, count: filtered.length };
 };
 module.exports.listAutomationEvents = function listAutomationEvents(pluginId) {
-  return { ok: true, events: automationEventRegistry.get(pluginId) || [] };
+  const canonId = nameToId.get(pluginId) || pluginId;
+  return { ok: true, events: automationEventRegistry.get(canonId) || [] };
 };
 
 module.exports.callFunction = function callFunction(targetPluginId, fnName, args) {
   return new Promise(async (resolve) => {
+    const canonId = nameToId.get(targetPluginId) || targetPluginId;
     // 优先主进程注册的函数，无需窗口
-    const fnMap = functionRegistry.get(targetPluginId);
+    const fnMap = functionRegistry.get(canonId);
     if (fnMap && fnMap.has(fnName)) {
       try {
         const result = await Promise.resolve(fnMap.get(fnName)(...(Array.isArray(args) ? args : [])));
@@ -433,7 +500,7 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
     }
 
     // 回退到插件窗口注册的函数
-    const win = pluginWindows.get(targetPluginId);
+    const win = pluginWindows.get(canonId);
     const wc = win?.webContents || win;
     if (!wc) return resolve({ ok: false, error: '目标插件未打开窗口或未注册' });
     const reqId = uuidv4();

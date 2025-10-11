@@ -103,6 +103,7 @@ class AutomationManager {
     const dom = d.getDate(); // 1..31
     // 读取单双周基准（来自 system.offsetBaseDate 或 system.semesterStart）
     const base = this.store.get('system', 'semesterStart') || this.store.get('system', 'offsetBaseDate');
+    const biweekOff = !!this.store.get('system', 'biweekOffset');
     let isEvenWeek = null;
     if (base) {
       try {
@@ -110,6 +111,7 @@ class AutomationManager {
         const diffDays = Math.floor((d - baseDate) / (24 * 3600 * 1000));
         const weekIndex = Math.floor(diffDays / 7);
         isEvenWeek = weekIndex % 2 === 0;
+        if (biweekOff) isEvenWeek = !isEvenWeek;
       } catch {}
     }
 
