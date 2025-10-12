@@ -24,6 +24,33 @@ body {
   overflow-y: hidden;
 }
 
+/* 插件页面主体容器（示例插件窗口等） */
+.wrap {
+  padding: 20px;
+  height: calc(100vh - 35px); /* 34px 标题栏 + 1px 边框 */
+  overflow-y: auto;
+}
+
+/* 插件页面滚动条样式（与设置页保持一致） */
+.wrap::-webkit-scrollbar {
+  width: 10px;
+}
+
+.wrap::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 1px solid var(--border);
+}
+
+.wrap::-webkit-scrollbar-thumb {
+  background: rgba(64, 75, 88, 0.685);
+  border: 1px solid rgba(72, 87, 107, 0.45);
+  border-radius: 999px;
+}
+
+.wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(69, 83, 90, 0.5);
+}
+
 /* 布局 */
 .layout {
   display: grid;
@@ -357,6 +384,10 @@ main {
   padding-right: 16px;
 }
 
+.modal-desc {
+  margin-top: 15px;
+}
+
 .array-item button {
   background: rgba(220, 38, 38, 0.25);
   color: #fff;
@@ -668,7 +699,7 @@ label {
 .section {
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px dashed var(--border);
+  /* border-top: 1px dashed var(--border); */
 }
 
 .section .section-title {
@@ -914,6 +945,7 @@ label {
 .titlebar .drag {
   -webkit-app-region: drag;
   height: 100%;
+  line-height: 34px;
 }
 
 .window-actions {
@@ -944,6 +976,14 @@ label {
 .win-btn.close:hover,
 .win-btn.close:active {
   background: rgba(220, 38, 38, 0.25);
+}
+
+.win-btn {
+  font-size: 18px;
+}
+
+.win-btn.max {
+  font-size: 13px;
 }
 
 /* NPM 页面 */

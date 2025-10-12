@@ -21,13 +21,13 @@ const functions = {
 const init = async (api) => {
   api.splash.setStatus('plugin:init', '初始化桌面组件');
   // 执行耗时初始化任务
-  await new Promise(r => setTimeout(r, 1500));
+  // await new Promise(r => setTimeout(r, 1500));
   api.splash.setStatus('plugin:init', '桌面组件加载完成');
-  await new Promise(r => setTimeout(r, 1500));
+  // await new Promise(r => setTimeout(r, 1500));
 };
 
 module.exports = {
-  name: 'ExamplePlugin',
+  name: '基础示例',
   version: '1.0.0',
   init,
   functions

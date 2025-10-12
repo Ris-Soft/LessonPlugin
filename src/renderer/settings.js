@@ -196,6 +196,86 @@ async function showParamsEditor(initial) {
   });
 }
 
+// 基于插件事件参数定义的编辑器：数量、类型、提示文本皆由插件提供
+async function showParamsEditorForEvent(paramDefs, initial) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑插件事件参数';
+    const body = document.createElement('div'); body.className = 'modal-body';
+    const list = document.createElement('div'); list.className = 'array-list';
+    const defs = Array.isArray(paramDefs) ? paramDefs : [];
+    const values = Array.isArray(initial) ? initial.map((x) => x) : [];
+    const parseByType = (type, str) => {
+      switch (String(type || 'string')) {
+        case 'string': return String(str || '');
+        case 'number': { const n = Number(str); if (!Number.isFinite(n)) throw new Error('数字格式错误'); return n; }
+        case 'boolean': { const s = String(str).trim().toLowerCase(); return s === 'true' || s === '1' || s === 'yes'; }
+        case 'object': { const o = JSON.parse(str || '{}'); if (Array.isArray(o) || typeof o !== 'object' || o === null) throw new Error('对象必须为JSON Object'); return o; }
+        case 'array': { const a = JSON.parse(str || '[]'); if (!Array.isArray(a)) throw new Error('数组必须为JSON Array'); return a; }
+        default: return String(str || '');
+      }
+    };
+    const stringifyByType = (type, v) => {
+      const t = String(type || 'string');
+      if (t === 'object' || t === 'array') return JSON.stringify(v ?? (t === 'array' ? [] : {}));
+      if (t === 'boolean') return v ? 'true' : 'false';
+      if (t === 'number') return String(Number(v || 0));
+      return String(v ?? '');
+    };
+    defs.forEach((def, i) => {
+      const row = document.createElement('div'); row.className = 'array-item';
+      const label = document.createElement('label'); label.className = 'muted'; label.textContent = def?.name || `参数${i+1}`;
+      const type = String(def?.type || 'string');
+      let input = null;
+      if (type === 'boolean') {
+        const wrap = document.createElement('label'); wrap.className = 'switch';
+        input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!values[i];
+        const slider = document.createElement('span'); slider.className = 'slider';
+        wrap.appendChild(input); wrap.appendChild(slider);
+        row.appendChild(label); row.appendChild(wrap);
+      } else {
+        input = document.createElement('input'); input.type = (type === 'number') ? 'number' : 'text';
+        input.value = stringifyByType(type, values[i]);
+        input.placeholder = String(def?.hint || def?.desc || def?.name || '');
+        row.appendChild(label); row.appendChild(input);
+      }
+      list.appendChild(row);
+    });
+
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='取消';
+    cancel.onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    const save = document.createElement('button'); save.className='btn primary'; save.textContent='保存';
+    save.onclick = async () => {
+      try {
+        const result = defs.map((def, i) => {
+          const type = String(def?.type || 'string');
+          const row = list.children[i];
+          const checkbox = row.querySelector('input[type="checkbox"]');
+          const input = checkbox || row.querySelector('input');
+          const raw = (checkbox ? checkbox.checked : (input?.value || ''));
+          const val = checkbox ? !!raw : parseByType(type, raw);
+          return val;
+        });
+        document.body.removeChild(overlay);
+        resolve(result);
+      } catch (e) {
+        await showAlert(e?.message || '参数格式错误，请检查');
+      }
+    };
+    const desc = document.createElement('div'); desc.className='modal-desc muted'; desc.textContent='参数类型与数量由插件定义；布尔值用开关，复杂类型按JSON编辑';
+    box.appendChild(title);
+    body.appendChild(list);
+    body.appendChild(desc);
+    box.appendChild(body);
+    actions.appendChild(cancel); actions.appendChild(save);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
 async function main() {
   // 左侧导航切换
   const navItems = document.querySelectorAll('.nav-item');
@@ -1045,6 +1125,9 @@ async function initAutomationSettings() {
             const evs = Array.isArray(res?.events) ? res.events : (Array.isArray(res) ? res : []);
             evs.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=(e.desc || e.title || e.name); evSel.appendChild(o); });
             evSel.value = a.event || evs[0]?.name || '';
+            // 立即写入，确保act包含pluginId与event
+            a.pluginId = plugSel.value;
+            a.event = evSel.value;
             const editParams = document.createElement('button'); editParams.className='btn secondary'; editParams.innerHTML = '<i class="ri-edit-2-line"></i> 编辑参数数组';
             const paramsPreview = document.createElement('div'); paramsPreview.className='muted'; paramsPreview.textContent = `参数项数：${Array.isArray(a.params)? a.params.length : 0}`;
             plugSel.addEventListener('change', async () => {
@@ -1056,7 +1139,12 @@ async function initAutomationSettings() {
               a.event = evSel.value = evs2[0]?.name || '';
             });
             evSel.addEventListener('change', () => { a.event = evSel.value; });
-            editParams.onclick = async () => { const res = await showParamsEditor(Array.isArray(a.params)? a.params : []); if (Array.isArray(res)) { a.params = res; paramsPreview.textContent = `参数项数：${res.length}`; } };
+            editParams.onclick = async () => {
+              const def = evs.find(e => e.name === evSel.value);
+              const defs = Array.isArray(def?.params) ? def.params : [];
+              const resEdit = await showParamsEditorForEvent(defs, Array.isArray(a.params) ? a.params : []);
+              if (Array.isArray(resEdit)) { a.params = resEdit; paramsPreview.textContent = `参数项数：${resEdit.length}`; }
+            };
             cfg.appendChild(plugSel); cfg.appendChild(evSel); cfg.appendChild(editParams); cfg.appendChild(paramsPreview);
           } else if (typeSel.value === 'power') {
             const opSel = document.createElement('select'); [['shutdown','关机'],['restart','重启'],['logoff','注销']].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; opSel.appendChild(o); }); opSel.value = a.op || 'shutdown'; opSel.addEventListener('change', () => { a.op = opSel.value; }); cfg.appendChild(opSel);

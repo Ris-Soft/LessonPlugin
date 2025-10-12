@@ -20,7 +20,7 @@ const functions = {
 const init = async (api) => {
   // 在真实启动阶段报告初始化状态到启动页
   api.splash.setStatus('plugin:init', '初始化学生列表示例');
-  await new Promise(r => setTimeout(r, 600));
+  // await new Promise(r => meout(r, 600));
   api.splash.progress('plugin:init', '学生列表示例就绪');
 };
 

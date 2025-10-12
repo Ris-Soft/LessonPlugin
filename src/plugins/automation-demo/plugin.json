@@ -1,5 +1,6 @@
 {
-  "name": "AutomationDemo",
+  "id": "demo.automation",
+  "name": "自动化演示",
   "icon": "ri-robot-line",
   "version": "1.0.0",
   "description": "示例插件：演示自动化事件与后端函数",

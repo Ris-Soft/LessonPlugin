@@ -207,7 +207,7 @@ class AutomationManager {
   async executeActions(actions, ctx) {
     for (const act of actions) {
       try {
-        console.log(act);
+        // console.log(act);
         if (act.type === 'pluginEvent') {
           await this.pluginManager.callFunction(act.pluginId, act.event, act.params || []);
           // console.log(act);

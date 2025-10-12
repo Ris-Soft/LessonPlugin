@@ -40,12 +40,12 @@ const functions = {
 
 // 自动化事件声明（供设置页查询）
 const automationEvents = [
-  { id: 'notify', name: 'notify', desc: '系统通知（标题、内容）', params: [ { name: 'title', type: 'string' }, { name: 'body', type: 'string' } ] },
-  { id: 'logTime', name: 'logTime', desc: '将当前时间写入日志文件', params: [] }
+  { id: 'notify', name: 'notify', desc: '系统通知', params: [ { name: 'title', type: 'string', hint: '通知标题' }, { name: 'body', type: 'string', hint: '通知内容' } ] },
+  { id: 'logTime', name: 'logTime', desc: '时间写入日志文件', params: [] }
 ];
 
 module.exports = {
-  name: 'AutomationDemo',
+  name: '自动化演示',
   version: '1.0.0',
   functions,
   automationEvents

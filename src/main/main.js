@@ -211,6 +211,7 @@ app.whenReady().then(async () => {
     // 需要的文件：标题栏样式、Remixicon 字体与样式
     const filesToMirror = [
       'titlebar.css',
+      'settings.css',
       'remixicon-local.css',
       'remixicon.woff2'
     ];
@@ -586,3 +587,17 @@ function applyUserDataOverride() {
 }
 
 applyUserDataOverride();
+// 资源路径解析：为插件窗口提供统一的资源URL（优先用户数据镜像，其次应用内置）
+ipcMain.handle('asset:url', async (_e, relPath) => {
+  try {
+    const userRoot = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer');
+    const shippedRoot = path.join(app.getAppPath(), 'src', 'renderer');
+    const candidates = [path.join(userRoot, relPath), path.join(shippedRoot, relPath)];
+    const found = candidates.find((p) => fs.existsSync(p));
+    if (!found) return null;
+    const url = 'file://' + found.replace(/\\/g, '/');
+    return url;
+  } catch (e) {
+    return null;
+  }
+});

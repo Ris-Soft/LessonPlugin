@@ -1,0 +1,10 @@
+{
+  "name": "notify-plugin",
+  "label": "通知插件",
+  "version": "1.0.0",
+  "description": "前置类通知插件：队列化通知、TTS播报、类型音频与两种窗口样式",
+  "id": "notify.plugin",
+  "actions": [
+    { "id": "openSettings", "text": "打开通知设置", "target": "openSettings", "icon": "ri-settings-3-line" }
+  ]
+}

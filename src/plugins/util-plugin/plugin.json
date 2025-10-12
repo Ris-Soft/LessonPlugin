@@ -1,5 +1,6 @@
 {
-  "name": "UtilPlugin",
+  "id": "demo.utils",
+  "name": "工具示例",
   "icon": "ri-tools-line",
   "version": "1.0.0",
   "description": "提供时间查询与事件演示",

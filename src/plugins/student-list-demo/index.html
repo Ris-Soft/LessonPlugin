@@ -3,23 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>学生列表示例</title>
+    <title>学生数据示例</title>
     <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
     <link rel="stylesheet" href="../../renderer/titlebar.css" />
+    <link rel="stylesheet" href="../../renderer/settings.css" />
     <style>
       :root { --bg:#0b1520; --fg:#e6f1ff; --muted:#9bb3cc; --panel:rgba(255,255,255,0.06); --accent:#2dd4bf; --danger:#ef4444; }
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Microsoft YaHei", sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
-      .wrap { padding: 20px; }
-      h1 { margin: 0 0 8px 0; color: var(--accent); }
-      p { color: var(--muted); margin: 4px 0 12px; }
+      /* 使用 settings.css 的 .btn/.section 样式，保留表格与 danger 按钮 */
       .box { margin-top: 16px; padding: 12px; border-radius: 8px; background: var(--panel); }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 8px; }
       th { text-align: left; color: var(--muted); font-weight: 600; }
       td input, td select { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); }
       .actions { display: flex; gap: 8px; }
-      .btn { padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; color: var(--bg); background: var(--fg); }
-      .btn.primary { background: var(--accent); color: #06222a; }
       .btn.danger { background: var(--danger); color: #fff; }
       .muted { color: var(--muted); }
       .titlebar .drag { color: var(--fg); }
@@ -27,22 +24,23 @@
   </head>
   <body>
     <div class="titlebar">
-      <div class="drag">学生列表示例</div>
+      <div class="drag">学生数据示例</div>
       <div class="window-actions">
         <button class="win-btn" data-act="minimize" title="最小化"><i class="ri-subtract-line"></i></button>
-        <button class="win-btn" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+        <button class="win-btn max" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
         <button class="win-btn close" data-act="close" title="关闭"><i class="ri-close-line"></i></button>
       </div>
     </div>
     <div class="wrap">
-      <h1>学生列表维护</h1>
-      <p>演示：读取与编辑“档案管理/学生列表”，以及“通用设置”的精准时间＋偏移效果。</p>
+      <div class="section">
+        <div class="section-title"><i class="ri-user-3-line"></i> 学生列表维护</div>
+        <div class="muted">演示：读取与编辑“档案管理/学生列表”，以及“通用设置”的精准时间＋偏移效果。</div>
 
       <div class="box">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
           <div class="muted">学生列表（保存在 `profiles.students`）</div>
           <div class="actions">
-            <button id="btn-add" class="btn"><i class="ri-user-add-line"></i> 增加一行</button>
+            <button id="btn-add" class="btn secondary"><i class="ri-user-add-line"></i> 增加一行</button>
             <button id="btn-save" class="btn primary"><i class="ri-save-3-line"></i> 保存修改</button>
           </div>
         </div>
@@ -52,18 +50,21 @@
         </table>
       </div>
 
-      <div class="box">
+      <div class="section">
+        <div class="section-title"><i class="ri-time-line"></i> 当前时间</div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
           <div>
-            <strong>当前时间（按设置偏移与精确开关）</strong>
             <div class="muted">显示设置调整后的时间与偏移秒数</div>
           </div>
-          <div class="actions"><button id="btn-refresh" class="btn"><i class="ri-refresh-line"></i> 立即同步</button></div>
+          <div class="actions"><button id="btn-refresh" class="btn secondary"><i class="ri-refresh-line"></i> 立即同步</button></div>
         </div>
         <div id="time-box" style="margin-top:8px;"></div>
       </div>
 
-      <div class="box muted" id="log"></div>
+      <div class="section">
+        <div class="section-title"><i class="ri-file-list-3-line"></i> 日志</div>
+        <div class="box muted" id="log"></div>
+      </div>
     </div>
 
     <script>

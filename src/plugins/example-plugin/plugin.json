@@ -1,5 +1,6 @@
 {
-  "name": "ExamplePlugin",
+  "id": "demo.basic",
+  "name": "基础示例",
   "version": "1.0.0",
   "icon": "ri-puzzle-line",
   "description": "示例插件，演示窗口与接口",

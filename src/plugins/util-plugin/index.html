@@ -3,37 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Util Plugin</title>
+    <title>工具示例</title>
     <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
-    <link rel="stylesheet" href="https://static.opendatasoft.com/fonts/remixicon/latest/remixicon.css" />
     <link rel="stylesheet" href="../../renderer/titlebar.css" />
-    <style>
-      :root { --bg:#071a12; --fg:#d7f3e5; --muted:#9bd6b8; --panel:rgba(255,255,255,0.06); --accent:#22c55e; }
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Microsoft YaHei", sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
-      .wrap { padding: 20px; }
-      h1 { margin: 0 0 8px 0; color: var(--accent); }
-      p { color: var(--muted); }
-      .box { margin-top: 16px; padding: 12px; border-radius: 8px; background: var(--panel); }
-      /* 标题栏样式已统一由 ../../renderer/titlebar.css 提供 */
-    </style>
+    <link rel="stylesheet" href="../../renderer/settings.css" />
   </head>
   <body>
     <div class="titlebar">
-      <div class="drag">工具插件</div>
+      <div class="drag">工具示例</div>
       <div class="window-actions">
         <button class="win-btn" data-act="minimize" title="最小化"><i class="ri-subtract-line"></i></button>
-        <button class="win-btn" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+        <button class="win-btn max" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
         <button class="win-btn close" data-act="close" title="关闭"><i class="ri-close-line"></i></button>
       </div>
     </div>
     <div class="wrap">
-      <h1>工具插件窗口</h1>
-      <p>此插件提供功能：<code>getTime</code> 与事件：<code>tick</code></p>
-      <div class="box">
-        <button id="btn-register" class="action"><i class="ri-plug-line"></i> 注册功能</button>
-        <button id="btn-call" class="action"><i class="ri-exchange-line"></i> 调用 ExamplePlugin.hello</button>
+      <div class="section">
+        <div class="section-title"><i class="ri-tools-line"></i> 工具示例</div>
+        <div class="muted">此插件提供功能：<code>getTime</code> 与事件：<code>basic:hello</code></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button id="btn-register" class="btn secondary"><i class="ri-plug-line"></i> 注册功能</button>
+          <button id="btn-call" class="btn secondary"><i class="ri-exchange-line"></i> 调用 demo.basic:hello</button>
+        </div>
       </div>
-      <div class="box" id="log"></div>
+      <div class="section">
+        <div class="section-title"><i class="ri-file-list-3-line"></i> 日志</div>
+        <div class="box" id="log"></div>
+      </div>
     </div>
     <script>
       const log = (msg) => { const el = document.getElementById('log'); const p = document.createElement('div'); p.textContent = msg; el.appendChild(p); };
@@ -51,12 +47,12 @@
       window.pluginAPI?.onEvent((name, payload) => { log(`[事件] ${name}: ${JSON.stringify(payload)}`); });
 
       document.getElementById('btn-register').addEventListener('click', () => {
-        window.pluginAPI?.register('UtilPlugin', ['getTime']);
-        window.pluginAPI?.subscribe('ExamplePlugin:helloEvent');
-        log('已注册函数: getTime，并订阅事件 ExamplePlugin:helloEvent');
+        window.pluginAPI?.register('demo.utils', ['getTime']);
+        window.pluginAPI?.subscribe('basic:hello');
+        log('已注册函数: getTime，并订阅事件 basic:hello');
       });
       document.getElementById('btn-call').addEventListener('click', async () => {
-        const res = await window.pluginAPI?.call('ExamplePlugin', 'hello', ['from UtilPlugin']);
+        const res = await window.pluginAPI?.call('demo.basic', 'hello', ['from 工具示例']);
         log('调用结果: ' + JSON.stringify(res));
       });
     </script>

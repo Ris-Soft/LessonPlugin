@@ -19,7 +19,7 @@ const functions = {
 };
 
 module.exports = {
-  name: 'UtilPlugin',
+  name: '工具示例',
   version: '1.0.0',
   functions
 };

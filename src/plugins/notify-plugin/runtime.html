@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>通知运行窗口</title>
+    <link rel="stylesheet" href="../../renderer/titlebar.css" />
+    <link rel="stylesheet" href="../../renderer/settings.css" />
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <style>
+      .toast { position: fixed; top: 48px; left: 24px; max-width: 520px; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,0.25); margin: 0; padding: 16px 20px; display: none; z-index: 1000; transform: translateX(-24px); opacity: 0; transition: transform 240ms ease, opacity 240ms ease, background-image 100ms linear; }
+      .toast.show { transform: translateX(0); opacity: 1; }
+      .toast .title { font-size: 20px; font-weight: 600; }
+      .toast .sub { margin-top: 8px; color: var(--text-secondary); }
+      .toast .meta { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+      .toast.info { border-left: 4px solid #3a86ff; }
+      .toast.warn { border-left: 4px solid #ffbe0b; }
+      .toast.error { border-left: 4px solid #ef233c; }
+      .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; z-index: 2000; }
+      .overlay .panel { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(760px, 92vw); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); padding: 24px 28px; }
+      .overlay .panel .title { font-size: 24px; font-weight: 700; }
+      .overlay .panel .sub { margin-top: 10px; color: var(--text-secondary); }
+      .overlay .panel .actions { margin-top: 16px; display: flex; gap: 8px; align-items: center; }
+      .overlay .panel .countdown { font-size: 12px; color: var(--text-secondary); }
+      .btn { border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; background: var(--bg); }
+      .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+    </style>
+  </head>
+  <body style="background: transparent;">
+    <!-- 左上角大字通知 -->
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+    <!-- 全屏黑色中央半透明背景通知 -->
+    <div id="overlay" class="overlay" role="dialog" aria-modal="true">
+      <div class="panel">
+        <div class="content">
+          <div class="title" id="ovTitle"></div>
+          <div class="sub" id="ovSub"></div>
+        </div>
+        <div class="actions">
+          <button id="ovClose" class="btn" style="display:none;">关闭</button>
+          <span id="ovCountdown" class="countdown" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+    <script src="runtime.js"></script>
+  </body>
+  </html>
