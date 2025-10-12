@@ -37,6 +37,15 @@ function createRuntimeWindow() {
     },
   });
 
+  // 提升置顶优先级至最高（macOS 使用最高层级；Windows 忽略 level 但仍为 TOPMOST）
+  try {
+    runtimeWin.setAlwaysOnTop(true, 'screen-saver');
+    // 确保全屏与不同工作区也可见（macOS 有效）
+    if (typeof runtimeWin.setVisibleOnAllWorkspaces === 'function') {
+      runtimeWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
+  } catch {}
+
   // 默认开启穿透
   runtimeWin.setIgnoreMouseEvents(true, { forward: true });
 
