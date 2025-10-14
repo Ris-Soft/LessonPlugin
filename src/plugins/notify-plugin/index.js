@@ -184,17 +184,38 @@ module.exports = {
       if (!win || win.isDestroyed()) return false;
       try { win.webContents.send('notify:enqueue', Array.isArray(list) ? list : [list]); return true; } catch { return false; }
     },
-    // 自动化/运行窗口调用：本地 EdgeTTS 合成，返回文件 URL
+    // 兼容自动化事件的细分入口：toast（内部调用 enqueue 构造 payload）
+    toast: (title, subText, type, duration, speak) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'toast', title, subText, type, duration, speak };
+      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：overlay（卡片）
+    overlay: (title, subText, autoClose, duration, showClose, closeDelay) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'overlay', title, subText, autoClose, duration, showClose, closeDelay };
+      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：overlay.text（纯文本遮罩）
+    ['overlay.text'](text, duration, animate) {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'overlay.text', text, duration, animate };
+      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：sound（别名，内部调用 playSound）
+    sound: (which = 'in') => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
+      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
+    },
+    // 自动化/运行窗口调用：本地 EdgeTTS 合成，返回文件 URL（暂时隐藏入口）
     edgeSpeakLocal: async (text, voiceName) => {
       const res = await synthEdgeTtsToFile(text, voiceName);
       return res;
-    },
-    // 自动化动作：纯文本全屏提示（无卡片），支持载入/载出动画
-    overlayText: (text, duration = 3000, animate = 'fade') => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'overlay.text', text: String(text || ''), duration: Number(duration) || 3000, animate: String(animate || 'fade') };
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
     },
     // 自动化动作/通用：播放内置音效（in 或 out）
     playSound: (which = 'in') => {
@@ -204,10 +225,18 @@ module.exports = {
       try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
     }
   },
-  // 自动化事件声明：暴露可调用动作
+  // 自动化事件声明：暴露可调用动作（更全面）
   automationEvents: [
-    { id: 'notify.overlayText', name: 'overlayText', desc: '全屏纯文本提示', params: [ { name: 'text', type: 'string' }, { name: 'duration', type: 'number' }, { name: 'animate', type: 'string', hint: 'fade/zoom' } ] },
-    { id: 'notify.playSound', name: 'playSound', desc: '播放通知音效', params: [ { name: 'which', type: 'string', hint: 'in/out' } ] },
-    { id: 'notify.edgeSpeak', name: 'edgeSpeakLocal', desc: '本地 EdgeTTS 合成并播放', params: [ { name: 'text', type: 'string' }, { name: 'voice', type: 'string' } ] }
+    // 通用入口：直接传递 payload（模式与参数见 README）
+    { id: 'notify.enqueue', name: 'enqueue', desc: '通用通知（直接传对象）', params: [ { name: 'payload', type: 'object', hint: '模式与参数见文档' } ] },
+    // 细分入口：toast
+    { id: 'notify.toast', name: 'toast', desc: '左上角通知', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'type', type: 'string', hint: 'info/warn/error' }, { name: 'duration', type: 'number' }, { name: 'speak', type: 'boolean' } ] },
+    // 细分入口：遮罩卡片
+    { id: 'notify.overlay', name: 'overlay', desc: '全屏遮罩卡片', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'autoClose', type: 'boolean' }, { name: 'duration', type: 'number' }, { name: 'showClose', type: 'boolean' }, { name: 'closeDelay', type: 'number' } ] },
+    // 细分入口：纯文本遮罩
+    { id: 'notify.overlayText', name: 'overlay.text', desc: '全屏纯文本提示', params: [ { name: 'text', type: 'string' }, { name: 'duration', type: 'number' }, { name: 'animate', type: 'string', hint: 'fade/zoom' } ] },
+    // 细分入口：音效
+    { id: 'notify.sound', name: 'sound', desc: '播放通知音效', params: [ { name: 'which', type: 'string', hint: 'in/out' } ] }
+    // EdgeTTS 入口暂时隐藏
   ]
 };

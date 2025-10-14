@@ -44,7 +44,7 @@
               <div class="setting-icon"><i class="ri-cpu-line"></i></div>
               <div class="setting-main">
                 <div class="setting-title">播报引擎</div>
-                <div class="setting-desc">当前仅支持系统语音（暂时隐藏 EdgeTTS）。</div>
+                <div class="setting-desc">当前仅支持系统语音。</div>
               </div>
               <div class="setting-action">
                 <select id="ttsEngine">
@@ -101,6 +101,17 @@
                   <button class="btn secondary" id="btnPlayIn"><i class="ri-play-line"></i> 试听入场</button>
                   <button class="btn secondary" id="btnPlayOut"><i class="ri-play-line"></i> 试听退场</button>
                 </div>
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-icon"><i class="ri-equalizer-line"></i></div>
+              <div class="setting-main">
+                <div class="setting-title">音效音量</div>
+                <div class="setting-desc">调节通知音效的相对音量（0–100%，默认90%）。</div>
+              </div>
+              <div class="setting-action">
+                <input id="soundVolume" type="range" min="0" max="100" step="1" />
               </div>
             </div>
 

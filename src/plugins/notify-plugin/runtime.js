@@ -1,5 +1,5 @@
 (() => {
-  const state = { queue: [], active: false, audio: { info: null, warn: null, error: null }, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '' };
+  const state = { queue: [], active: false, audio: { info: null, warn: null, error: null }, soundVolume: 0.9, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '' };
   const el = {
     toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovCountdown: document.getElementById('ovCountdown'),
     overlayText: document.getElementById('overlayText'), overlayTextContent: document.getElementById('overlayTextContent')
@@ -20,6 +20,7 @@
         state.ttsEndpoint = cfg?.ttsEndpoint || '';
         state.ttsEdgeVoice = cfg?.ttsEdgeVoice || '';
         const audio = cfg?.audio || {};
+        state.soundVolume = Math.max(0, Math.min(1, Number(cfg?.soundVolume ?? state.soundVolume)));
         ['info','warn','error'].forEach((k) => { state.audio[k] = audio?.[k] || null; });
       } catch {}
     });
@@ -30,7 +31,7 @@
     try {
       const file = which === 'out' ? 'out.mp3' : 'in.mp3';
       const a = new Audio(`./sounds/${file}`);
-      a.volume = 0.9;
+      a.volume = Math.max(0, Math.min(1, Number(state.soundVolume || 0.9)));
       a.play().catch(() => {});
     } catch {}
   };

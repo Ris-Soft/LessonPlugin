@@ -22,11 +22,42 @@ class AutomationManager {
     this.store.ensureDefaults('automation', { list: [] });
     const latest = this.store.get('automation', 'list');
     this.items = Array.isArray(latest) ? latest : [];
-    // 定时检查“到达某时间”触发器（每30秒）
-    this.timer = setInterval(() => this.checkTimeTriggers(), 30 * 1000);
+    // 按整分钟对齐检查“到达某时间”触发器
+    try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+    const scheduleNext = () => {
+      const now = Date.now();
+      // 距离下一分钟边界的毫秒数（确保在 mm:00 秒准点触发）
+      const msToNextMinute = 60000 - (now % 60000);
+      this.timer = setTimeout(() => {
+        try { this.checkTimeTriggers(); } catch {}
+        scheduleNext();
+      }, msToNextMinute);
+    };
+    scheduleNext();
+
+    // 启动补触发：应用启动或初始化后，若当前分钟尚未执行，则立即检查一次
+    try { this.checkTimeTriggers(); } catch {}
+
+    // 系统睡眠后恢复时进行补触发，并重新对齐下一分钟
+    try {
+      const { powerMonitor } = require('electron');
+      this._onResume = () => {
+        try { this.checkTimeTriggers(); } catch {}
+        try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+        scheduleNext();
+      };
+      powerMonitor.on('resume', this._onResume);
+    } catch {}
   }
 
-  dispose() { try { if (this.timer) clearInterval(this.timer); } catch {} }
+  dispose() {
+    try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+    try {
+      const { powerMonitor } = require('electron');
+      if (this._onResume) powerMonitor.removeListener('resume', this._onResume);
+      this._onResume = null;
+    } catch {}
+  }
 
   list() { return this.items; }
   get(id) { return this.items.find((x) => x.id === id) || null; }

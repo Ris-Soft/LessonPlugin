@@ -462,6 +462,9 @@ main {
   grid-template-columns: 320px 1fr;
   gap: 12px;
   padding: 12px 0 20px;
+  height: 90%;
+  overflow: hidden;
+  /* 避免触发页面滚动，由内部区域滚动 */
 }
 
 .auto-left {
@@ -469,6 +472,10 @@ main {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 10px;
   overflow: hidden;
+  /* 由列表区域滚动 */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .auto-topbar {
@@ -482,15 +489,20 @@ main {
 }
 
 .auto-list {
-  display: grid;
-  gap: 6px;
+  display: block;
   padding: 10px;
+  overflow-y: auto;
+  /* 左侧列表独立滚动 */
+  flex: 1;
+  min-height: 0;
+  /* 允许在 flex 容器中收缩以产生滚动 */
 }
 
 .auto-item {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+  margin-bottom: 5px;
   align-items: center;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -526,7 +538,11 @@ main {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   border-radius: 10px;
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  /* 由编辑器区域滚动 */
 }
 
 .auto-editor-header {
@@ -534,6 +550,19 @@ main {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  position: sticky;
+  /* 右侧顶栏固定，以下区域滚动 */
+  top: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(2px);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.auto-editor>.section {
+  padding: 16px;
+  margin: 10px;
 }
 
 .auto-editor .field-row {
@@ -565,6 +594,90 @@ main {
 
 .auto-editor textarea {
   min-height: 80px;
+}
+
+/* 右侧编辑器为可滚动区域（除顶栏） */
+.auto-editor {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自动化页面占满内容区高度，禁用全局滚动影响 */
+#page-automation {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 34px);
+  /* 与 #content 高度一致，避免页面滚动 */
+  overflow: hidden;
+}
+
+#page-automation .automation.panel {
+  flex: 1;
+  overflow: hidden;
+  margin: 0 20px 20px 20px;
+}
+
+/* 左右滚动区保持与全局滚动条样式一致 */
+.auto-list::-webkit-scrollbar,
+.auto-editor::-webkit-scrollbar {
+  width: 10px;
+}
+
+.auto-list::-webkit-scrollbar-track,
+.auto-editor::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 1px solid var(--border);
+}
+
+.auto-list::-webkit-scrollbar-thumb,
+.auto-editor::-webkit-scrollbar-thumb {
+  background: rgba(64, 75, 88, 0.685);
+  border: 1px solid rgba(72, 87, 107, 0.45);
+  border-radius: 999px;
+}
+
+.auto-list::-webkit-scrollbar-thumb:hover,
+.auto-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(69, 83, 90, 0.5);
+}
+
+/* --- 修复自动化页面隐藏与高度布局、优化样式（覆盖前面规则） --- */
+
+/* 当存在 hidden 属性时强制隐藏（避免被 display 覆盖） */
+#page-automation[hidden] {
+  display: none !important;
+}
+
+/* 仅在可见时参与布局：采用两行网格，header 自适应，高度精确填充 */
+#page-automation:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: calc(100vh - 34px);
+  overflow: hidden;
+}
+
+/* 面板作为第二行填满，并允许内部滚动区正确收缩 */
+#page-automation .automation.panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 左侧列表：统一每项高度，避免视觉错乱 */
+.auto-list {
+  grid-auto-rows: minmax(56px, auto);
+}
+
+/* 右侧编辑器顶栏：优化间距与输入扩展，保持粘性顶部 */
+.auto-editor-header {
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+.auto-editor-header input[type="text"] {
+  flex: 1;
+  min-width: 0;
 }
 
 /* 下拉框（Select）深色样式与选中项颜色 */

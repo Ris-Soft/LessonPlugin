@@ -313,7 +313,9 @@ async function main() {
   const container = document.getElementById('plugins');
   const list = await fetchPlugins();
   container.innerHTML = '';
-  list.forEach((p) => container.appendChild(renderPlugin(p)));
+  // 需求：无动作的插件不应在插件列表显示（但不影响自动化编辑器的插件选择）
+  const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+  filtered.forEach((p) => container.appendChild(renderPlugin(p)));
 
   // 自定义标题栏按钮
   document.querySelectorAll('.win-btn').forEach((b) => {
@@ -1121,9 +1123,15 @@ async function initAutomationSettings() {
             plugins.forEach(p => { const o=document.createElement('option'); o.value=(p.id || p.name); o.textContent=p.name; plugSel.appendChild(o); });
             plugSel.value = a.pluginId || (plugins[0]?.id || plugins[0]?.name) || '';
             const evSel = document.createElement('select');
-            const res = await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value);
-            const evs = Array.isArray(res?.events) ? res.events : (Array.isArray(res) ? res : []);
-            evs.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=(e.desc || e.title || e.name); evSel.appendChild(o); });
+            // 首次加载事件列表
+            const loadEvents = async (plugKey) => {
+              const res = await window.settingsAPI?.pluginAutomationListEvents?.(plugKey);
+              const list = Array.isArray(res?.events) ? res.events : (Array.isArray(res) ? res : []);
+              evSel.innerHTML = '';
+              list.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=(e.desc || e.title || e.name); evSel.appendChild(o); });
+              return list;
+            };
+            let evs = await loadEvents(plugSel.value);
             evSel.value = a.event || evs[0]?.name || '';
             // 立即写入，确保act包含pluginId与event
             a.pluginId = plugSel.value;
@@ -1132,15 +1140,22 @@ async function initAutomationSettings() {
             const paramsPreview = document.createElement('div'); paramsPreview.className='muted'; paramsPreview.textContent = `参数项数：${Array.isArray(a.params)? a.params.length : 0}`;
             plugSel.addEventListener('change', async () => {
               a.pluginId = plugSel.value;
-              const res2 = await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value);
-              const evs2 = Array.isArray(res2?.events) ? res2.events : (Array.isArray(res2) ? res2 : []);
-              evSel.innerHTML = '';
-              evs2.forEach(e => { const o=document.createElement('option'); o.value=e.name; o.textContent=(e.desc || e.title || e.name); evSel.appendChild(o); });
-              a.event = evSel.value = evs2[0]?.name || '';
+              evs = await loadEvents(plugSel.value);
+              a.event = evSel.value = evs[0]?.name || '';
+              // 切换插件后，参数预览清零（防止参数与事件不匹配）
+              a.params = Array.isArray(a.params) ? a.params : [];
+              paramsPreview.textContent = `参数项数：${a.params.length}`;
             });
-            evSel.addEventListener('change', () => { a.event = evSel.value; });
+            evSel.addEventListener('change', () => {
+              a.event = evSel.value;
+              // 切换事件后，仅重置预览；保留现有参数由用户自行调整
+              paramsPreview.textContent = `参数项数：${Array.isArray(a.params)? a.params.length : 0}`;
+            });
             editParams.onclick = async () => {
-              const def = evs.find(e => e.name === evSel.value);
+              // 点击时按当前选择的插件与事件动态加载参数定义
+              const curRes = await window.settingsAPI?.pluginAutomationListEvents?.(plugSel.value);
+              const curEvs = Array.isArray(curRes?.events) ? curRes.events : (Array.isArray(curRes) ? curRes : []);
+              const def = curEvs.find(e => e.name === evSel.value);
               const defs = Array.isArray(def?.params) ? def.params : [];
               const resEdit = await showParamsEditorForEvent(defs, Array.isArray(a.params) ? a.params : []);
               if (Array.isArray(resEdit)) { a.params = resEdit; paramsPreview.textContent = `参数项数：${resEdit.length}`; }

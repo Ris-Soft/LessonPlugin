@@ -113,10 +113,11 @@
       ]]);
     };
 
-    // 新接口测试
+    // 统一调用：纯文本遮罩改为通用 enqueue
     document.getElementById('btnOverlayText').onclick = async () => {
-      await window.pluginAPI?.call('notify.plugin', 'overlayText', ['这是一条纯文本提示', 2500, 'fade']);
-      log('已触发纯文本遮罩');
+      const payload = { mode: 'overlay.text', text: '这是一条纯文本提示', duration: 2500, animate: 'fade' };
+      await window.pluginAPI?.call('notify.plugin', 'enqueue', [payload]);
+      log('已触发纯文本遮罩（enqueue）');
     };
     document.getElementById('btnSoundIn').onclick = async () => {
       await window.pluginAPI?.call('notify.plugin', 'playSound', ['in']);

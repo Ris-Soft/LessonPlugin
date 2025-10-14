@@ -7,6 +7,7 @@
     ttsRate: document.getElementById('ttsRate'),
     ttsEndpoint: document.getElementById('ttsEndpoint'),
     ttsEdgeVoice: document.getElementById('ttsEdgeVoice'),
+    soundVolume: document.getElementById('soundVolume'),
     btnPlayIn: document.getElementById('btnPlayIn'),
     btnPlayOut: document.getElementById('btnPlayOut'),
     btnTestOverlayText: document.getElementById('btnTestOverlayText'),
@@ -22,6 +23,7 @@
       if (el.ttsRate) el.ttsRate.value = (cfg?.ttsRate ?? 1);
       if (el.ttsEndpoint) el.ttsEndpoint.value = (cfg?.ttsEndpoint ?? '');
       if (el.ttsEdgeVoice) el.ttsEdgeVoice.value = (cfg?.ttsEdgeVoice ?? '');
+      if (el.soundVolume) el.soundVolume.value = Math.round(((cfg?.soundVolume ?? 0.9) * 100));
       // 加载语音列表
       initVoices(cfg?.ttsVoiceURI);
       // 音频存在性无需展示，运行窗口会直接使用配置中的 dataURL
@@ -78,7 +80,10 @@
   // 测试纯文本提示（全屏）
   if (el.btnTestOverlayText) {
     el.btnTestOverlayText.addEventListener('click', () => {
-      try { window.settingsAPI?.pluginCall?.('notify.plugin', 'overlayText', ['这是一条纯文本提示', 'fade', 2500]); } catch {}
+      try {
+        const payload = { mode: 'overlay.text', text: '这是一条纯文本提示', animate: 'fade', duration: 2500 };
+        window.settingsAPI?.pluginCall?.('notify.plugin', 'enqueue', [payload]);
+      } catch {}
     });
   }
 
@@ -151,6 +156,22 @@
     };
     el.ttsRate.addEventListener('change', handler);
     el.ttsRate.addEventListener('input', handler);
+  }
+
+  // 音量滑块：设置通知音效相对音量（0–1）
+  if (el.soundVolume) {
+    const handler = () => {
+      const v = Math.max(0, Math.min(100, Number(el.soundVolume.value || 90)));
+      const norm = Math.round(v) / 100;
+      (async () => {
+        try {
+          await window.settingsAPI?.configSet?.('notify', 'soundVolume', norm);
+          await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
+        } catch {}
+      })();
+    };
+    el.soundVolume.addEventListener('input', handler);
+    el.soundVolume.addEventListener('change', handler);
   }
 
   // 标题栏窗口控件绑定（复用主程序 settings preload 的 windowControl）
