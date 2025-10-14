@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>早读助手设置</title>
+  <link rel="stylesheet" href="../../renderer/titlebar.css" />
+  <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+  <link rel="stylesheet" href="../../renderer/settings.css" />
+  <style>
+    /* 采用设置页内置控件，保留少量布局 */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+    }
+
+    .tab {
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: rgba(34, 197, 94, 0.18);
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 14px;
+    }
+
+    .chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip.active {
+      background: rgba(34, 197, 94, 0.18);
+    }
+
+    #period-list .setting-item {
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    #period-list .setting-icon {
+      margin-left: 0px;
+      margin-bottom: 5px;
+    }
+
+    #period-list .setting-main {
+      margin-bottom: 10px;
+    }
+
+    .main {
+      padding: 16px;
+      height: calc(100vh - 165px);
+    }
+
+    .form {
+      max-height: calc(100vh - 265px);
+      overflow-y: auto;
+    }
+
+    .form::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .form::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 1px solid var(--border);
+    }
+
+    .form::-webkit-scrollbar-thumb {
+      background: rgba(64, 75, 88, 0.685);
+      border: 1px solid rgba(72, 87, 107, 0.45);
+      border-radius: 999px;
+    }
+
+    .form::-webkit-scrollbar-thumb:hover {
+      background: rgba(69, 83, 90, 0.5);
+    }
+
+    .wrap {
+      overflow-y: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="titlebar">
+    <div class="drag">早读助手设置</div>
+    <div class="window-actions">
+      <button class="win-btn" data-act="minimize" title="最小化"><i class="ri-subtract-line"></i></button>
+      <button class="win-btn max" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+      <button class="win-btn close" data-act="close" title="关闭"><i class="ri-close-line"></i></button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="tabs">
+      <div class="tab active" data-page="p-stand">站立早读提醒</div>
+      <div class="tab" data-page="p-plan" title="规划中">早读看板（规划）</div>
+    </div>
+
+    <div class="page active" id="p-stand">
+      <div class="section main">
+        <div class="section-title"><i class="ri-sun-foggy-line"></i> 站立早读提醒</div>
+        <div class="grid-two">
+          <!-- 左侧：时段列表与操作 -->
+          <div>
+            <div class="section" style="padding:12px;">
+              <div class="section-title" style="justify-content:space-between;">
+                <span>时段列表</span>
+                <span style="display:flex;gap:8px;">
+                  <button class="btn secondary" id="btn-add"><i class="ri-add-line"></i> 新增时段</button>
+                  <button class="btn secondary" id="btn-import" style="display:none;"><i
+                      class="ri-file-list-3-line"></i> 导入</button>
+                  <button class="btn" id="btn-export" style="display:none;"><i class="ri-download-2-line"></i>
+                    导出</button>
+                </span>
+              </div>
+              <div id="period-list"></div>
+            </div>
+          </div>
+          <!-- 右侧：编辑表单（采用设置页控件） -->
+          <div>
+            <div class="section" style="padding:12px;">
+              <div class="section-title" style="justify-content:space-between;">
+                <div>
+                  <span style="font-weight:600;">编辑时段</span>
+                  <!-- <span class="muted" style="margin-left:8px;"></span> -->
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn primary" id="btn-save"><i class="ri-save-line"></i> 保存并应用</button>
+                  <button class="btn" id="btn-test-start"><i class="ri-play-circle-line"></i> 测试入场</button>
+                  <button class="btn" id="btn-test-end"><i class="ri-stop-circle-line"></i> 测试退场</button>
+                </div>
+              </div>
+              <div class="form">
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-pencil-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">名称</div>
+                    <div class="setting-desc">例如：每天早读</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="inline"><input id="f-name" type="text" placeholder="例如：每天早读" /></div>
+                  </div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-toggle-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">启用该时段</div>
+                    <div class="setting-desc">保存后自动应用。</div>
+                  </div>
+                  <div class="setting-action"><label class="switch"><input type="checkbox" id="f-enabled" /><span
+                        class="slider"></span></label></div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-time-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">开始与结束时间</div>
+                    <div class="setting-desc">格式 HH:MM</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="inline">
+                      <input id="f-start" type="time" />
+                      <input id="f-end" type="time" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-calendar-check-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">周几启用</div>
+                    <div class="setting-desc">点击选择启用的工作日</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="chips" id="f-weekdays"></div>
+                  </div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-shuffle-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">单双周</div>
+                    <div class="setting-desc">不限、双周或单周</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="options" role="group" aria-label="单双周">
+                      <input type="radio" id="biweek-any" name="biweek" value="any" />
+                      <label for="biweek-any">不限</label>
+                      <input type="radio" id="biweek-even" name="biweek" value="even" />
+                      <label for="biweek-even">双周</label>
+                      <input type="radio" id="biweek-odd" name="biweek" value="odd" />
+                      <label for="biweek-odd">单周</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-font-size"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">入场文字（全屏遮罩）</div>
+                    <div class="setting-desc">入场提示文字</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="inline"><input id="f-text-start" type="text" placeholder="站立早读开始，请站立朗读" /></div>
+                  </div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-font-size"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">退场文字（左上角通知）</div>
+                    <div class="setting-desc">退场提示文字</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="inline"><input id="f-text-end" type="text" placeholder="站立早读结束" /></div>
+                  </div>
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-sound-module-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">音效与播报</div>
+                    <div class="setting-desc">入场/退场音效与TTS</div>
+                  </div>
+                  <div class="setting-action" style="gap:10px;">
+                    <label class="switch" title="入场音效"><input type="checkbox" id="f-sound-in" checked /><span
+                        class="slider"></span></label>
+                    <span class="muted">入场音效</span>
+                    <label class="switch" title="退场音效" style="margin-left:12px;"><input type="checkbox" id="f-sound-out"
+                        checked /><span class="slider"></span></label>
+                    <span class="muted">退场音效</span>
+                    <label class="switch" title="入场TTS" style="margin-left:12px;"><input type="checkbox"
+                        id="f-speak-start" /><span class="slider"></span></label>
+                    <span class="muted">入场TTS</span>
+                    <label class="switch" title="退场TTS" style="margin-left:12px;"><input type="checkbox"
+                        id="f-speak-end" /><span class="slider"></span></label>
+                    <span class="muted">退场TTS</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-plan">
+      <div class="card">
+        <div style="font-size:16px; font-weight:600;">功能规划</div>
+        <div class="muted">早读看板与早读应用将与其他插件结合开发。</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+    const weekdaysLabels = ['一', '二', '三', '四', '五', '六', '日'];
+
+    // 标题栏窗口控件（复用主程序 settings preload 的 windowControl）
+    document.querySelectorAll('.win-btn').forEach((b) => {
+      b.addEventListener('click', () => window.settingsAPI?.windowControl(b.dataset.act));
+    });
+
+    // Tabs
+    $$('.tab').forEach(t => t.addEventListener('click', () => {
+      $$('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      const pid = t.getAttribute('data-page');
+      $$('.page').forEach(p => p.classList.toggle('active', p.id === pid));
+    }));
+
+    // 生成周几选择
+    function renderWeekdays(container, selected) {
+      container.innerHTML = '';
+      weekdaysLabels.forEach((lab, i) => {
+        const v = i + 1; const el = document.createElement('span');
+        el.className = 'chip' + (selected?.includes(v) ? ' active' : '');
+        el.textContent = `周${lab}`; el.dataset.v = String(v);
+        el.addEventListener('click', () => { el.classList.toggle('active'); });
+        container.appendChild(el);
+      });
+    }
+
+    // 读取配置并初始化
+    let periods = [];
+    async function init() {
+      await window.settingsAPI?.configEnsureDefaults('morningReading', { periods: [] });
+      const cfg = await window.settingsAPI?.configGetAll('morningReading');
+      periods = Array.isArray(cfg?.periods) ? cfg.periods : [];
+      renderList();
+      if (!periods.length) addItem();
+    }
+
+    function addItem() {
+      const idx = periods.length + 1;
+      periods.push({ name: `早读时段${idx}`, enabled: true, start: '06:50', end: '07:20', weekdays: [1, 2, 3, 4, 5], biweek: 'any', textStart: '早读开始，请站立朗读', textEnd: '早读结束，请坐下休息', soundIn: true, soundOut: true, speakStart: false, speakEnd: false });
+      renderList();
+    }
+
+    function renderList() {
+      const listEl = $('#period-list');
+      listEl.innerHTML = '';
+      periods.forEach((p, idx) => {
+        const item = document.createElement('div'); item.className = 'setting-item';
+        const name = p.name || ('时段' + (idx + 1));
+        const desc = `${p.start || '--:--'} ~ ${p.end || '--:--'} · 周${(p.weekdays || []).map(v => weekdaysLabels[v - 1]).join('')} · ${(p.biweek === 'even' ? '双周' : p.biweek === 'odd' ? '单周' : '不限')}`;
+        item.innerHTML = `
+          <div class="setting-icon"><i class="ri-time-line"></i></div>
+          <div class="setting-main">
+            <div class="setting-title">${name}</div>
+            <div class="setting-desc">${desc}</div>
+          </div>
+          <div class="setting-action" style="gap:8px;">
+            <label class="switch" title="启用"><input type="checkbox" ${p.enabled !== false ? 'checked' : ''}/><span class="slider"></span></label>
+            <button class="btn secondary" data-op="edit"><i class="ri-edit-line"></i> 编辑</button>
+            <button class="btn danger" data-op="del"><i class="ri-delete-bin-line"></i> 删除</button>
+          </div>`;
+        // 事件
+        const chk = item.querySelector('input[type=checkbox]');
+        chk.addEventListener('change', (e) => { p.enabled = e.target.checked; });
+        item.querySelector('[data-op=edit]').addEventListener('click', () => { fillEditor(p); });
+        item.querySelector('[data-op=del]').addEventListener('click', () => { periods.splice(idx, 1); renderList(); });
+        listEl.appendChild(item);
+      });
+    }
+
+    function getEditorBiweek() {
+      const r = document.querySelector('input[name="biweek"]:checked');
+      return r?.value || 'any';
+    }
+
+    function setEditorBiweek(v) {
+      const ids = { any: 'biweek-any', even: 'biweek-even', odd: 'biweek-odd' };
+      const id = ids[v] || ids.any;
+      const el = document.getElementById(id);
+      if (el) el.checked = true;
+    }
+
+    function getEditorWeekdays() {
+      return $$('#f-weekdays .chip').filter(c => c.classList.contains('active')).map(c => parseInt(c.dataset.v, 10));
+    }
+
+    function fillEditor(p) {
+      $('#f-name').value = p.name || '';
+      $('#f-enabled').checked = p.enabled !== false;
+      $('#f-start').value = p.start || '';
+      $('#f-end').value = p.end || '';
+      renderWeekdays($('#f-weekdays'), Array.isArray(p.weekdays) ? p.weekdays : []);
+      setEditorBiweek(p.biweek || 'any');
+      $('#f-text-start').value = p.textStart || '';
+      $('#f-text-end').value = p.textEnd || '';
+      $('#f-sound-in').checked = p.soundIn !== false;
+      $('#f-sound-out').checked = p.soundOut !== false;
+      $('#f-speak-start').checked = !!p.speakStart;
+      $('#f-speak-end').checked = !!p.speakEnd;
+      // biweek 单选无需绑定点击（由浏览器处理）。
+    }
+
+    function readEditor() {
+      return {
+        name: $('#f-name').value.trim() || '未命名时段',
+        enabled: $('#f-enabled').checked,
+        start: $('#f-start').value.trim(),
+        end: $('#f-end').value.trim(),
+        weekdays: getEditorWeekdays(),
+        biweek: getEditorBiweek(),
+        textStart: $('#f-text-start').value.trim(),
+        textEnd: $('#f-text-end').value.trim(),
+        soundIn: $('#f-sound-in').checked,
+        soundOut: $('#f-sound-out').checked,
+        speakStart: $('#f-speak-start').checked,
+        speakEnd: $('#f-speak-end').checked
+      };
+    }
+
+    // 交互
+    $('#btn-add')?.addEventListener('click', addItem);
+    $('#btn-save')?.addEventListener('click', async () => {
+      // 将编辑器当前值合并到列表中第一个（或当前编辑对象）
+      const cur = readEditor();
+      if (periods.length) periods[0] = { ...periods[0], ...cur }; else periods.push(cur);
+      await window.settingsAPI?.configSet('morningReading', 'periods', periods);
+      await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]);
+      renderList();
+    });
+    $('#btn-test-start')?.addEventListener('click', async () => {
+      await window.settingsAPI?.pluginCall('morning.reading', 'previewStart', []);
+    });
+    $('#btn-test-end')?.addEventListener('click', async () => {
+      await window.settingsAPI?.pluginCall('morning.reading', 'previewEnd', []);
+    });
+
+    init();
+    // 初次填充编辑器（选中首条或新建）
+    setTimeout(() => { fillEditor(periods[0] || {}); }, 0);
+  </script>
+</body>
+
+</html>

@@ -18,6 +18,8 @@ let functionRegistry = new Map(); // pluginId -> Map(fnName -> function)
 let eventSubscribers = new Map(); // eventName -> Set(webContentsId)
 let storeRoot = '';
 let progressReporter = null; // 供插件在初始化期间更新启动页文本
+// 引入自动化管理器引用，供插件入口 API 使用
+let automationManagerRef = null;
 
 function readJsonSafe(jsonPath, fallback) {
   try {
@@ -31,6 +33,11 @@ function readJsonSafe(jsonPath, fallback) {
 function writeJsonSafe(jsonPath, data) {
   fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
 }
+
+// 由主进程注入自动化管理器实例，使插件可通过统一 API 访问计时器能力
+module.exports.setAutomationManager = function setAutomationManager(am) {
+  automationManagerRef = am || null;
+};
 
 module.exports.init = function init(paths) {
   manifestPath = paths.manifestPath;
@@ -520,6 +527,33 @@ function createPluginApi(pluginId) {
     call: (targetPluginId, fnName, args) => module.exports.callFunction(targetPluginId, fnName, args),
     emit: (eventName, payload) => module.exports.emitEvent(eventName, payload),
     registerAutomationEvents: (events) => module.exports.registerAutomationEvents(pluginId, events),
+    // 为插件提供自动化计时器接口（减少插件自行创建定时器）
+    automation: {
+      registerTimers: (periods) => {
+        try {
+          if (!automationManagerRef) return { ok: false, error: 'automation_manager_missing' };
+          return automationManagerRef.registerPluginTimers(pluginId, Array.isArray(periods) ? periods : []);
+        } catch (e) {
+          return { ok: false, error: e?.message || String(e) };
+        }
+      },
+      clearTimers: () => {
+        try {
+          if (!automationManagerRef) return { ok: false, error: 'automation_manager_missing' };
+          return automationManagerRef.clearPluginTimers(pluginId);
+        } catch (e) {
+          return { ok: false, error: e?.message || String(e) };
+        }
+      },
+      listTimers: () => {
+        try {
+          if (!automationManagerRef) return [];
+          return automationManagerRef.listPluginTimers(pluginId) || [];
+        } catch {
+          return [];
+        }
+      }
+    },
     // 启动页文本控制：插件可在初始化期间更新启动页状态文本
     splash: {
       setStatus: (stage, message) => {

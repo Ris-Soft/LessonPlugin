@@ -244,6 +244,9 @@ app.whenReady().then(async () => {
   // 初始化自动化管理器（在 store.init 之后）
   automationManager = new AutomationManager({ app, store, pluginManager });
   automationManager.init();
+  // 提供给插件访问（两种方式）：通过 pluginManager API 或全局变量
+  try { pluginManager.setAutomationManager(automationManager); } catch {}
+  try { global.__automationManager__ = automationManager; } catch {}
 
   // 注册协议处理（LessonPlugin://task/<text>）
   try { app.setAsDefaultProtocolClient('LessonPlugin'); } catch {}

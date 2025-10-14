@@ -1,0 +1,15 @@
+{
+  "id": "morning.reading",
+  "name": "早读助手",
+  "icon": "ri-sun-foggy-line",
+  "description": "站立早读提醒、早读看板等功能",
+  "actions": [
+    {
+      "id": "openSettings",
+      "icon": "ri-settings-3-line",
+      "text": "打开设置",
+      "target": "openSettings"
+    }
+  ],
+  "version": "1.0.0"
+}

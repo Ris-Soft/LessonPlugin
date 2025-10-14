@@ -15,6 +15,8 @@ class AutomationManager {
     const initial = this.store.get('automation', 'list');
     this.items = Array.isArray(initial) ? initial : [];
     this.timer = null;
+    // 插件计时器：pluginId -> { periods: Array<Period> }
+    this.pluginTimers = new Map();
   }
 
   init() {
@@ -114,6 +116,105 @@ class AutomationManager {
         this.tryExecute(item, { reason: 'time', now: d });
       }
     }
+
+    // 检查插件计时器（开始/结束时间点）
+    this._checkPluginTimersAt(cur, d);
+  }
+
+  // 插件计时器接口：注册/清理/查询
+  registerPluginTimers(pluginId, periods) {
+    const canonId = String(pluginId || '').trim();
+    if (!canonId) return { ok: false, error: 'invalid_plugin_id' };
+    const list = Array.isArray(periods) ? periods.map((p, idx) => ({
+      id: p?.id || `p_${idx}`,
+      name: String(p?.name || `时段${idx + 1}`),
+      enabled: p?.enabled !== false,
+      start: String(p?.start || '').slice(0,5),
+      end: String(p?.end || '').slice(0,5),
+      weekdays: Array.isArray(p?.weekdays) ? p.weekdays : [1,2,3,4,5],
+      biweek: ['even','odd','any'].includes(String(p?.biweek)) ? String(p.biweek) : 'any',
+      speakStart: !!p?.speakStart,
+      speakEnd: !!p?.speakEnd,
+      soundIn: p?.soundIn !== false, // 默认播放入场
+      soundOut: p?.soundOut !== false, // 默认播放退场
+      textStart: p?.textStart || '早读开始，请站立朗读',
+      textEnd: p?.textEnd || '早读结束，请坐下休息'
+    })) : [];
+    this.pluginTimers.set(canonId, { periods: list });
+    return { ok: true, count: list.length };
+  }
+  clearPluginTimers(pluginId) {
+    const canonId = String(pluginId || '').trim();
+    this.pluginTimers.delete(canonId);
+    return { ok: true };
+  }
+  listPluginTimers(pluginId) {
+    const canonId = String(pluginId || '').trim();
+    const entry = this.pluginTimers.get(canonId) || { periods: [] };
+    return { ok: true, periods: entry.periods };
+  }
+
+  _checkPluginTimersAt(curHHMM, dateObj) {
+    const d = dateObj || nowDate();
+    const weekday = d.getDay() === 0 ? 7 : d.getDay(); // 1..7
+    // 读取单双周基准
+    const base = this.store.get('system', 'semesterStart') || this.store.get('system', 'offsetBaseDate');
+    const biweekOff = !!this.store.get('system', 'biweekOffset');
+    let isEvenWeek = null;
+    if (base) {
+      try {
+        const baseDate = new Date(base + 'T00:00:00');
+        const diffDays = Math.floor((d - baseDate) / (24 * 3600 * 1000));
+        const weekIndex = Math.floor(diffDays / 7);
+        isEvenWeek = weekIndex % 2 === 0;
+        if (biweekOff) isEvenWeek = !isEvenWeek;
+      } catch {}
+    }
+
+    const matchBiweek = (rule) => {
+      if (rule === 'any' || rule == null) return true;
+      if (isEvenWeek == null) return false;
+      return rule === 'even' ? isEvenWeek : !isEvenWeek;
+    };
+
+    for (const [pid, entry] of this.pluginTimers.entries()) {
+      const periods = Array.isArray(entry?.periods) ? entry.periods : [];
+      for (const p of periods) {
+        if (!p.enabled) continue;
+        const onWeekday = Array.isArray(p.weekdays) ? p.weekdays.includes(weekday) : true;
+        if (!onWeekday || !matchBiweek(p.biweek)) continue;
+        // 触发开始
+        if (p.start && p.start === curHHMM) {
+          if (p._lastStartMinute !== curHHMM) {
+            p._lastStartMinute = curHHMM;
+            this._invokeMorningStart(pid, p);
+          }
+        }
+        // 触发结束
+        if (p.end && p.end === curHHMM) {
+          if (p._lastEndMinute !== curHHMM) {
+            p._lastEndMinute = curHHMM;
+            this._invokeMorningEnd(pid, p);
+          }
+        }
+      }
+    }
+  }
+
+  async _invokeMorningStart(pluginId, period) {
+    // 入场：纯文本遮罩 + 可选音效 + 可选 TTS
+    const payloads = [];
+    if (period.soundIn) payloads.push({ mode: 'sound', which: 'in' });
+    payloads.push({ mode: 'overlay.text', text: String(period.textStart || '早读开始，请站立朗读'), duration: 5000, animate: 'fade', speak: !!period.speakStart });
+    try { await this.pluginManager.callFunction('notify.plugin', 'enqueueBatch', [payloads]); } catch {}
+  }
+
+  async _invokeMorningEnd(pluginId, period) {
+    // 退场：左上角 toast + 可选音效 + 可选 TTS
+    const payloads = [];
+    payloads.push({ mode: 'toast', title: String(period.textEnd || '早读结束'), subText: '请坐下休息', type: 'info', duration: 4000, speak: !!period.speakEnd });
+    if (period.soundOut) payloads.push({ mode: 'sound', which: 'out' });
+    try { await this.pluginManager.callFunction('notify.plugin', 'enqueueBatch', [payloads]); } catch {}
   }
 
   async invokeProtocol(text) {
