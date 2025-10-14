@@ -12,7 +12,9 @@
       // 运行窗口订阅主进程广播的配置更新，实现设置实时生效
       onConfigUpdate: (handler) => {
         try { ipcRenderer.on('notify:config:update', (_e, cfg) => handler && handler(cfg)); } catch {}
-      }
+      },
+      // 运行窗口可调用主进程插件函数（用于本地 EdgeTTS 等）
+      pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args)
     });
   } catch (e) {
     // 非 Electron 环境（例如浏览器预览）下静默降级

@@ -1,10 +1,17 @@
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { BrowserWindow, ipcMain, screen, app } = require('electron');
 // 读取统一配置存储，用于向运行窗口广播配置更新
 const store = require(path.join(app.getAppPath(), 'src', 'main', 'store.js'));
 
 let runtimeWin = null;
 let settingsWin = null;
+let edgeTts = null;
+try {
+  // 可选依赖：本地 EdgeTTS（若未安装则保持为 null）
+  edgeTts = require('edge-tts');
+} catch {}
 
 function createRuntimeWindow() {
   if (runtimeWin && !runtimeWin.isDestroyed()) {
@@ -103,6 +110,43 @@ ipcMain.handle('notify:setClickThrough', (_evt, enable) => {
   return true;
 });
 
+// 辅助：使用本地 EdgeTTS 合成并返回音频文件路径（file:///）
+async function synthEdgeTtsToFile(text, voiceName) {
+  if (!edgeTts) return { ok: false, error: 'edge-tts_not_installed' };
+  try {
+    const safeText = String(text || '').trim();
+    if (!safeText) return { ok: false, error: 'empty_text' };
+    const voice = String(voiceName || 'zh-CN-XiaoxiaoNeural');
+    const outDir = path.join(os.tmpdir(), 'lesson_notify_tts');
+    try { if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true }); } catch {}
+    const fileName = `edge_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`;
+    const outPath = path.join(outDir, fileName);
+    // 常见 edge-tts 用法：生成可读流并写入文件
+    // 不同版本 API 可能差异，这里尽量兼容常见调用方式
+    let stream = null;
+    if (typeof edgeTts?.Synthesize === 'function') {
+      stream = await edgeTts.Synthesize(safeText, { voice });
+    } else if (typeof edgeTts?.synthesize === 'function') {
+      stream = await edgeTts.synthesize(safeText, { voice });
+    } else if (typeof edgeTts?.tts === 'function') {
+      stream = await edgeTts.tts({ text: safeText, voice });
+    }
+    if (!stream) return { ok: false, error: 'edge_tts_api_unavailable' };
+    await new Promise((resolve, reject) => {
+      try {
+        const ws = fs.createWriteStream(outPath);
+        stream.pipe(ws);
+        ws.on('finish', resolve);
+        ws.on('error', reject);
+      } catch (e) { reject(e); }
+    });
+    const fileUrl = 'file:///' + outPath.replace(/\\/g, '/');
+    return { ok: true, path: fileUrl };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 module.exports = {
   name: '通知插件',
   version: '1.0.0',
@@ -139,6 +183,31 @@ module.exports = {
       const win = createRuntimeWindow();
       if (!win || win.isDestroyed()) return false;
       try { win.webContents.send('notify:enqueue', Array.isArray(list) ? list : [list]); return true; } catch { return false; }
+    },
+    // 自动化/运行窗口调用：本地 EdgeTTS 合成，返回文件 URL
+    edgeSpeakLocal: async (text, voiceName) => {
+      const res = await synthEdgeTtsToFile(text, voiceName);
+      return res;
+    },
+    // 自动化动作：纯文本全屏提示（无卡片），支持载入/载出动画
+    overlayText: (text, duration = 3000, animate = 'fade') => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'overlay.text', text: String(text || ''), duration: Number(duration) || 3000, animate: String(animate || 'fade') };
+      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
+    },
+    // 自动化动作/通用：播放内置音效（in 或 out）
+    playSound: (which = 'in') => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
+      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
     }
   },
+  // 自动化事件声明：暴露可调用动作
+  automationEvents: [
+    { id: 'notify.overlayText', name: 'overlayText', desc: '全屏纯文本提示', params: [ { name: 'text', type: 'string' }, { name: 'duration', type: 'number' }, { name: 'animate', type: 'string', hint: 'fade/zoom' } ] },
+    { id: 'notify.playSound', name: 'playSound', desc: '播放通知音效', params: [ { name: 'which', type: 'string', hint: 'in/out' } ] },
+    { id: 'notify.edgeSpeak', name: 'edgeSpeakLocal', desc: '本地 EdgeTTS 合成并播放', params: [ { name: 'text', type: 'string' }, { name: 'voice', type: 'string' } ] }
+  ]
 };

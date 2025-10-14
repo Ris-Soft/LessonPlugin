@@ -27,8 +27,9 @@ body {
 /* 插件页面主体容器（示例插件窗口等） */
 .wrap {
   padding: 20px;
-  height: calc(100vh - 35px); /* 34px 标题栏 + 1px 边框 */
+  height: calc(100vh - 35px);
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 /* 插件页面滚动条样式（与设置页保持一致） */
@@ -342,6 +343,7 @@ main {
 .muted {
   color: var(--muted);
   font-size: 12px;
+  margin-bottom: 8px;
 }
 
 .array-list {
@@ -449,7 +451,10 @@ main {
   gap: 8px;
   padding: 0 12px 12px;
 }
-.card-actions .muted { color: var(--muted); }
+
+.card-actions .muted {
+  color: var(--muted);
+}
 
 /* 自动执行页面 */
 .automation {
@@ -568,6 +573,11 @@ select,
   background: #2f3137;
   color: var(--fg);
   border: 1px solid var(--border);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  padding: 6px 8px;
 }
 
 select:focus {
@@ -700,6 +710,10 @@ label {
   margin-top: 10px;
   padding-top: 8px;
   /* border-top: 1px dashed var(--border); */
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 16px;
 }
 
 .section .section-title {
@@ -1134,36 +1148,141 @@ label {
 }
 
 /* 档案管理样式 */
-.profiles-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.profiles-import { margin: 8px 0; }
-.profiles-import textarea { width: 100%; min-height: 120px; resize: vertical; }
-.profiles-import .import-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-.profiles-filters { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
-.profiles-table-wrap { max-width: calc(100vw - 350px); overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-.profiles-table { width: max-content; min-width: 720px; border-collapse: collapse; }
-.profiles-table th, .profiles-table td { border-bottom: 1px solid #eeeeee1e; padding: 8px; border-left: none; border-right: none; }
-.profiles-table thead th { text-align: left; color: #555; font-weight: 600; }
-.profiles-table .col-required { width: 64px; text-align: center; }
-.profiles-table .col-gender { width: 120px; }
-.profiles-table .col-index { width: 64px; text-align: right; color: #666; }
-.profiles-table .col-actions { width: 100px; }
-.profiles-table .col-name { min-width: 180px; }
-.profiles-table input[type="text"] { width: 160px; max-width: 220px; }
-.profiles-table select { width: 120px; }
-.profiles-table .col-actions .btn { min-width: 72px; }
+.profiles-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.profiles-import {
+  margin: 8px 0;
+}
+
+.profiles-import textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+}
+
+.profiles-import .import-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.profiles-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.profiles-table-wrap {
+  max-width: calc(100vw - 350px);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.profiles-table {
+  width: max-content;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.profiles-table th,
+.profiles-table td {
+  border-bottom: 1px solid #eeeeee1e;
+  padding: 8px;
+  border-left: none;
+  border-right: none;
+}
+
+.profiles-table thead th {
+  text-align: left;
+  color: #555;
+  font-weight: 600;
+}
+
+.profiles-table .col-required {
+  width: 64px;
+  text-align: center;
+}
+
+.profiles-table .col-gender {
+  width: 120px;
+}
+
+.profiles-table .col-index {
+  width: 64px;
+  text-align: right;
+  color: #666;
+}
+
+.profiles-table .col-actions {
+  width: 100px;
+}
+
+.profiles-table .col-name {
+  min-width: 180px;
+}
+
+.profiles-table input[type="text"] {
+  width: 160px;
+  max-width: 220px;
+}
+
+.profiles-table select {
+  width: 120px;
+}
+
+.profiles-table .col-actions .btn {
+  min-width: 72px;
+}
 
 /* 固定/置顶列：序号固定左侧，操作固定右侧 */
-.profiles-table th.col-index, .profiles-table td.col-index { position: sticky; left: 0; background: var(--panel); z-index: 2; }
-.profiles-table th.col-actions, .profiles-table td.col-actions { position: sticky; right: 0; background: var(--panel); z-index: 2; }
+.profiles-table th.col-index,
+.profiles-table td.col-index {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 2;
+}
+
+.profiles-table th.col-actions,
+.profiles-table td.col-actions {
+  position: sticky;
+  right: 0;
+  background: var(--panel);
+  z-index: 2;
+}
 
 /* 自定义横向滚动条样式，仅作用于表格容器 */
-.profiles-table-wrap::-webkit-scrollbar { height: 10px; }
-.profiles-table-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 6px; }
-.profiles-table-wrap::-webkit-scrollbar-thumb { background: rgba(42, 53, 46, 0.35); border-radius: 6px; }
-.profiles-table-wrap::-webkit-scrollbar-thumb:hover { background: rgba(59, 82, 67, 0.5); }
+.profiles-table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.profiles-table-wrap::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.profiles-table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(42, 53, 46, 0.35);
+  border-radius: 6px;
+}
+
+.profiles-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 82, 67, 0.5);
+}
 
 /* 限制档案管理页整体不出现页面级横向滚动，仅表格容器滚动 */
-#page-profiles .panel { overflow: hidden; }
+#page-profiles .panel {
+  overflow: hidden;
+}
 
 /* 框选焦点统一（移除黄色/高亮边框），并与通用输入样式保持一致 */
 #page-profiles input:focus,
@@ -1192,11 +1311,13 @@ select:focus {
   box-shadow: none;
   border-color: var(--border);
 }
+
 /* 覆盖插件卡片操作区：固定在卡片底部并左右分布 */
 .plugin-card {
   display: flex;
   flex-direction: column;
 }
+
 .plugin-card .card-actions {
   margin-top: auto;
   display: flex;
@@ -1205,7 +1326,10 @@ select:focus {
   padding: 8px 12px;
   border-top: 1px dashed var(--border);
 }
-.plugin-card .card-actions .muted { color: var(--muted); }
+
+.plugin-card .card-actions .muted {
+  color: var(--muted);
+}
 
 /* 右侧小图标按钮，无文字无背景，仅图标 */
 .icon-btn {
@@ -1220,5 +1344,11 @@ select:focus {
   height: 28px;
   border-radius: 6px;
 }
-.icon-btn i { font-size: 18px; }
-.icon-btn:hover { color: #fca5a5; }
+
+.icon-btn i {
+  font-size: 18px;
+}
+
+.icon-btn:hover {
+  color: #fca5a5;
+}

@@ -7,9 +7,9 @@
     ttsRate: document.getElementById('ttsRate'),
     ttsEndpoint: document.getElementById('ttsEndpoint'),
     ttsEdgeVoice: document.getElementById('ttsEdgeVoice'),
-    audioInfo: document.getElementById('audioInfo'),
-    audioWarn: document.getElementById('audioWarn'),
-    audioError: document.getElementById('audioError'),
+    btnPlayIn: document.getElementById('btnPlayIn'),
+    btnPlayOut: document.getElementById('btnPlayOut'),
+    btnTestOverlayText: document.getElementById('btnTestOverlayText'),
   };
 
   // 初始化：从统一配置存储读取
@@ -64,27 +64,23 @@
     } catch {}
   };
 
-  // 文件选择后写入配置，并广播使运行窗口实时生效
-  const bindFile = (input, key) => {
-    if (!input) return;
-    input.addEventListener('change', () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      try {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          try {
-            await window.settingsAPI?.configSet?.('notify', `audio.${key}`, reader.result);
-            await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
-          } catch {}
-        };
-        reader.readAsDataURL(file);
-      } catch {}
+  // 试听入场与退场音效
+  if (el.btnPlayIn) {
+    el.btnPlayIn.addEventListener('click', () => {
+      try { window.settingsAPI?.pluginCall?.('notify.plugin', 'playSound', ['in']); } catch {}
     });
-  };
-  bindFile(el.audioInfo, 'info');
-  bindFile(el.audioWarn, 'warn');
-  bindFile(el.audioError, 'error');
+  }
+  if (el.btnPlayOut) {
+    el.btnPlayOut.addEventListener('click', () => {
+      try { window.settingsAPI?.pluginCall?.('notify.plugin', 'playSound', ['out']); } catch {}
+    });
+  }
+  // 测试纯文本提示（全屏）
+  if (el.btnTestOverlayText) {
+    el.btnTestOverlayText.addEventListener('click', () => {
+      try { window.settingsAPI?.pluginCall?.('notify.plugin', 'overlayText', ['这是一条纯文本提示', 'fade', 2500]); } catch {}
+    });
+  }
 
   if (el.enableTTS) {
     el.enableTTS.addEventListener('change', () => {
@@ -98,10 +94,11 @@
     });
   }
 
-  // 引擎选择
+  // 引擎选择（暂时仅 system）
   if (el.ttsEngine) {
+    el.ttsEngine.value = 'system';
     el.ttsEngine.addEventListener('change', () => {
-      const val = el.ttsEngine.value || 'system';
+      const val = 'system';
       (async () => {
         try {
           await window.settingsAPI?.configSet?.('notify', 'ttsEngine', val);
@@ -111,35 +108,9 @@
     });
   }
 
-  // EdgeTTS 服务地址
-  if (el.ttsEndpoint) {
-    const handler = () => {
-      const v = el.ttsEndpoint.value || '';
-      (async () => {
-        try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsEndpoint', v);
-          await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
-        } catch {}
-      })();
-    };
-    el.ttsEndpoint.addEventListener('change', handler);
-    el.ttsEndpoint.addEventListener('blur', handler);
-  }
+  // 暂时隐藏 EdgeTTS 服务地址（无需绑定）
 
-  // EdgeTTS 音色名称
-  if (el.ttsEdgeVoice) {
-    const handler = () => {
-      const v = el.ttsEdgeVoice.value || '';
-      (async () => {
-        try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsEdgeVoice', v);
-          await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
-        } catch {}
-      })();
-    };
-    el.ttsEdgeVoice.addEventListener('change', handler);
-    el.ttsEdgeVoice.addEventListener('blur', handler);
-  }
+  // 暂时隐藏 EdgeTTS 音色名称（无需绑定）
 
   // 音色设置：voice, pitch, rate
   if (el.ttsVoice) {

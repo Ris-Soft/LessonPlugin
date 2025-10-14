@@ -27,7 +27,8 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
-    "uuid": "^13.0.0",
-    "extract-zip": "^2.0.1"
+    "edge-tts": "^1.0.1",
+    "extract-zip": "^2.0.1",
+    "uuid": "^13.0.0"
   }
 }

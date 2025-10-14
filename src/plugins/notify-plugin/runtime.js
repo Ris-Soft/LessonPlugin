@@ -1,7 +1,8 @@
 (() => {
   const state = { queue: [], active: false, audio: { info: null, warn: null, error: null }, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '' };
   const el = {
-    toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovCountdown: document.getElementById('ovCountdown')
+    toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovCountdown: document.getElementById('ovCountdown'),
+    overlayText: document.getElementById('overlayText'), overlayTextContent: document.getElementById('overlayTextContent')
   };
 
   // 初始启用穿透（左上角通知与空闲时）
@@ -25,12 +26,11 @@
   } catch {}
 
   // 基础工具
-  const playSound = (type) => {
-    if (!type || type === 'silent') return;
-    const url = state.audio[type];
-    if (!url) return; // 默认系统音无法直接调用，若已配置自定义音频则播放
+  const playSoundBuiltin = (which = 'in') => {
     try {
-      const a = new Audio(url);
+      const file = which === 'out' ? 'out.mp3' : 'in.mp3';
+      const a = new Audio(`./sounds/${file}`);
+      a.volume = 0.9;
       a.play().catch(() => {});
     } catch {}
   };
@@ -38,6 +38,17 @@
   const speak = async (text) => {
     if (!state.ttsEnabled) return;
     try {
+      if (state.ttsEngine === 'edge.local') {
+        try {
+          const voice = state.ttsEdgeVoice || 'zh-CN-XiaoxiaoNeural';
+          const res = await window.notifyAPI?.pluginCall?.('notify.plugin', 'edgeSpeakLocal', [text, voice]);
+          if (res?.ok && res?.path) {
+            const a = new Audio(res.path);
+            a.play().catch(() => {});
+            return;
+          }
+        } catch {}
+      }
       if (state.ttsEngine === 'edge' && state.ttsEndpoint) {
         try {
           const u = new URL(state.ttsEndpoint);
@@ -92,13 +103,29 @@
     const speakText = n.speakText || `${title}${sub ? '，' + sub : ''}`;
     const speakEnabled = (n.speak === true) || (n.speak === undefined && state.ttsEnabled);
 
-    // 声音
-    playSound(type);
+    // 声音：按参数播放，默认 in；遮罩场景只播放一次
+    const sound = (n.which === 'out') ? 'out' : 'in';
+    if (n.mode === 'overlay' || n.mode === 'overlay.text') {
+      // 遮罩进入时只播放一次，退出不再统一播放
+      playSoundBuiltin(sound);
+    } else {
+      playSoundBuiltin(sound);
+    }
     // TTS
     if (speakEnabled) speak(speakText);
 
-    if (n.mode === 'overlay') {
+    if (n.mode === 'sound') {
+      // 仅播放音效，不显示任何 UI
+      playSoundBuiltin(sound);
+      resolve();
+      return;
+    } else if (n.mode === 'overlay') {
       showOverlay({ title, sub, autoClose: !!n.autoClose, duration: n.duration || 3000, showClose: !!n.showClose, closeDelay: n.closeDelay || 0 }, resolve);
+    } else if (n.mode === 'overlay.text') {
+      const text = n.text || speakText;
+      const animate = n.animate || 'fade';
+      const duration = n.duration || 3000;
+      showOverlayText({ text, animate, duration }, resolve);
     } else {
       showToast({ title, sub, type, duration: n.duration || 3000 }, resolve);
     }
@@ -203,6 +230,7 @@
       el.ovClose.onclick = null;
       // 退出遮罩恢复穿透
       try { window.notifyAPI?.setClickThrough(true); } catch {}
+      // 遮罩关闭时不强制播放退场音效（按通知入场已播放一次）
       done();
     };
 
@@ -210,6 +238,29 @@
       if (el.ovClose.disabled) return;
       close();
     };
+  };
+
+  const showOverlayText = ({ text, animate, duration }, done) => {
+    // 进入遮罩时关闭穿透
+    try { window.notifyAPI?.setClickThrough(false); } catch {}
+    el.overlayTextContent.textContent = String(text || '').trim();
+    el.overlayText.style.display = 'flex';
+    // 动画控制
+    const inCls = (animate === 'zoom') ? 'anim-zoom-in' : 'anim-fade-in';
+    const outCls = (animate === 'zoom') ? 'anim-zoom-out' : 'anim-fade-out';
+    el.overlayText.classList.add(inCls);
+    const dur = Math.max(800, Number(duration) || 3000);
+    setTimeout(() => {
+      el.overlayText.classList.remove(inCls);
+      el.overlayText.classList.add(outCls);
+      setTimeout(() => {
+        el.overlayText.classList.remove(outCls);
+        el.overlayText.style.display = 'none';
+        // 退出遮罩恢复穿透（纯文本遮罩不播放退场音效）
+        try { window.notifyAPI?.setClickThrough(true); } catch {}
+        done();
+      }, 260);
+    }, dur);
   };
 
   // 跨窗口消息 API

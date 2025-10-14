@@ -71,6 +71,10 @@
         <button class="btn secondary" id="btnOverlayAuto">全屏遮罩（自动关闭）</button>
         <button class="btn secondary" id="btnOverlayClose">全屏遮罩（带关闭按钮与倒计时）</button>
         <button class="btn secondary" id="btnQueueDemo">队列示例</button>
+        <button class="btn" id="btnOverlayText"><i class="ri-layout-top-2-line"></i> 纯文本遮罩</button>
+        <button class="btn secondary" id="btnSoundIn"><i class="ri-volume-up-line"></i> 入场音效</button>
+        <button class="btn secondary" id="btnSoundOut"><i class="ri-volume-down-line"></i> 退场音效</button>
+        <!-- 暂时隐藏 EdgeTTS 测试入口 -->
       </div>
     </div>
     <div class="section">
@@ -108,6 +112,21 @@
         { mode: 'toast', type: 'error', title: '队列 3/3', subText: '错误', duration: 1800, speak: true },
       ]]);
     };
+
+    // 新接口测试
+    document.getElementById('btnOverlayText').onclick = async () => {
+      await window.pluginAPI?.call('notify.plugin', 'overlayText', ['这是一条纯文本提示', 2500, 'fade']);
+      log('已触发纯文本遮罩');
+    };
+    document.getElementById('btnSoundIn').onclick = async () => {
+      await window.pluginAPI?.call('notify.plugin', 'playSound', ['in']);
+      log('已播放入场音效');
+    };
+    document.getElementById('btnSoundOut').onclick = async () => {
+      await window.pluginAPI?.call('notify.plugin', 'playSound', ['out']);
+      log('已播放退场音效');
+    };
+    // 暂时隐藏 EdgeTTS 测试入口
   </script>
 </body>
 

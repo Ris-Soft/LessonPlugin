@@ -9,15 +9,7 @@
     <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
     <style>
       .form { display: flex; flex-direction: column; gap: 12px; }
-      .setting-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; }
-      .setting-icon { text-align: center; color: var(--text-secondary); }
-      .setting-title { font-weight: 600; }
-      .setting-desc { color: var(--text-secondary); font-size: 12px; }
       .inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-      /* 卡片风格（使用主设置页的面板色，避免绿色底色） */
-      .box { border-radius: 12px; background: var(--panel); border: 1px solid var(--border); padding: 16px; }
-      .setting-item { border-bottom: none !important; padding: 8px 0; }
-      .section { gap: 8px; }
       /* 选择控件采用主程序设置页样式（由 settings.css 提供） */
       .setting-action select, .setting-action input[type="text"], .setting-action input[type="range"] { min-width: 220px; }
     </style>
@@ -27,7 +19,7 @@
       <div class="drag">通知设置</div>
       <div class="window-actions">
         <button class="win-btn" data-act="minimize" title="最小化"><i class="ri-subtract-line"></i></button>
-        <button class="win-btn" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+        <button class="win-btn max" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
         <button class="win-btn close" data-act="close" title="关闭"><i class="ri-close-line"></i></button>
       </div>
     </div>
@@ -35,7 +27,7 @@
       <div class="section">
         <div class="section-title"><i class="ri-notification-3-line"></i> 通知设置</div>
         <div class="muted">配置播报与类型音频；通知展示在“通知运行窗口”。</div>
-        <div class="box">
+
           <div class="form">
             <div class="setting-item">
               <div class="setting-icon"><i class="ri-speaker-line"></i></div>
@@ -52,12 +44,11 @@
               <div class="setting-icon"><i class="ri-cpu-line"></i></div>
               <div class="setting-main">
                 <div class="setting-title">播报引擎</div>
-                <div class="setting-desc">选择系统语音或 EdgeTTS。</div>
+                <div class="setting-desc">当前仅支持系统语音（暂时隐藏 EdgeTTS）。</div>
               </div>
               <div class="setting-action">
                 <select id="ttsEngine">
                   <option value="system">系统语音（Web Speech）</option>
-                  <option value="edge">EdgeTTS（需服务端）</option>
                 </select>
               </div>
             </div>
@@ -73,27 +64,9 @@
               </div>
             </div>
 
-            <div class="setting-item">
-              <div class="setting-icon"><i class="ri-link-m"></i></div>
-              <div class="setting-main">
-                <div class="setting-title">EdgeTTS 服务地址</div>
-                <div class="setting-desc">本地或远程服务，例如 http://localhost:5173/tts</div>
-              </div>
-              <div class="setting-action">
-                <input id="ttsEndpoint" type="text" placeholder="http://localhost:5173/tts" />
-              </div>
-            </div>
+            <!-- 暂时隐藏 EdgeTTS 相关设置 -->
 
-            <div class="setting-item">
-              <div class="setting-icon"><i class="ri-mic-line"></i></div>
-              <div class="setting-main">
-                <div class="setting-title">EdgeTTS 音色名称</div>
-                <div class="setting-desc">如 zh-CN-XiaoxiaoNeural</div>
-              </div>
-              <div class="setting-action">
-                <input id="ttsEdgeVoice" type="text" placeholder="zh-CN-XiaoxiaoNeural" />
-              </div>
-            </div>
+            <!-- 暂时隐藏 EdgeTTS 相关设置 -->
 
             <div class="setting-item">
               <div class="setting-icon"><i class="ri-sound-module-line"></i></div>
@@ -118,33 +91,32 @@
             </div>
 
             <div class="setting-item">
-              <div class="setting-icon"><i class="ri-information-line"></i></div>
+              <div class="setting-icon"><i class="ri-volume-up-line"></i></div>
               <div class="setting-main">
-                <div class="setting-title">信息类型音频</div>
-                <div class="setting-desc">用于信息通知的提示音。</div>
+                <div class="setting-title">通知音效</div>
+                <div class="setting-desc">统一使用 <code>sounds/in.mp3</code> 与 <code>sounds/out.mp3</code>。可在此处试听。</div>
               </div>
-              <div class="setting-action"><input type="file" id="audioInfo" accept="audio/*" /></div>
+              <div class="setting-action">
+                <div class="inline">
+                  <button class="btn secondary" id="btnPlayIn"><i class="ri-play-line"></i> 试听入场</button>
+                  <button class="btn secondary" id="btnPlayOut"><i class="ri-play-line"></i> 试听退场</button>
+                </div>
+              </div>
             </div>
 
             <div class="setting-item">
-              <div class="setting-icon"><i class="ri-alert-line"></i></div>
+              <div class="setting-icon"><i class="ri-font-size"></i></div>
               <div class="setting-main">
-                <div class="setting-title">警告类型音频</div>
-                <div class="setting-desc">用于警告通知的提示音。</div>
+                <div class="setting-title">测试纯文本提示（全屏）</div>
+                <div class="setting-desc">无卡片、较大字体、带载入/载出动画。</div>
               </div>
-              <div class="setting-action"><input type="file" id="audioWarn" accept="audio/*" /></div>
-            </div>
-
-            <div class="setting-item">
-              <div class="setting-icon"><i class="ri-close-circle-line"></i></div>
-              <div class="setting-main">
-                <div class="setting-title">错误类型音频</div>
-                <div class="setting-desc">用于错误通知的提示音。</div>
+              <div class="setting-action">
+                <div class="inline">
+                  <button class="btn" id="btnTestOverlayText"><i class="ri-layout-top-2-line"></i> 测试</button>
+                </div>
               </div>
-              <div class="setting-action"><input type="file" id="audioError" accept="audio/*" /></div>
             </div>
           </div>
-        </div>
       </div>
 
       <div class="section">
