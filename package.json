@@ -19,6 +19,13 @@
       "icon": "icon.ico"
     },
     "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LessonPlugin",
+      "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     }
   },
