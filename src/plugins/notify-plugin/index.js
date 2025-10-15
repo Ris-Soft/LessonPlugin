@@ -28,7 +28,7 @@ function createRuntimeWindow() {
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    show: true,
+    show: false,
     resizable: false,
     movable: false,
     minimizable: false,
@@ -108,6 +108,15 @@ ipcMain.handle('notify:setClickThrough', (_evt, enable) => {
   if (!runtimeWin || runtimeWin.isDestroyed()) return false;
   runtimeWin.setIgnoreMouseEvents(Boolean(enable), { forward: true });
   return true;
+});
+
+// 渲染进程请求显示/隐藏运行窗口：空闲时隐藏，有通知时显示
+ipcMain.handle('notify:setVisible', (_evt, visible) => {
+  if (!runtimeWin || runtimeWin.isDestroyed()) return false;
+  try {
+    if (visible) runtimeWin.show(); else runtimeWin.hide();
+    return true;
+  } catch { return false; }
 });
 
 // 辅助：使用本地 EdgeTTS 合成并返回音频文件路径（file:///）

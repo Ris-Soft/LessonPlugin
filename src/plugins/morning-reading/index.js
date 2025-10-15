@@ -2,6 +2,7 @@ const path = require('path');
 const { BrowserWindow, app } = require('electron');
 
 let settingsWin = null;
+let pluginApi = null;
 
 function openSettingsWindow() {
   if (settingsWin && !settingsWin.isDestroyed()) {
@@ -29,36 +30,64 @@ module.exports = {
   name: '早读助手',
   version: '1.0.0',
   // 插件无需运行窗口，仅提供设置与自动化计时器注册
-  init: (_api) => { /* no-op */ },
+  init: (api) => { pluginApi = api; },
   functions: {
     openSettings: () => { openSettingsWindow(); return true; },
     // 注册时段（从设置页调用），写入自动化计时器
     setSchedule: (periods) => {
       try {
-        const am = global.__automationManager__;
-        if (!am) return { ok: false, error: 'automation_unavailable' };
-        return am.registerPluginTimers('morning.reading', Array.isArray(periods) ? periods : []);
-      } catch (e) {
-        return { ok: false, error: e?.message || String(e) };
-      }
+        if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
+        const src = Array.isArray(periods) ? periods : [];
+        const mapped = src.map((p, idx) => {
+          const soundIn = p?.soundIn !== false;
+          const soundOut = p?.soundOut !== false;
+          const speakStart = (p?.speakStart === true ? true : false);
+          const speakEnd = (p?.speakEnd === true ? true : false);
+          const actionsStart = [{
+            type: 'pluginEvent', pluginId: 'notify.plugin', event: 'enqueueBatch',
+            params: [[{ mode: 'overlay.text', text: String(p?.textStart || '早读开始，请站立朗读'), duration: 5000, animate: 'fade', speak: speakStart, which: (soundIn ? 'in' : 'none') }]]
+          }];
+          const actionsEnd = [{
+            type: 'pluginEvent', pluginId: 'notify.plugin', event: 'enqueueBatch',
+            params: [[{ mode: 'toast', title: String(p?.textEnd || '早读结束'), subText: String(p?.subTextEnd || '请坐下休息'), type: 'info', duration: 4000, speak: speakEnd, which: (soundOut ? 'out' : 'none') }]]
+          }];
+          return {
+            id: p?.id || `p_${idx}`,
+            name: p?.name || `时段${idx + 1}`,
+            enabled: p?.enabled !== false,
+            start: p?.start || '',
+            end: p?.end || '',
+            weekdays: Array.isArray(p?.weekdays) ? p.weekdays : [1,2,3,4,5],
+            biweek: ['even','odd','any'].includes(String(p?.biweek)) ? String(p.biweek) : 'any',
+            speakStart, speakEnd, soundIn, soundOut,
+            textStart: (p?.textStart || ''),
+            textEnd: (p?.textEnd || ''),
+            subTextEnd: (p?.subTextEnd ?? ''),
+            actionsStart, actionsEnd
+          };
+        });
+        return pluginApi.automation.registerTimers(mapped);
+      } catch (e) { return { ok: false, error: e?.message || String(e) }; }
     },
     clearSchedule: () => {
+      try { if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' }; return pluginApi.automation.clearTimers(); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    },
+    previewStart: async (period) => {
       try {
-        const am = global.__automationManager__;
-        if (!am) return { ok: false, error: 'automation_unavailable' };
-        return am.clearPluginTimers('morning.reading');
+        const p = (period && typeof period === 'object') ? period : {};
+        const payloads = [];
+        payloads.push({ mode: 'overlay.text', text: p.textStart || '站立早读开始', duration: 4000, animate: 'fade', speak: (p.speakStart === true ? true : false), which: (p.soundIn !== false ? 'in' : 'none') });
+        if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
+        return await pluginApi.call('notify.plugin', 'enqueueBatch', [payloads]);
       } catch (e) { return { ok: false, error: e?.message || String(e) }; }
     },
-    previewStart: async () => {
+    previewEnd: async (period) => {
       try {
-        const payloads = [ { mode: 'sound', which: 'in' }, { mode: 'overlay.text', text: '站立早读开始，请站立朗读', duration: 4000, animate: 'fade', speak: true } ];
-        return await require(path.join(app.getAppPath(), 'src', 'main', 'pluginManager.js')).callFunction('notify.plugin', 'enqueueBatch', [payloads]);
-      } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-    },
-    previewEnd: async () => {
-      try {
-        const payloads = [ { mode: 'toast', title: '站立早读结束', subText: '请坐下休息', type: 'info', duration: 4000, speak: true }, { mode: 'sound', which: 'out' } ];
-        return await require(path.join(app.getAppPath(), 'src', 'main', 'pluginManager.js')).callFunction('notify.plugin', 'enqueueBatch', [payloads]);
+        const p = (period && typeof period === 'object') ? period : {};
+        const payloads = [];
+        payloads.push({ mode: 'toast', title: p.textEnd || '站立早读结束', subText: (p.subTextEnd || '请坐下休息'), type: 'info', duration: 4000, speak: (p.speakEnd === true ? true : false), which: (p.soundOut !== false ? 'out' : 'none') });
+        if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
+        return await pluginApi.call('notify.plugin', 'enqueueBatch', [payloads]);
       } catch (e) { return { ok: false, error: e?.message || String(e) }; }
     }
   }

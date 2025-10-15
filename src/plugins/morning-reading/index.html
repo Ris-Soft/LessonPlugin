@@ -71,27 +71,32 @@
       height: calc(100vh - 165px);
     }
 
-    .form {
+    .form,
+    #period-list {
       max-height: calc(100vh - 265px);
       overflow-y: auto;
     }
 
-    .form::-webkit-scrollbar {
+    .form::-webkit-scrollbar,
+    #period-list::-webkit-scrollbar {
       width: 10px;
     }
 
-    .form::-webkit-scrollbar-track {
+    .form::-webkit-scrollbar-track,
+    #period-list::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.04);
       border-left: 1px solid var(--border);
     }
 
-    .form::-webkit-scrollbar-thumb {
+    .form::-webkit-scrollbar-thumb,
+    #period-list::-webkit-scrollbar-thumb {
       background: rgba(64, 75, 88, 0.685);
       border: 1px solid rgba(72, 87, 107, 0.45);
       border-radius: 999px;
     }
 
-    .form::-webkit-scrollbar-thumb:hover {
+    .form::-webkit-scrollbar-thumb:hover,
+    #period-list::-webkit-scrollbar-thumb:hover {
       background: rgba(69, 83, 90, 0.5);
     }
 
@@ -138,16 +143,16 @@
           </div>
           <!-- 右侧：编辑表单（采用设置页控件） -->
           <div>
-            <div class="section" style="padding:12px;">
+            <div class="section" id="editor-sec" style="padding:12px; display:none;">
               <div class="section-title" style="justify-content:space-between;">
                 <div>
-                  <span style="font-weight:600;">编辑时段</span>
+                  <span style="font-weight:600;" id="editor-title">编辑时段</span>
                   <!-- <span class="muted" style="margin-left:8px;"></span> -->
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button class="btn primary" id="btn-save"><i class="ri-save-line"></i> 保存并应用</button>
-                  <button class="btn" id="btn-test-start"><i class="ri-play-circle-line"></i> 测试入场</button>
-                  <button class="btn" id="btn-test-end"><i class="ri-stop-circle-line"></i> 测试退场</button>
+                  <button class="btn primary" id="btn-save" disabled><i class="ri-save-line"></i> 保存并应用</button>
+                  <button class="btn" id="btn-test-start" disabled><i class="ri-play-circle-line"></i> 测试开始</button>
+                  <button class="btn" id="btn-test-end" disabled><i class="ri-stop-circle-line"></i> 测试结束</button>
                 </div>
               </div>
               <div class="form">
@@ -222,7 +227,7 @@
                     <div class="setting-desc">入场提示文字</div>
                   </div>
                   <div class="setting-action">
-                    <div class="inline"><input id="f-text-start" type="text" placeholder="站立早读开始，请站立朗读" /></div>
+                    <div class="inline"><input id="f-text-start" type="text" placeholder="站立早读开始" /></div>
                   </div>
                 </div>
 
@@ -234,6 +239,16 @@
                   </div>
                   <div class="setting-action">
                     <div class="inline"><input id="f-text-end" type="text" placeholder="站立早读结束" /></div>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-subtract-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">退场副标题（左上角通知）</div>
+                    <div class="setting-desc">例如：请坐下休息</div>
+                  </div>
+                  <div class="setting-action">
+                    <div class="inline"><input id="f-sub-end" type="text" placeholder="请坐下休息" /></div>
                   </div>
                 </div>
 
@@ -305,18 +320,19 @@
 
     // 读取配置并初始化
     let periods = [];
+    let currentIndex = null; // 当前正在编辑的条目索引（未选择为 null）
     async function init() {
       await window.settingsAPI?.configEnsureDefaults('morningReading', { periods: [] });
       const cfg = await window.settingsAPI?.configGetAll('morningReading');
       periods = Array.isArray(cfg?.periods) ? cfg.periods : [];
       renderList();
-      if (!periods.length) addItem();
     }
 
     function addItem() {
       const idx = periods.length + 1;
-      periods.push({ name: `早读时段${idx}`, enabled: true, start: '06:50', end: '07:20', weekdays: [1, 2, 3, 4, 5], biweek: 'any', textStart: '早读开始，请站立朗读', textEnd: '早读结束，请坐下休息', soundIn: true, soundOut: true, speakStart: false, speakEnd: false });
+      periods.push({ name: `早读时段${idx}`, enabled: true, start: '06:50', end: '07:20', weekdays: [1, 2, 3, 4, 5], biweek: 'any', textStart: '站立早读开始', textEnd: '站立早读结束', soundIn: true, soundOut: true, speakStart: false, speakEnd: false });
       renderList();
+      fillEditor(periods[periods.length - 1], periods.length - 1);
     }
 
     function renderList() {
@@ -340,7 +356,7 @@
         // 事件
         const chk = item.querySelector('input[type=checkbox]');
         chk.addEventListener('change', (e) => { p.enabled = e.target.checked; });
-        item.querySelector('[data-op=edit]').addEventListener('click', () => { fillEditor(p); });
+        item.querySelector('[data-op=edit]').addEventListener('click', () => { fillEditor(p, idx); });
         item.querySelector('[data-op=del]').addEventListener('click', () => { periods.splice(idx, 1); renderList(); });
         listEl.appendChild(item);
       });
@@ -362,7 +378,8 @@
       return $$('#f-weekdays .chip').filter(c => c.classList.contains('active')).map(c => parseInt(c.dataset.v, 10));
     }
 
-    function fillEditor(p) {
+    function fillEditor(p, idx) {
+      currentIndex = (typeof idx === 'number') ? idx : periods.findIndex(x => x === p);
       $('#f-name').value = p.name || '';
       $('#f-enabled').checked = p.enabled !== false;
       $('#f-start').value = p.start || '';
@@ -371,11 +388,18 @@
       setEditorBiweek(p.biweek || 'any');
       $('#f-text-start').value = p.textStart || '';
       $('#f-text-end').value = p.textEnd || '';
+      $('#f-sub-end').value = (p.subTextEnd != null ? p.subTextEnd : '请坐下休息');
       $('#f-sound-in').checked = p.soundIn !== false;
       $('#f-sound-out').checked = p.soundOut !== false;
       $('#f-speak-start').checked = !!p.speakStart;
       $('#f-speak-end').checked = !!p.speakEnd;
       // biweek 单选无需绑定点击（由浏览器处理）。
+      // 显示编辑区域，启用按钮
+      const sec = document.getElementById('editor-sec'); if (sec) sec.style.display = '';
+      const t = document.getElementById('editor-title'); if (t) t.textContent = `编辑：${p.name || '未命名时段'}`;
+      $('#btn-save')?.removeAttribute('disabled');
+      $('#btn-test-start')?.removeAttribute('disabled');
+      $('#btn-test-end')?.removeAttribute('disabled');
     }
 
     function readEditor() {
@@ -388,6 +412,7 @@
         biweek: getEditorBiweek(),
         textStart: $('#f-text-start').value.trim(),
         textEnd: $('#f-text-end').value.trim(),
+        subTextEnd: $('#f-sub-end').value.trim(),
         soundIn: $('#f-sound-in').checked,
         soundOut: $('#f-sound-out').checked,
         speakStart: $('#f-speak-start').checked,
@@ -398,23 +423,27 @@
     // 交互
     $('#btn-add')?.addEventListener('click', addItem);
     $('#btn-save')?.addEventListener('click', async () => {
-      // 将编辑器当前值合并到列表中第一个（或当前编辑对象）
+      // 未选择不允许保存
+      if (currentIndex == null) return;
       const cur = readEditor();
-      if (periods.length) periods[0] = { ...periods[0], ...cur }; else periods.push(cur);
+      periods[currentIndex] = { ...periods[currentIndex], ...cur };
       await window.settingsAPI?.configSet('morningReading', 'periods', periods);
       await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]);
       renderList();
     });
     $('#btn-test-start')?.addEventListener('click', async () => {
-      await window.settingsAPI?.pluginCall('morning.reading', 'previewStart', []);
+      if (currentIndex == null) return;
+      const cur = readEditor();
+      await window.settingsAPI?.pluginCall('morning.reading', 'previewStart', [cur]);
     });
     $('#btn-test-end')?.addEventListener('click', async () => {
-      await window.settingsAPI?.pluginCall('morning.reading', 'previewEnd', []);
+      if (currentIndex == null) return;
+      const cur = readEditor();
+      await window.settingsAPI?.pluginCall('morning.reading', 'previewEnd', [cur]);
     });
 
     init();
-    // 初次填充编辑器（选中首条或新建）
-    setTimeout(() => { fillEditor(periods[0] || {}); }, 0);
+    // 默认未选择：右侧不显示设置，需点击编辑或新增。
   </script>
 </body>
 

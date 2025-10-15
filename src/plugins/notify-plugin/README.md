@@ -15,7 +15,7 @@
   - `type?: 'info'|'warn'|'error'` 默认 `info`
   - `duration?: number` 毫秒，默认 3000
   - `speak?: boolean` 是否播报；不传时跟随设置页开关
-  - `which?: 'in'|'out'` 音效类型，默认 `in`
+  - `which?: 'in'|'out'|'none'` 音效类型，默认 `in`；`none` 为不播放
 
 - `mode: 'overlay'` 全屏遮罩卡片
   - `title: string` 标题
@@ -24,11 +24,12 @@
   - `duration?: number` 自动关闭时的时长（毫秒，默认 3000）
   - `showClose?: boolean` 是否展示关闭按钮
   - `closeDelay?: number` 关闭按钮延迟可用（毫秒，默认 0）
-  - `which?: 'in'|'out'` 入场音效类型，默认 `in`（遮罩仅入场播放一次）
+  - `which?: 'in'|'out'|'none'` 入场音效类型，默认 `in`；`none` 为不播放（遮罩仅入场播放一次）
 
 - `mode: 'overlay.text'` 全屏纯文本遮罩
   - `text: string` 展示文本（未提供时将使用组合的播报文本）
   - `animate?: 'fade'|'zoom'` 入/出动画，默认 `fade`
+  - `which?: 'in'|'out'|'none'` 入场音效类型，默认 `in`；`none` 为不播放
   - `duration?: number` 展示时长（毫秒，默认 3000）
   - `which?: 'in'|'out'` 入场音效类型，默认 `in`（仅入场播放一次）
 

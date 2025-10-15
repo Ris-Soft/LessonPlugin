@@ -85,12 +85,13 @@
   // 队列控制
   const enqueue = (n) => {
     state.queue.push(n);
+    try { window.notifyAPI?.setVisible(true); } catch {}
     if (!state.active) next();
   };
 
   const next = async () => {
     const n = state.queue.shift();
-    if (!n) { state.active = false; return; }
+    if (!n) { state.active = false; try { window.notifyAPI?.setVisible(false); } catch {}; return; }
     state.active = true;
     await showNotification(n);
     state.active = false;
@@ -101,33 +102,29 @@
     const type = n.type || 'info';
     const title = n.title || n.main || '';
     const sub = n.subText || n.sub || '';
-    const speakText = n.speakText || `${title}${sub ? '，' + sub : ''}`;
+    const speakText = n.speakText || n.text || `${title}${sub ? '，' + sub : ''}`;
     const speakEnabled = (n.speak === true) || (n.speak === undefined && state.ttsEnabled);
 
-    // 声音：按参数播放，默认 in；遮罩场景只播放一次
-    const sound = (n.which === 'out') ? 'out' : 'in';
-    if (n.mode === 'overlay' || n.mode === 'overlay.text') {
-      // 遮罩进入时只播放一次，退出不再统一播放
-      playSoundBuiltin(sound);
-    } else {
-      playSoundBuiltin(sound);
-    }
-    // TTS
+    // 声音：按模式控制避免重叠；TTS 按 speak 开关播报
+    const sound = (n.which === 'out') ? 'out' : (n.which === 'none' ? null : 'in');
     if (speakEnabled) speak(speakText);
 
     if (n.mode === 'sound') {
       // 仅播放音效，不显示任何 UI
-      playSoundBuiltin(sound);
+      if (sound) playSoundBuiltin(sound);
       resolve();
       return;
     } else if (n.mode === 'overlay') {
+      if (sound) playSoundBuiltin(sound);
       showOverlay({ title, sub, autoClose: !!n.autoClose, duration: n.duration || 3000, showClose: !!n.showClose, closeDelay: n.closeDelay || 0 }, resolve);
     } else if (n.mode === 'overlay.text') {
       const text = n.text || speakText;
       const animate = n.animate || 'fade';
       const duration = n.duration || 3000;
+      if (sound) playSoundBuiltin(sound);
       showOverlayText({ text, animate, duration }, resolve);
     } else {
+      if (sound) playSoundBuiltin(sound);
       showToast({ title, sub, type, duration: n.duration || 3000 }, resolve);
     }
   });

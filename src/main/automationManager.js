@@ -137,8 +137,13 @@ class AutomationManager {
       speakEnd: !!p?.speakEnd,
       soundIn: p?.soundIn !== false, // 默认播放入场
       soundOut: p?.soundOut !== false, // 默认播放退场
-      textStart: p?.textStart || '早读开始，请站立朗读',
-      textEnd: p?.textEnd || '早读结束，请坐下休息'
+      // 插件自带动作：在开始/结束时执行（通用，无需主程序特判）
+      actionsStart: Array.isArray(p?.actionsStart) ? p.actionsStart : [],
+      actionsEnd: Array.isArray(p?.actionsEnd) ? p.actionsEnd : [],
+      // 文案交由插件默认处理，此处不设默认
+      textStart: (p?.textStart || ''),
+      textEnd: (p?.textEnd || ''),
+      subTextEnd: (p?.subTextEnd ?? '')
     })) : [];
     this.pluginTimers.set(canonId, { periods: list });
     return { ok: true, count: list.length };
@@ -152,6 +157,112 @@ class AutomationManager {
     const canonId = String(pluginId || '').trim();
     const entry = this.pluginTimers.get(canonId) || { periods: [] };
     return { ok: true, periods: entry.periods };
+  }
+
+  // 为插件创建“动作快捷方式”到桌面：生成协议触发的自动化项 + .url 快捷方式 + ICO 图标
+  async createActionShortcut(pluginId, options) {
+    try {
+      const nameRaw = String(options?.name || '').trim();
+      const name = nameRaw || '插件动作';
+      const actions = Array.isArray(options?.actions) ? options.actions : [];
+      if (!actions.length) return { ok: false, error: 'actions_required' };
+      const iconName = String(options?.icon || '').trim() || 'ri-flashlight-fill';
+      const bgColor = String(options?.bgColor || '#262626');
+      const fgColor = String(options?.fgColor || '#ffffff');
+
+      // 1) 创建自动化项：使用协议触发（LessonPlugin://task/<text>）
+      const protoText = `plugin:${String(pluginId || '').trim()}:${uuidv4().slice(0, 8)}`;
+      const item = this.create({ name, triggers: [{ type: 'protocol', text: protoText }], actions, confirm: { enabled: false, timeout: 0 } });
+
+      // 2) 生成 ICO 图标（深色圆角边框背景 + 白色 Remixicon 图标）
+      const iconsDir = path.join(this.app.getPath('userData'), 'icons');
+      try { if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true }); } catch {}
+      const icoPath = path.join(iconsDir, `${item.id}.ico`);
+      const icoOk = await this._generateRemixIconIco(iconName, icoPath, bgColor, fgColor);
+
+      // 3) 在桌面创建 .url 快捷方式，指向协议
+      const desktop = this.app.getPath('desktop');
+      const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
+      const shortcutPath = path.join(desktop, safeFile);
+      const urlLine = `URL=LessonPlugin://task/${encodeURIComponent(protoText)}`;
+      const iconLines = icoOk ? `IconFile=${icoPath}\r\nIconIndex=0` : '';
+      const content = `[InternetShortcut]\r\n${urlLine}\r\n${iconLines}\r\n`;
+      try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+
+      return { ok: true, shortcutPath, iconPath: icoOk ? icoPath : null, itemId: item.id, protocolText: protoText };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
+  async _generateRemixIconIco(iconClassName, icoPath, bgColor, fgColor) {
+    try {
+      const size = 256;
+      const rendererDir = path.join(__dirname, '..', 'renderer');
+      const html = `<!DOCTYPE html><html><head>
+        <meta charset=\"utf-8\" />
+        <link rel=\"stylesheet\" href=\"file://${rendererDir.replace(/\\/g, '/')}/remixicon-local.css\" />
+        <style>
+          @font-face { font-family: 'remixicon'; src: url('file://${rendererDir.replace(/\\/g, '/')}/remixicon.woff2') format('woff2'); font-display: block; }
+          html,body{margin:0;padding:0;background:transparent;}
+        </style>
+      </head><body></body></html>`;
+      const win = new BrowserWindow({ show: false, width: size, height: size, webPreferences: { offscreen: true } });
+      await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+      const js = `(() => new Promise(async (resolve) => {
+        const size = ${size};
+        const bg = ${JSON.stringify(bgColor)};
+        const fg = ${JSON.stringify(fgColor)};
+        const icon = ${JSON.stringify(iconClassName)};
+        const i = document.createElement('i');
+        i.className = icon;
+        document.body.appendChild(i);
+        try { await document.fonts.ready; } catch {}
+        const content = getComputedStyle(i, '::before').content || '';
+        const hex = String(content).replace(/[\"\']/g, '').replace('\\\\', '');
+        const code = parseInt(hex || '0', 16);
+        const ch = String.fromCharCode(code || 0);
+        const c = document.createElement('canvas'); c.width = size; c.height = size; document.body.appendChild(c);
+        const ctx = c.getContext('2d');
+        function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+        ctx.fillStyle = bg; roundRect(0,0,size,size, Math.floor(size*0.18)); ctx.fill();
+        ctx.fillStyle = fg;
+        const fontSize = Math.floor(size*0.56);
+        ctx.font = fontSize + 'px remixicon';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText(ch, size/2, size/2);
+        const data = c.toDataURL('image/png');
+        resolve(data);
+      }))()`;
+      const dataUrl = await win.webContents.executeJavaScript(js, true);
+      try { if (!win.isDestroyed()) win.destroy(); } catch {}
+      const pngBuf = Buffer.from(String(dataUrl || '').replace(/^data:image\/png;base64,/, ''), 'base64');
+      if (!pngBuf?.length) return false;
+      const icoBuf = this._pngToIco(pngBuf, size);
+      fs.writeFileSync(icoPath, icoBuf);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _pngToIco(pngBuf, size) {
+    // 参考 ICO 结构：Header(6) + Directory(16) + PNG 数据
+    const header = Buffer.alloc(6);
+    header.writeUInt16LE(0, 0); // reserved
+    header.writeUInt16LE(1, 2); // type: icon
+    header.writeUInt16LE(1, 4); // count
+    const dir = Buffer.alloc(16);
+    dir[0] = size >= 256 ? 0 : size; // width
+    dir[1] = size >= 256 ? 0 : size; // height
+    dir[2] = 0; // color count
+    dir[3] = 0; // reserved
+    dir.writeUInt16LE(1, 4); // planes
+    dir.writeUInt16LE(32, 6); // bit depth
+    dir.writeUInt32LE(pngBuf.length, 8); // size of data
+    dir.writeUInt32LE(6 + 16, 12); // offset to data
+    return Buffer.concat([header, dir, pngBuf]);
   }
 
   _checkPluginTimersAt(curHHMM, dateObj) {
@@ -183,38 +294,28 @@ class AutomationManager {
         if (!p.enabled) continue;
         const onWeekday = Array.isArray(p.weekdays) ? p.weekdays.includes(weekday) : true;
         if (!onWeekday || !matchBiweek(p.biweek)) continue;
-        // 触发开始
+        // 触发开始：执行插件注册的 actionsStart（若为空则忽略）
         if (p.start && p.start === curHHMM) {
           if (p._lastStartMinute !== curHHMM) {
             p._lastStartMinute = curHHMM;
-            this._invokeMorningStart(pid, p);
+            try {
+              const acts = Array.isArray(p.actionsStart) ? p.actionsStart : [];
+              if (acts.length) this.executeActions(acts, { reason: 'pluginTimer:start', pluginId: pid, now: d, period: p });
+            } catch {}
           }
         }
-        // 触发结束
+        // 触发结束：执行插件注册的 actionsEnd（若为空则忽略）
         if (p.end && p.end === curHHMM) {
           if (p._lastEndMinute !== curHHMM) {
             p._lastEndMinute = curHHMM;
-            this._invokeMorningEnd(pid, p);
+            try {
+              const acts = Array.isArray(p.actionsEnd) ? p.actionsEnd : [];
+              if (acts.length) this.executeActions(acts, { reason: 'pluginTimer:end', pluginId: pid, now: d, period: p });
+            } catch {}
           }
         }
       }
     }
-  }
-
-  async _invokeMorningStart(pluginId, period) {
-    // 入场：纯文本遮罩 + 可选音效 + 可选 TTS
-    const payloads = [];
-    if (period.soundIn) payloads.push({ mode: 'sound', which: 'in' });
-    payloads.push({ mode: 'overlay.text', text: String(period.textStart || '早读开始，请站立朗读'), duration: 5000, animate: 'fade', speak: !!period.speakStart });
-    try { await this.pluginManager.callFunction('notify.plugin', 'enqueueBatch', [payloads]); } catch {}
-  }
-
-  async _invokeMorningEnd(pluginId, period) {
-    // 退场：左上角 toast + 可选音效 + 可选 TTS
-    const payloads = [];
-    payloads.push({ mode: 'toast', title: String(period.textEnd || '早读结束'), subText: '请坐下休息', type: 'info', duration: 4000, speak: !!period.speakEnd });
-    if (period.soundOut) payloads.push({ mode: 'sound', which: 'out' });
-    try { await this.pluginManager.callFunction('notify.plugin', 'enqueueBatch', [payloads]); } catch {}
   }
 
   async invokeProtocol(text) {

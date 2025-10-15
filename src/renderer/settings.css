@@ -200,6 +200,12 @@ body {
   overflow-y: auto;
 }
 
+/* 选择动作对话框：滚动条与整体一致 */
+.modal-body::-webkit-scrollbar { width: 10px; }
+.modal-body::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); border-left: 1px solid var(--border); }
+.modal-body::-webkit-scrollbar-thumb { background: rgba(64, 75, 88, 0.685); border: 1px solid rgba(72, 87, 107, 0.45); border-radius: 999px; }
+.modal-body::-webkit-scrollbar-thumb:hover { background: rgba(69, 83, 90, 0.5); }
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -357,6 +363,21 @@ main {
   gap: 8px;
   align-items: center;
 }
+
+/* 动作选择列表（满宽、固定高度区域滚动） */
+.action-list { display: grid; gap: 8px; }
+.action-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+.action-item i { font-size: 18px; }
+.action-item:hover { border-color: rgba(34, 197, 94, 0.45); background: rgba(34, 197, 94, 0.12); }
 
 .array-item input {
   border-radius: 8px;
@@ -1463,5 +1484,11 @@ select:focus {
 }
 
 .icon-btn:hover {
-  color: #fca5a5;
+  color: var(--accent);
+}
+
+/* 激活态为绿色（点击按下时） */
+.icon-btn:active {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
 }

@@ -28,7 +28,10 @@ function renderPlugin(item) {
     </div>
     <div class="card-actions">
       <div class="actions-left">${actionsHtml}</div>
-      <div class="actions-right"><button class="icon-btn uninstall-btn" title="卸载"><i class="ri-delete-bin-line"></i></button></div>
+      <div class="actions-right">
+        <button class="icon-btn create-shortcut-btn" title="创建快捷方式"><i class="ri-links-line"></i></button>
+        <button class="icon-btn uninstall-btn" title="卸载"><i class="ri-delete-bin-line"></i></button>
+      </div>
     </div>
   `;
 
@@ -72,6 +75,60 @@ function renderPlugin(item) {
     const list = await fetchPlugins();
     container.innerHTML = '';
     list.forEach((p) => container.appendChild(renderPlugin(p)));
+  });
+  // 创建快捷方式（选择 action；若唯一则直接创建）
+  const shortcutBtn = el.querySelector('.create-shortcut-btn');
+  shortcutBtn?.addEventListener('click', async () => {
+    const pluginId = item.id || item.name;
+    // 收集可用的动作：来自 plugin.json 的 actions（需有 target），以及插件声明的 automationEvents
+    const metaActions = Array.isArray(item.actions) ? item.actions.filter(a => typeof a.target === 'string' && a.target) : [];
+    let eventDefs = [];
+    try {
+      const evRes = await window.settingsAPI?.pluginAutomationListEvents?.(pluginId);
+      eventDefs = Array.isArray(evRes?.events) ? evRes.events : [];
+    } catch {}
+    const candidates = [];
+    for (const a of metaActions) {
+      candidates.push({ kind: 'meta', id: a.id || a.target, label: a.text || a.id || a.target, icon: a.icon || item.icon || 'ri-links-line', target: a.target, args: Array.isArray(a.args) ? a.args : [] });
+    }
+    for (const e of eventDefs) {
+      candidates.push({ kind: 'event', id: e.id || e.name, label: e.name || e.id, icon: item.icon || 'ri-links-line', def: e });
+    }
+    if (!candidates.length) { await showAlert('该插件未定义可用于快捷方式的动作'); return; }
+    // 选择或直接使用唯一项
+    let chosen = null;
+    let params = [];
+    if (candidates.length === 1) {
+      chosen = candidates[0];
+      if (chosen.kind === 'event' && Array.isArray(chosen.def?.params) && chosen.def.params.length) {
+        const edited = await showParamsEditorForEvent(chosen.def.params, []);
+        if (edited === null) return;
+        params = edited;
+      } else if (chosen.kind === 'meta') {
+        params = Array.isArray(chosen.args) ? chosen.args : [];
+      }
+    } else {
+      const sel = await showActionSelector(candidates);
+      if (!sel) return;
+      chosen = candidates.find(c => c.kind === sel.kind && c.id === sel.id);
+      if (!chosen) return;
+      if (chosen.kind === 'event' && Array.isArray(chosen.def?.params) && chosen.def.params.length) {
+        const edited = await showParamsEditorForEvent(chosen.def.params, []);
+        if (edited === null) return;
+        params = edited;
+      } else if (chosen.kind === 'meta') {
+        params = Array.isArray(chosen.args) ? chosen.args : [];
+      }
+    }
+    // 构造自动化动作并请求创建桌面快捷方式
+    const eventName = (chosen.kind === 'meta') ? chosen.target : (chosen.def?.name || chosen.def?.id);
+    const action = { type: 'pluginEvent', pluginId, event: eventName, params: Array.isArray(params) ? params : [] };
+    const iconClass = chosen.icon || item.icon || 'ri-links-line';
+    const shortcutName = `${item.name} - ${chosen.label}`;
+    const options = { name: shortcutName, icon: iconClass, bgColor: '#111827', fgColor: '#ffffff', actions: [action] };
+    const res = await window.settingsAPI?.pluginAutomationCreateShortcut?.(pluginId, options);
+    if (!res?.ok) { await showAlert(`创建快捷方式失败：${res?.error || '未知错误'}`); return; }
+    await showAlert('已在桌面创建快捷方式');
   });
   return el;
 }
@@ -202,8 +259,8 @@ async function showParamsEditorForEvent(paramDefs, initial) {
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
     const box = document.createElement('div'); box.className = 'modal-box';
     const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑插件事件参数';
-    const body = document.createElement('div'); body.className = 'modal-body';
-    const list = document.createElement('div'); list.className = 'array-list';
+  const body = document.createElement('div'); body.className = 'modal-body';
+  const list = document.createElement('div'); list.className = 'action-list';
     const defs = Array.isArray(paramDefs) ? paramDefs : [];
     const values = Array.isArray(initial) ? initial.map((x) => x) : [];
     const parseByType = (type, str) => {
@@ -270,6 +327,44 @@ async function showParamsEditorForEvent(paramDefs, initial) {
     body.appendChild(desc);
     box.appendChild(body);
     actions.appendChild(cancel); actions.appendChild(save);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
+// 选择插件动作（meta actions + automation events）
+async function showActionSelector(candidates) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '选择动作';
+    const body = document.createElement('div'); body.className = 'modal-body';
+    const list = document.createElement('div'); list.className = 'array-list';
+    let selected = null;
+
+    candidates.forEach((c) => {
+    const row = document.createElement('div'); row.className = 'action-item';
+    const icon = document.createElement('i'); icon.className = c.icon || 'ri-links-line';
+    const label = document.createElement('div'); label.textContent = `${c.label}`;
+    label.style.flex = '1'; label.style.marginLeft = '8px';
+    const kind = document.createElement('span'); kind.className = 'muted'; kind.textContent = c.kind === 'event' ? '事件' : '动作';
+    kind.style.marginLeft = '8px';
+    const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'actionSel';
+      radio.addEventListener('change', () => { selected = { kind: c.kind, id: c.id }; });
+      row.appendChild(radio); row.appendChild(icon); row.appendChild(label); row.appendChild(kind);
+      list.appendChild(row);
+    });
+
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='取消';
+    cancel.onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    const ok = document.createElement('button'); ok.className='btn primary'; ok.textContent='确定';
+    ok.onclick = () => { if (!selected) { return; } document.body.removeChild(overlay); resolve(selected); };
+    box.appendChild(title);
+    body.appendChild(list);
+    box.appendChild(body);
+    actions.appendChild(cancel); actions.appendChild(ok);
     box.appendChild(actions);
     overlay.appendChild(box);
     document.body.appendChild(overlay);

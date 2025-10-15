@@ -10,6 +10,13 @@ const store = require('./store');
 // 让插件管理器可以访问 ipcMain（用于事件回调注册）
 pluginManager._ipcMain = ipcMain;
 
+// 进程锁：防止重复运行（单实例）
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  try { app.quit(); } catch {}
+  try { process.exit(0); } catch {}
+}
+
 let splashWindow = null;
 let settingsWindow = null;
 let tray = null;
@@ -376,9 +383,17 @@ ipcMain.handle('plugin:event:emit', async (_event, evName, payload) => {
 ipcMain.on('plugin:automation:register', (event, pluginId, events) => {
   pluginManager.registerAutomationEvents(pluginId, events);
 });
-ipcMain.handle('plugin:automation:listEvents', async (_e, pluginId) => {
-  return pluginManager.listAutomationEvents(pluginId);
-});
+  ipcMain.handle('plugin:automation:listEvents', async (_e, pluginId) => {
+    return pluginManager.listAutomationEvents(pluginId);
+  });
+  // 从设置页直接请求为插件动作创建桌面快捷方式
+  ipcMain.handle('plugin:automation:createShortcut', async (_e, pluginId, options) => {
+    try {
+      return await automationManager.createActionShortcut(pluginId, options || {});
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
 
 // 统一配置存储 IPC
 ipcMain.handle('config:getAll', async (_e, scope) => {

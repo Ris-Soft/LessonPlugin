@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   automationTest: (id) => ipcRenderer.invoke('automation:test', id),
   // 插件自动化事件查询
   pluginAutomationListEvents: (pluginId) => ipcRenderer.invoke('plugin:automation:listEvents', pluginId),
+  // 为插件创建桌面快捷方式（包装自动化动作）
+  pluginAutomationCreateShortcut: (pluginId, options) => ipcRenderer.invoke('plugin:automation:createShortcut', pluginId, options),
   // 直接调用插件函数（用于 actions 目标指向 functions 中的函数）
   pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
   // 自动化执行确认覆盖层通信

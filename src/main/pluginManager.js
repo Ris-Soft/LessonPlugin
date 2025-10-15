@@ -552,6 +552,15 @@ function createPluginApi(pluginId) {
         } catch {
           return [];
         }
+      },
+      // 为插件提供“创建动作快捷方式到桌面”的接口
+      createActionShortcut: (options) => {
+        try {
+          if (!automationManagerRef) return { ok: false, error: 'automation_manager_missing' };
+          return automationManagerRef.createActionShortcut(pluginId, options || {});
+        } catch (e) {
+          return { ok: false, error: e?.message || String(e) };
+        }
       }
     },
     // 启动页文本控制：插件可在初始化期间更新启动页状态文本
