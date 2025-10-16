@@ -120,15 +120,17 @@ function renderPlugin(item) {
         params = Array.isArray(chosen.args) ? chosen.args : [];
       }
     }
-    // 构造自动化动作并请求创建桌面快捷方式
+    // 构造自动化动作，弹出预览与选项对话框并确认创建
     const eventName = (chosen.kind === 'meta') ? chosen.target : (chosen.def?.name || chosen.def?.id);
-    const action = { type: 'pluginEvent', pluginId, event: eventName, params: Array.isArray(params) ? params : [] };
-    const iconClass = chosen.icon || item.icon || 'ri-links-line';
-    const shortcutName = `${item.name} - ${chosen.label}`;
-    const options = { name: shortcutName, icon: iconClass, bgColor: '#111827', fgColor: '#ffffff', actions: [action] };
-    const res = await window.settingsAPI?.pluginAutomationCreateShortcut?.(pluginId, options);
-    if (!res?.ok) { await showAlert(`创建快捷方式失败：${res?.error || '未知错误'}`); return; }
-    await showAlert('已在桌面创建快捷方式');
+    const action = (chosen.kind === 'meta')
+      ? { type: 'pluginAction', pluginId, target: eventName, params: Array.isArray(params) ? params : [] }
+      : { type: 'pluginEvent', pluginId, event: eventName, params: Array.isArray(params) ? params : [] };
+    const ok = await showShortcutCreateDialog(item, chosen, pluginId, action);
+    if (ok?.res) {
+      const proto = ok.res?.protocolText ? `LessonPlugin://task/${encodeURIComponent(ok.res.protocolText)}` : '';
+      const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式';
+      await showAlert(msg);
+    }
   });
   return el;
 }
@@ -160,6 +162,61 @@ function showModal({ title = '提示', message = '', confirmText = '确定', can
 }
 function showAlert(message, title = '提示') { return showModal({ title, message, confirmText: '好的' }); }
 function showConfirm(message, title = '确认') { return showModal({ title, message, confirmText: '确认', cancelText: '取消' }); }
+
+// 条件值编辑模态框（用于选项较多的条件）
+async function showCondEditorModal(type, initial) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑条件值';
+    const body = document.createElement('div'); body.className = 'modal-body';
+    const hint = document.createElement('div'); hint.className = 'muted'; hint.textContent = '点击标签进行选择/取消，确认后生效';
+    const wrap = document.createElement('div'); wrap.className = 'cond-editor';
+    let sel = new Set(Array.isArray(initial) ? initial : []);
+
+    const renderChips = (values, labelsFn = (v) => String(v)) => {
+      wrap.innerHTML = '';
+      values.forEach((v) => {
+        const lab = document.createElement('span');
+        lab.className = 'chip' + (sel.has(v) ? ' selected' : '');
+        lab.textContent = labelsFn(v);
+        lab.addEventListener('click', () => {
+          if (sel.has(v)) { sel.delete(v); lab.classList.remove('selected'); }
+          else { sel.add(v); lab.classList.add('selected'); }
+        });
+        wrap.appendChild(lab);
+      });
+    };
+
+    if (type === 'weekdayIn') {
+      title.textContent = '编辑星期选择';
+      renderChips([1,2,3,4,5,6,7]);
+    } else if (type === 'monthIn') {
+      title.textContent = '编辑月份选择';
+      renderChips(Array.from({ length: 12 }, (_, i) => i + 1));
+    } else if (type === 'dayIn') {
+      title.textContent = '编辑日期选择';
+      renderChips(Array.from({ length: 31 }, (_, i) => i + 1));
+    } else {
+      // Fallback：仅返回原值，不使用模态编辑
+      resolve(initial);
+      return;
+    }
+
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = '确认';
+    ok.addEventListener('click', () => { overlay.remove(); resolve(Array.from(sel).sort((a,b)=>a-b)); });
+    const cancel = document.createElement('button'); cancel.className = 'btn secondary'; cancel.textContent = '取消';
+    cancel.addEventListener('click', () => { overlay.remove(); resolve(null); });
+    actions.appendChild(ok); actions.appendChild(cancel);
+
+    box.appendChild(title); box.appendChild(body);
+    body.appendChild(hint); body.appendChild(wrap);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
 
 // 参数数组编辑对话框（结构化编辑，不使用广域文本框）
 async function showParamsEditor(initial) {
@@ -367,7 +424,129 @@ async function showActionSelector(candidates) {
     actions.appendChild(cancel); actions.appendChild(ok);
     box.appendChild(actions);
     overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  });
+}
+
+// 解析 remixicon ::before 的十六进制内容为字符
+function getRemixCharFromComputed(el) {
+  const content = getComputedStyle(el, '::before').content || '';
+  const raw = String(content).replace(/^\s*["']|["']\s*$/g, '');
+  if (/^\\[0-9a-fA-F]+$/.test(raw)) {
+    const hex = raw.replace(/\\+/g, '');
+    const code = parseInt(hex || '0', 16);
+    return String.fromCharCode(code || 0);
+  }
+  return raw;
+}
+
+// 在 Canvas 上按当前逻辑绘制 remixicon 字体图标
+async function drawRemixIconCanvas(iconClass, canvas, bg = '#111827', fg = '#ffffff', size = 256) {
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  ctx.fillStyle = bg; roundRect(0,0,size,size, Math.floor(size*0.18)); ctx.fill();
+  const i = document.createElement('i'); i.className = iconClass; i.style.fontFamily = 'remixicon'; i.style.fontStyle = 'normal'; i.style.fontWeight = 'normal'; document.body.appendChild(i);
+  try { await document.fonts.ready; } catch {}
+  let ch = getRemixCharFromComputed(i);
+  for (let t = 0; t < 30 && (!ch || ch === 'none' || ch === '""' || ch === "''"); t++) { await new Promise(r => setTimeout(r, 50)); ch = getRemixCharFromComputed(i); }
+  if (!ch || ch === 'none' || ch === '""' || ch === "''") { i.className = 'ri-flashlight-fill'; ch = getRemixCharFromComputed(i) || ''; }
+  const fontSize = Math.floor(size*0.56);
+  ctx.fillStyle = fg; ctx.font = fontSize + 'px remixicon'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillText(ch || '', size/2, size/2);
+  i.remove();
+}
+
+// 快捷方式创建预览与选项对话框
+async function showShortcutCreateDialog(pluginItem, chosen, pluginId, action) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '创建快捷方式预览';
+    const body = document.createElement('div'); body.className = 'modal-body';
+
+    const defaultName = `${pluginItem.name} - ${chosen.label}`;
+    const nameRow = document.createElement('div'); nameRow.className = 'form-row';
+    const nameLabel = document.createElement('label'); nameLabel.textContent = '名称'; nameLabel.className = 'muted';
+    const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.value = defaultName; nameInput.style.flex = '1';
+    nameRow.appendChild(nameLabel); nameRow.appendChild(nameInput);
+
+    const iconRow = document.createElement('div'); iconRow.className = 'form-row';
+    const iconLabel = document.createElement('label'); iconLabel.textContent = '图标来源'; iconLabel.className = 'muted';
+    const iconOpts = document.createElement('div'); iconOpts.className = 'options';
+    const r1 = document.createElement('input'); r1.type = 'radio'; r1.name = 'iconSrc'; r1.id = 'iconSrcAction'; r1.checked = true;
+    const l1 = document.createElement('label'); l1.htmlFor = 'iconSrcAction'; l1.innerHTML = '<i class="ri-flashlight-line"></i> 动作图标';
+    const r2 = document.createElement('input'); r2.type = 'radio'; r2.name = 'iconSrc'; r2.id = 'iconSrcPlugin';
+    const l2 = document.createElement('label'); l2.htmlFor = 'iconSrcPlugin'; l2.innerHTML = '<i class="ri-puzzle-line"></i> 插件图标';
+    iconOpts.appendChild(r1); iconOpts.appendChild(l1); iconOpts.appendChild(r2); iconOpts.appendChild(l2);
+    iconRow.appendChild(iconLabel); iconRow.appendChild(iconOpts);
+
+    const colorRow = document.createElement('div'); colorRow.className = 'form-row';
+    const bgLabel = document.createElement('label'); bgLabel.textContent = '背景色'; bgLabel.className = 'muted';
+    const bgInput = document.createElement('input'); bgInput.type = 'color'; bgInput.value = '#111827'; bgInput.className = 'color-input';
+    const fgLabel = document.createElement('label'); fgLabel.textContent = '前景色'; fgLabel.className = 'muted'; fgLabel.style.marginLeft = '12px';
+    const fgInput = document.createElement('input'); fgInput.type = 'color'; fgInput.value = '#ffffff'; fgInput.className = 'color-input';
+    colorRow.appendChild(bgLabel); colorRow.appendChild(bgInput); colorRow.appendChild(fgLabel); colorRow.appendChild(fgInput);
+
+    const grid = document.createElement('div'); grid.className = 'shortcut-preview-grid';
+    const meta = document.createElement('div'); meta.className = 'preview-meta';
+    const info = document.createElement('div'); info.className = 'muted';
+    const eventName = (chosen.kind === 'meta') ? chosen.target : (chosen.def?.name || chosen.def?.id);
+    const kindLabel = (chosen.kind === 'meta') ? '动作' : '事件';
+    info.textContent = `目标：${pluginItem.name} / ${chosen.label}（${kindLabel}：${eventName}）`;
+    // 字符串预览（示例，实际创建时由主进程生成具体ID）
+    const protoPreview = document.createElement('div'); protoPreview.className = 'muted';
+    const sample = `plugin:${pluginId}:${Math.random().toString(16).slice(2,10)}`;
+    protoPreview.textContent = `协议字符串预览：LessonPlugin://task/${encodeURIComponent(sample)}`;
+    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; canvas.className = 'preview-canvas';
+    // 左列放画布，右列放文本容器，避免跨行造成空白
+    meta.appendChild(info); meta.appendChild(protoPreview);
+    grid.appendChild(canvas);
+    grid.appendChild(meta);
+
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='取消';
+    cancel.onclick = () => { document.body.removeChild(overlay); resolve(false); };
+    const ok = document.createElement('button'); ok.className='btn primary'; ok.textContent='创建快捷方式';
+
+    function currentIconClass() {
+      const useAction = r1.checked;
+      return useAction ? (chosen.icon || pluginItem.icon || 'ri-links-line') : (pluginItem.icon || 'ri-links-line');
+    }
+    async function renderPreview() {
+      await drawRemixIconCanvas(currentIconClass(), canvas, bgInput.value, fgInput.value, 256);
+    }
+    r1.addEventListener('change', renderPreview);
+    r2.addEventListener('change', renderPreview);
+    bgInput.addEventListener('input', renderPreview);
+    fgInput.addEventListener('input', renderPreview);
+
+    ok.onclick = async () => {
+      const options = {
+        name: (nameInput.value || defaultName),
+        icon: currentIconClass(),
+        bgColor: bgInput.value,
+        fgColor: fgInput.value,
+        actions: [action],
+        iconDataUrl: canvas.toDataURL('image/png')
+      };
+      const res = await window.settingsAPI?.pluginAutomationCreateShortcut?.(pluginId, options);
+      if (!res?.ok) { await showAlert(`创建快捷方式失败：${res?.error || '未知错误'}`); return; }
+      document.body.removeChild(overlay);
+      resolve({ ok: true, res });
+    };
+
+    box.appendChild(title);
+    body.appendChild(nameRow);
+    body.appendChild(iconRow);
+    body.appendChild(colorRow);
+    body.appendChild(grid);
+    box.appendChild(body);
+    actions.appendChild(cancel); actions.appendChild(ok);
+    box.appendChild(actions);
+    overlay.appendChild(box);
     document.body.appendChild(overlay);
+    renderPreview();
   });
 }
 
@@ -1091,8 +1270,7 @@ async function initAutomationSettings() {
               // ['selectedProcess','当前选中窗口进程为']
             ].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
             typeSel.value = c.type || 'timeEquals';
-            const valInput = document.createElement('input'); valInput.type = 'text'; valInput.placeholder = '值（逗号分隔或单值）';
-            if (Array.isArray(c.value)) valInput.value = c.value.join(','); else valInput.value = c.value || '';
+            const editorWrap = document.createElement('div'); editorWrap.className = 'cond-editor';
             const negate = document.createElement('label'); negate.className='negate'; negate.innerHTML = '<input type="checkbox" /> 反条件';
             negate.querySelector('input').checked = !!c.negate;
             const delBtn = document.createElement('span'); delBtn.className='del'; delBtn.innerHTML = '<i class="ri-delete-bin-line"></i>';
@@ -1145,22 +1323,72 @@ async function initAutomationSettings() {
                 statusDot.title = ok ? '当前满足' : '当前不满足';
               } catch {}
             };
+            const renderEditor = () => {
+              editorWrap.innerHTML = '';
+              const t = typeSel.value;
+              const needValue = !(t === 'alwaysTrue' || t === 'alwaysFalse');
+              if (!needValue) {
+                const tip = document.createElement('span'); tip.className = 'muted'; tip.textContent = '无需填写';
+                editorWrap.appendChild(tip);
+                return;
+              }
+              if (t === 'timeEquals') {
+                const timeInput = document.createElement('input');
+                timeInput.type = 'time';
+                timeInput.step = '60';
+                const v = (typeof c.value === 'string' && /\d{2}:\d{2}/.test(c.value)) ? c.value : '';
+                timeInput.value = v;
+                timeInput.placeholder = 'HH:MM';
+                timeInput.addEventListener('change', () => { c.value = timeInput.value; updateStatus(); });
+                editorWrap.appendChild(timeInput);
+                return;
+              }
+              if (t === 'weekdayIn' || t === 'monthIn' || t === 'dayIn') {
+                const editBtn = document.createElement('button'); editBtn.className = 'btn secondary'; editBtn.innerHTML = '<i class="ri-edit-2-line"></i> 编辑选项';
+                const preview = document.createElement('span'); preview.className = 'editor-summary';
+                const updatePreview = () => { preview.textContent = (Array.isArray(c.value) && c.value.length) ? ('已选：' + c.value.join(',')) : '已选：无'; };
+                updatePreview();
+                editBtn.addEventListener('click', async () => {
+                  const res = await showCondEditorModal(t, c.value);
+                  if (res !== null) { c.value = res; updatePreview(); updateStatus(); }
+                });
+                editorWrap.appendChild(editBtn);
+                editorWrap.appendChild(preview);
+                return;
+              }
+              if (t === 'biweek') {
+                const optSel = document.createElement('select');
+                [['even','双周'], ['odd','单周']].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; optSel.appendChild(o); });
+                optSel.value = (c.value === 'odd' || c.value === 'even') ? c.value : 'even';
+                const preview = document.createElement('span'); preview.className = 'editor-summary';
+                const updatePreview = () => { preview.textContent = '当前：' + (optSel.value === 'even' ? '双周' : '单周'); };
+                optSel.addEventListener('change', () => { c.value = optSel.value; updatePreview(); updateStatus(); });
+                updatePreview();
+                editorWrap.appendChild(optSel);
+                editorWrap.appendChild(preview);
+                return;
+              }
+              // 默认回退到文本输入（兼容扩展类型）
+              const txt = document.createElement('input'); txt.type = 'text';
+              txt.placeholder = '值（逗号分隔或单值）';
+              txt.value = Array.isArray(c.value) ? c.value.join(',') : (c.value || '');
+              txt.addEventListener('change', () => {
+                if (t.endsWith('In')) c.value = txt.value.split(',').map(s => parseInt(s,10)).filter(n => !isNaN(n));
+                else c.value = txt.value.trim();
+                updateStatus();
+              });
+              editorWrap.appendChild(txt);
+            };
             typeSel.addEventListener('change', () => {
               c.type = typeSel.value;
-              const needValue = !(c.type === 'alwaysTrue' || c.type === 'alwaysFalse');
-              valInput.disabled = !needValue; valInput.placeholder = needValue ? '值（逗号分隔或单值）' : '无需填写';
-              updateStatus();
-            });
-            valInput.addEventListener('change', () => {
-              if (c.type.endsWith('In')) c.value = valInput.value.split(',').map(s => parseInt(s,10)).filter(n => !isNaN(n));
-              else c.value = valInput.value.trim();
+              renderEditor();
               updateStatus();
             });
             negate.querySelector('input').addEventListener('change', (e) => { c.negate = !!e.target.checked; updateStatus(); });
             delBtn.addEventListener('click', () => { g.items.splice(ci,1); renderConds(); });
-            // 初始禁用状态
-            valInput.disabled = (c.type === 'alwaysTrue' || c.type === 'alwaysFalse'); if (valInput.disabled) valInput.placeholder = '无需填写';
-            row.appendChild(statusDot); row.appendChild(typeSel); row.appendChild(valInput); row.appendChild(negate); row.appendChild(delBtn);
+            // 初始渲染编辑器
+            renderEditor();
+            row.appendChild(statusDot); row.appendChild(typeSel); row.appendChild(editorWrap); row.appendChild(negate); row.appendChild(delBtn);
             condList.appendChild(row);
             // 初次渲染更新一次状态
             updateStatus();
@@ -1201,6 +1429,7 @@ async function initAutomationSettings() {
         const typeSel = document.createElement('select');
         [
           ['pluginEvent','插件功能'],
+          ['pluginAction','插件动作'],
           ['power','电源功能'],
           ['openApp','打开应用程序'],
           ['cmd','执行CMD命令'],
@@ -1256,6 +1485,53 @@ async function initAutomationSettings() {
               if (Array.isArray(resEdit)) { a.params = resEdit; paramsPreview.textContent = `参数项数：${resEdit.length}`; }
             };
             cfg.appendChild(plugSel); cfg.appendChild(evSel); cfg.appendChild(editParams); cfg.appendChild(paramsPreview);
+          } else if (typeSel.value === 'pluginAction') {
+            // 选择插件 + 选择该插件在 plugin.json 中声明的 actions
+            const plugSel = document.createElement('select');
+            const plugins = await window.settingsAPI?.getPlugins?.() || [];
+            plugins.forEach(p => { const o=document.createElement('option'); o.value=(p.id || p.name); o.textContent=p.name; plugSel.appendChild(o); });
+            plugSel.value = a.pluginId || (plugins[0]?.id || plugins[0]?.name) || '';
+            const actSel = document.createElement('select');
+            const loadActions = (plugKey) => {
+              const target = plugins.find(pp => (pp.id === plugKey) || (pp.name === plugKey));
+              const acts = Array.isArray(target?.actions) ? target.actions : [];
+              actSel.innerHTML = '';
+              acts.forEach(ac => { const o=document.createElement('option'); o.value=(ac.id || ac.target || ''); o.textContent=(ac.text || ac.id || ac.target || '动作'); actSel.appendChild(o); });
+              return acts;
+            };
+            let acts = loadActions(plugSel.value);
+            // 立即写入，确保 act 包含 pluginId 与 target
+            const first = acts[0] || null;
+            a.pluginId = plugSel.value;
+            if (!a.target && first) { a.target = first.target || first.id || ''; }
+            actSel.value = a.action || a.target || (first?.id || first?.target || '');
+            const editParams = document.createElement('button'); editParams.className='btn secondary'; editParams.innerHTML = '<i class="ri-edit-2-line"></i> 编辑参数数组';
+            const paramsPreview = document.createElement('div'); paramsPreview.className='muted'; paramsPreview.textContent = `参数项数：${Array.isArray(a.params)? a.params.length : 0}`;
+            plugSel.addEventListener('change', () => {
+              a.pluginId = plugSel.value;
+              acts = loadActions(plugSel.value);
+              const first = acts[0] || null;
+              a.action = actSel.value = (first?.id || first?.target || '');
+              a.target = first?.target || a.action || '';
+              // 切换插件后，使用该动作的默认参数（如有），否则清零
+              const defArgs = Array.isArray(first?.args) ? first.args : [];
+              a.params = defArgs.map(x => x);
+              paramsPreview.textContent = `参数项数：${a.params.length}`;
+            });
+            actSel.addEventListener('change', () => {
+              const cur = acts.find(x => (x.id === actSel.value) || (x.target === actSel.value));
+              a.action = actSel.value;
+              a.target = cur?.target || actSel.value;
+              // 切换动作后，使用动作默认参数（如有），不保留旧参数以避免不匹配
+              const defArgs = Array.isArray(cur?.args) ? cur.args : [];
+              a.params = defArgs.map(x => x);
+              paramsPreview.textContent = `参数项数：${a.params.length}`;
+            });
+            editParams.onclick = async () => {
+              const resEdit = await showParamsEditor(Array.isArray(a.params) ? a.params : []);
+              if (Array.isArray(resEdit)) { a.params = resEdit; paramsPreview.textContent = `参数项数：${resEdit.length}`; }
+            };
+            cfg.appendChild(plugSel); cfg.appendChild(actSel); cfg.appendChild(editParams); cfg.appendChild(paramsPreview);
           } else if (typeSel.value === 'power') {
             const opSel = document.createElement('select'); [['shutdown','关机'],['restart','重启'],['logoff','注销']].forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; opSel.appendChild(o); }); opSel.value = a.op || 'shutdown'; opSel.addEventListener('change', () => { a.op = opSel.value; }); cfg.appendChild(opSel);
           } else if (typeSel.value === 'openApp') {

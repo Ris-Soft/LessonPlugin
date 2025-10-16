@@ -169,6 +169,7 @@ class AutomationManager {
       const iconName = String(options?.icon || '').trim() || 'ri-flashlight-fill';
       const bgColor = String(options?.bgColor || '#262626');
       const fgColor = String(options?.fgColor || '#ffffff');
+      const iconDataUrl = String(options?.iconDataUrl || '').trim();
 
       // 1) 创建自动化项：使用协议触发（LessonPlugin://task/<text>）
       const protoText = `plugin:${String(pluginId || '').trim()}:${uuidv4().slice(0, 8)}`;
@@ -178,7 +179,22 @@ class AutomationManager {
       const iconsDir = path.join(this.app.getPath('userData'), 'icons');
       try { if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true }); } catch {}
       const icoPath = path.join(iconsDir, `${item.id}.ico`);
-      const icoOk = await this._generateRemixIconIco(iconName, icoPath, bgColor, fgColor);
+      let icoOk = false;
+      try {
+        // 优先使用设置页预览生成的 PNG（避免在无字体环境下渲染失败）
+        if (iconDataUrl && iconDataUrl.startsWith('data:image/png;base64,')) {
+          const pngBuf = Buffer.from(iconDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+          if (pngBuf?.length) {
+            const icoBuf = this._pngToIco(pngBuf, 256);
+            fs.writeFileSync(icoPath, icoBuf);
+            icoOk = true;
+          }
+        }
+      } catch {}
+      if (!icoOk) {
+        // 回退到主进程生成（离屏渲染 + 字体）
+        icoOk = await this._generateRemixIconIco(iconName, icoPath, bgColor, fgColor);
+      }
 
       // 3) 在桌面创建 .url 快捷方式，指向协议
       const desktop = this.app.getPath('desktop');
@@ -199,13 +215,20 @@ class AutomationManager {
     try {
       const size = 256;
       const rendererDir = path.join(__dirname, '..', 'renderer');
+      const remixCssPath = path.join(rendererDir, 'remixicon-local.css');
+      let remixCss = '';
+      try { remixCss = fs.readFileSync(remixCssPath, 'utf8'); } catch {}
+      const woffUrl = `file://${rendererDir.replace(/\\/g, '/')}/remixicon.woff2`;
+      if (remixCss) {
+        // 重写字体文件为绝对 file://，避免 data: 环境相对路径失效
+        remixCss = remixCss.replace(/url\(\s*['\"]?remixicon\.woff2['\"]?\s*\)/g, `url('${woffUrl}')`);
+      }
+      const cssBlock = remixCss
+        ? `<style>${remixCss}\nhtml,body{margin:0;padding:0;background:transparent;}</style>`
+        : `<link rel=\"stylesheet\" href=\"file://${rendererDir.replace(/\\/g, '/')}/remixicon-local.css\" />\n<style>@font-face { font-family: 'remixicon'; src: url('${woffUrl}') format('woff2'); font-display: block; } html,body{margin:0;padding:0;background:transparent;}</style>`;
       const html = `<!DOCTYPE html><html><head>
         <meta charset=\"utf-8\" />
-        <link rel=\"stylesheet\" href=\"file://${rendererDir.replace(/\\/g, '/')}/remixicon-local.css\" />
-        <style>
-          @font-face { font-family: 'remixicon'; src: url('file://${rendererDir.replace(/\\/g, '/')}/remixicon.woff2') format('woff2'); font-display: block; }
-          html,body{margin:0;padding:0;background:transparent;}
-        </style>
+        ${cssBlock}
       </head><body></body></html>`;
       const win = new BrowserWindow({ show: false, width: size, height: size, webPreferences: { offscreen: true } });
       await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -216,12 +239,33 @@ class AutomationManager {
         const icon = ${JSON.stringify(iconClassName)};
         const i = document.createElement('i');
         i.className = icon;
+        i.style.fontFamily = 'remixicon';
+        i.style.fontStyle = 'normal';
+        i.style.fontWeight = 'normal';
         document.body.appendChild(i);
         try { await document.fonts.ready; } catch {}
-        const content = getComputedStyle(i, '::before').content || '';
-        const hex = String(content).replace(/[\"\']/g, '').replace('\\\\', '');
-        const code = parseInt(hex || '0', 16);
-        const ch = String.fromCharCode(code || 0);
+        function getCharFromComputed(el) {
+          const content = getComputedStyle(el, '::before').content || '';
+          const raw = String(content).replace(/^\s*[\"\']|[\"\']\s*$/g, '');
+          if (/^\\[0-9a-fA-F]+$/.test(raw)) {
+            const hex = raw.replace(/\\+/g, '');
+            const code = parseInt(hex || '0', 16);
+            return String.fromCharCode(code || 0);
+          }
+          // 若浏览器直接返回的是字符（而非十六进制转义），直接使用
+          return raw;
+        }
+        let ch = getCharFromComputed(i);
+        // 等待样式应用，避免 content 为 'none'
+        for (let t = 0; t < 30 && (!ch || ch === 'none' || ch === '""' || ch === "''"); t++) {
+          await new Promise(r => setTimeout(r, 50));
+          ch = getCharFromComputed(i);
+        }
+        if (!ch || ch === '""' || ch === "''" || ch === 'none') {
+          // 兜底：若指定图标类无效，尝试使用默认图标
+          i.className = 'ri-flashlight-fill';
+          ch = getCharFromComputed(i) || '';
+        }
         const c = document.createElement('canvas'); c.width = size; c.height = size; document.body.appendChild(c);
         const ctx = c.getContext('2d');
         function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
@@ -231,7 +275,7 @@ class AutomationManager {
         ctx.font = fontSize + 'px remixicon';
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'center';
-        ctx.fillText(ch, size/2, size/2);
+        ctx.fillText(ch || '', size/2, size/2);
         const data = c.toDataURL('image/png');
         resolve(data);
       }))()`;
@@ -406,8 +450,10 @@ class AutomationManager {
     return new Promise((resolve) => {
       const win = new BrowserWindow({
         width: 800, height: 560, fullscreen: true, frame: false, transparent: true, alwaysOnTop: true,
-        webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js') } // 复用API能力
+        skipTaskbar: true, focusable: false, hasShadow: false, acceptFirstMouse: true,
+        webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js'), backgroundThrottling: false } // 复用API能力
       });
+      try { win.setAlwaysOnTop(true, 'screen-saver'); } catch {}
       win.loadFile(path.join(__dirname, '..', 'renderer', 'automation-confirm.html'));
       const timeout = Math.max(5, parseInt(item?.confirm?.timeout || 60, 10));
       // 将自动化条目基本信息传递给渲染页
@@ -445,6 +491,11 @@ class AutomationManager {
           await this.pluginManager.callFunction(act.pluginId, act.event, act.params || []);
           // console.log(act);
           // console.log(`Plugin ${act.pluginId} event ${act.event} called with params ${JSON.stringify(act.params || [])}`);
+        } else if (act.type === 'pluginAction') {
+          const fn = String(act.target || act.action || '').trim();
+          if (fn) {
+            await this.pluginManager.callFunction(act.pluginId, fn, act.params || []);
+          }
         } else if (act.type === 'power') {
           const platform = process.platform;
           if (platform === 'win32') {
