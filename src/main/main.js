@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electr
 const path = require('path');
 const fs = require('fs');
 const dgram = require('dgram');
+const os = require('os');
 
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
@@ -236,6 +237,12 @@ app.whenReady().then(async () => {
 
   sendSplashProgress({ stage: 'init', message: '初始化插件管理器...' });
 
+  // 提前创建自动化管理器并注入到插件管理器，以便插件 init 阶段能注册分钟触发器
+  automationManager = new AutomationManager({ app, store, pluginManager });
+  try { pluginManager.setAutomationManager(automationManager); } catch {}
+  try { global.__automationManager__ = automationManager; } catch {}
+
+  // 之后再加载插件（插件在 init 内可使用 automation.registerMinuteTriggers）
   try {
     const statuses = await pluginManager.loadPlugins((status) => {
       sendSplashProgress(status);
@@ -248,12 +255,8 @@ app.whenReady().then(async () => {
   // 创建“打开用户数据”快捷脚本（每次启动检查，缺失则补齐）
   ensureUserDataShortcut();
 
-  // 初始化自动化管理器（在 store.init 之后）
-  automationManager = new AutomationManager({ app, store, pluginManager });
+  // 最后对齐并启动自动化计时器（此时插件注册已完成）
   automationManager.init();
-  // 提供给插件访问（两种方式）：通过 pluginManager API 或全局变量
-  try { pluginManager.setAutomationManager(automationManager); } catch {}
-  try { global.__automationManager__ = automationManager; } catch {}
 
   // 注册协议处理（LessonPlugin://task/<text>）
   try { app.setAsDefaultProtocolClient('LessonPlugin'); } catch {}
@@ -541,7 +544,32 @@ ipcMain.handle('system:cleanupUserData', async () => {
   }
 });
 ipcMain.handle('system:getAppInfo', async () => {
-  return { appVersion: app.getVersion(), electronVersion: process.versions.electron };
+  let platformText = '';
+  try {
+    const ver = (typeof os.version === 'function') ? os.version() : '';
+    const release = os.release();
+    const plat = process.platform;
+    const name = plat === 'win32' ? 'Windows' : (plat === 'darwin' ? 'macOS' : (plat === 'linux' ? 'Linux' : plat));
+    if (ver && typeof ver === 'string' && ver.trim()) {
+      platformText = plat === 'win32' ? `${ver} ${release}` : ver; // Windows: 追加构建号
+    } else {
+      platformText = `${name} ${release}`;
+    }
+  } catch {
+    const release = require('os').release();
+    const plat = process.platform;
+    const name = plat === 'win32' ? 'Windows' : (plat === 'darwin' ? 'macOS' : (plat === 'linux' ? 'Linux' : plat));
+    platformText = `${name} ${release}`;
+  }
+  const archRaw = process.arch;
+  const archLabel = archRaw === 'ia32' ? 'x86' : archRaw;
+  return {
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+    nodeVersion: process.versions.node,
+    chromeVersion: process.versions.chrome,
+    platform: `${platformText} (${archLabel})`
+  };
 });
 ipcMain.handle('system:getAutostart', async () => {
   try {

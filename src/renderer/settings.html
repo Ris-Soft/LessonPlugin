@@ -19,6 +19,7 @@
       </div>
       <nav>
         <button class="nav-item active" data-page="plugins"><i class="ri-puzzle-line"></i> 插件管理</button>
+        <button class="nav-item" data-page="market"><i class="ri-store-2-line"></i> 功能市场</button>
         <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
         <button class="nav-item" data-page="profiles"><i class="ri-archive-line"></i> 档案管理</button>
         <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
@@ -48,6 +49,15 @@
             拖入插件ZIP安装包以开始安装
           </div>
           <div id="plugins" class="plugins"></div>
+        </section>
+        <section id="page-market" hidden>
+          <header>
+            <h1>功能市场</h1>
+            <p>浏览、发现与获取功能模块（即将上线）</p>
+          </header>
+          <div class="panel">
+            <div class="muted" style="padding: 12px;">功能市场正在建设中，敬请期待。</div>
+          </div>
         </section>
         <section id="page-general" hidden>
           <header>
@@ -253,7 +263,7 @@
                 </div>
               </div>
 
-              
+
             </div>
           </div>
 
@@ -270,7 +280,8 @@
                 </div>
                 <div class="setting-action">
                   <div class="inline">
-                    <button id="open-user-data" class="btn secondary"><i class="ri-folder-open-line"></i> 打开数据目录</button>
+                    <button id="open-user-data" class="btn secondary"><i class="ri-folder-open-line"></i>
+                      打开数据目录</button>
                     <button id="change-user-data" class="btn"><i class="ri-pencil-line"></i> 更改数据目录</button>
                   </div>
                 </div>
@@ -339,12 +350,12 @@
               </div>
             </div>
             <div id="profiles-filters" class="profiles-filters"></div>
-        <div class="profiles-table-wrap">
-          <table class="profiles-table">
-            <thead id="profiles-thead"></thead>
-            <tbody id="profiles-tbody"></tbody>
-          </table>
-        </div>
+            <div class="profiles-table-wrap">
+              <table class="profiles-table">
+                <thead id="profiles-thead"></thead>
+                <tbody id="profiles-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -358,11 +369,26 @@
             <div class="auto-left">
               <div class="auto-topbar">
                 <button id="auto-add" class="btn primary"><i class="ri-add-line"></i> 新建任务</button>
+                <button id="auto-filters-toggle" class="btn secondary"><i class="ri-filter-3-line"></i> 筛选</button>
+              </div>
+              <div id="auto-filters" class="auto-filters" hidden>
+                <div class="chips">
+                  <span class="chip" data-filter-source="user">来源：用户</span>
+                  <span class="chip" data-filter-source="plugin">来源：插件</span>
+                  <span class="chip" data-filter-source="shortcut">来源：快捷</span>
+                </div>
+                <div class="chips">
+                  <span class="chip" data-filter-enabled="all">不限</span>
+                  <span class="chip" data-filter-enabled="enabled">已启用</span>
+                  <span class="chip" data-filter-enabled="disabled">未启用</span>
+                </div>
               </div>
               <div id="auto-list" class="auto-list"></div>
             </div>
             <div class="auto-right">
-              <div id="auto-editor" class="auto-editor muted">从左侧选择任务或新建</div>
+              <div id="auto-editor" class="auto-editor">
+                <div class="auto-editor-empty">从左侧选择任务或新建</div>
+              </div>
             </div>
           </div>
         </section>
@@ -374,19 +400,55 @@
             <p>LessonPlugin — 插件化大屏课堂辅助工具</p>
           </header>
           <div class="panel">
-            <div class="about">
-              <div><i class="ri-information-line"></i> 版本：<span id="about-version">—</span></div>
-              <div><i class="ri-computer-line"></i> Electron 版本：<span id="about-electron">—</span></div>
-              <div><i class="ri-git-repository-line"></i> 仓库：<a href="https://github.com/Ris-Soft/LessonPlugin" target="_blank">https://github.com/Ris-Soft/LessonPlugin</a></div>
+            <div class="about-hero">
+              <img class="about-logo" src="../../icon.ico" alt="LessonPlugin" />
+              <div class="about-title">
+                <div class="name">LessonPlugin</div>
+                <div class="tagline">插件化大屏课堂辅助工具</div>
+              </div>
+              <div class="about-badges">
+                <span class="pill small">版本 <span id="about-version">—</span></span>
+                <span class="pill small">Electron <span id="about-electron">—</span></span>
+                <span class="pill small">Node <span id="about-node">—</span></span>
+                <span class="pill small">Chrome <span id="about-chrome">—</span></span>
+                <span class="pill small">平台 <span id="about-platform">—</span></span>
+              </div>
+            </div>
+            <div class="about-links">
+              <a href="https://github.com/Ris-Soft/LessonPlugin" target="_blank" class="btn"><i
+                  class="ri-git-repository-line"></i> 仓库</a>
+              <div class="spacer"></div>
+              <button id="about-copy" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制版本信息</button>
+              <button id="about-open-data" class="btn"><i class="ri-folder-2-line"></i> 打开数据目录</button>
             </div>
           </div>
           <div class="panel">
             <div class="contributors">
               <div class="section-title"><i class="ri-team-line"></i> 贡献者</div>
-              <ul class="contributors-list">
-                <li><span class="name">PYLXU</span> — 主程序开发</li>
-                <li><span class="name">风吟残歌</span> — 主程序开发</li>
-                <li><span class="name">小震</span> — LOGO设计</li>
+              <ul class="contributors-list horizontal">
+                <li>
+                  <div class="avatar"><i style="color: white;" class="ri-code-line"></i></div>
+                  <div class="name">PYLXU</div>
+                  <div class="role">主程序开发</div>
+                </li>
+                <li>
+                  <div class="avatar"><i style="color: white;" class="ri-code-line"></i></div>
+                  <div class="name">风吟残歌</div>
+                  <div class="role">主程序开发</div>
+                </li>
+                <li>
+                  <div class="avatar"><i style="color: white;" class="ri-palette-line"></i></div>
+                  <div class="name">小震</div>
+                  <div class="role">LOGO设计</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="credits">
+              <div class="section-title"><i class="ri-heart-2-line"></i> 特别鸣谢</div>
+              <ul class="credits-list">
+                <li><span class="pill small name">ClassIsland</span> — 为本程序部分组件设计提供设计思路</li>
               </ul>
             </div>
           </div>

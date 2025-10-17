@@ -17,6 +17,10 @@ class AutomationManager {
     this.timer = null;
     // 插件计时器：pluginId -> { periods: Array<Period> }
     this.pluginTimers = new Map();
+    // 新增：插件“分钟触发器”注册表（仅 HH:MM + 回调）
+    this.pluginMinuteTriggers = new Map();
+    // 轻日志：按系统配置或环境变量启用
+    this.log = (...a) => { try { if (this.store.get('system','debugLog') || process.env.LP_DEBUG) console.log('[Automation]', ...a); } catch {} };
   }
 
   init() {
@@ -24,30 +28,37 @@ class AutomationManager {
     this.store.ensureDefaults('automation', { list: [] });
     const latest = this.store.get('automation', 'list');
     this.items = Array.isArray(latest) ? latest : [];
-    // 按整分钟对齐检查“到达某时间”触发器
+
+    // 根据规范对齐分钟触发：插件 init 完成后按当前秒数决定补触发与定时器创建
     try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
-    const scheduleNext = () => {
-      const now = Date.now();
-      // 距离下一分钟边界的毫秒数（确保在 mm:00 秒准点触发）
-      const msToNextMinute = 60000 - (now % 60000);
-      this.timer = setTimeout(() => {
-        try { this.checkTimeTriggers(); } catch {}
-        scheduleNext();
-      }, msToNextMinute);
+    const align = () => {
+      try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+      const d = nowDate();
+      const sec = d.getSeconds();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const cur = `${hh}:${mm}`;
+      const msToNextMinute = (60 - sec) * 1000;
+      this.log('align:start', { cur, sec, msToNextMinute });
+    
+      const startAlignedInterval = () => {
+        try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+        // 在 00 秒边界执行一次，然后进入每 60s 的对齐循环
+        try { this.checkTimeTriggers(); this.log('aligned:boundary_tick'); } catch {}
+        this.timer = setInterval(() => { this.log('tick:minute'); try { this.checkTimeTriggers(); } catch {} }, 60000);
+      };
+    
+      // 启动时立即检查一次当前分钟（补触发），随后在下一分钟 00 秒对齐并进入每 60s 检查
+      try { this.checkTimeTriggers(); this.log('startup:immediate_check', cur); } catch {}
+      this.log('align:schedule_next_minute', msToNextMinute);
+      this.timer = setTimeout(startAlignedInterval, msToNextMinute);
     };
-    scheduleNext();
+    align();
 
-    // 启动补触发：应用启动或初始化后，若当前分钟尚未执行，则立即检查一次
-    try { this.checkTimeTriggers(); } catch {}
-
-    // 系统睡眠后恢复时进行补触发，并重新对齐下一分钟
+    // 系统睡眠后恢复：重新对齐
     try {
       const { powerMonitor } = require('electron');
-      this._onResume = () => {
-        try { this.checkTimeTriggers(); } catch {}
-        try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
-        scheduleNext();
-      };
+      this._onResume = () => { align(); };
       powerMonitor.on('resume', this._onResume);
     } catch {}
   }
@@ -93,12 +104,16 @@ class AutomationManager {
     const canRun = this.evaluateConditions(item);
     if (!canRun) return { ok: true, executed: false, reason: 'conditions_not_met' };
     if (item?.confirm?.enabled) {
-      const approved = await this.showConfirmOverlay(item, { reason: 'manual_test' });
+      const approved = await this.showConfirmOverlay(item, { reason: 'manual_test', itemId: item.id });
       // 注意：showConfirmOverlay 内部已在批准时执行动作，这里不重复执行
       return { ok: true, executed: !!approved, reason: approved ? null : 'cancelled' };
     }
-    await this.executeActions(item.actions || [], { reason: 'manual_test' });
+    await this.executeActions(item.actions || [], { reason: 'manual_test', itemId: item.id });
     return { ok: true, executed: true };
+  }
+
+  checkMinuteAlignmentStartup() {
+    // deprecated: 启动对齐与补触发逻辑已迁移到 init()
   }
 
   checkTimeTriggers() {
@@ -119,6 +134,8 @@ class AutomationManager {
 
     // 检查插件计时器（开始/结束时间点）
     this._checkPluginTimersAt(cur, d);
+    // 新增：检查插件分钟触发器（HH:MM + 回调）
+    this._checkPluginMinuteTriggersAt(cur, d);
   }
 
   // 插件计时器接口：注册/清理/查询
@@ -173,7 +190,7 @@ class AutomationManager {
 
       // 1) 创建自动化项：使用协议触发（LessonPlugin://task/<text>）
       const protoText = `plugin:${String(pluginId || '').trim()}:${uuidv4().slice(0, 8)}`;
-      const item = this.create({ name, triggers: [{ type: 'protocol', text: protoText }], actions, confirm: { enabled: false, timeout: 0 } });
+      const item = this.create({ name, source: 'shortcut', triggers: [{ type: 'protocol', text: protoText }], actions, confirm: { enabled: false, timeout: 0 } });
 
       // 2) 生成 ICO 图标（深色圆角边框背景 + 白色 Remixicon 图标）
       const iconsDir = path.join(this.app.getPath('userData'), 'icons');
@@ -342,6 +359,7 @@ class AutomationManager {
         if (p.start && p.start === curHHMM) {
           if (p._lastStartMinute !== curHHMM) {
             p._lastStartMinute = curHHMM;
+            this.log('period:start', pid, p.id, p.name);
             try {
               const acts = Array.isArray(p.actionsStart) ? p.actionsStart : [];
               if (acts.length) this.executeActions(acts, { reason: 'pluginTimer:start', pluginId: pid, now: d, period: p });
@@ -352,6 +370,7 @@ class AutomationManager {
         if (p.end && p.end === curHHMM) {
           if (p._lastEndMinute !== curHHMM) {
             p._lastEndMinute = curHHMM;
+            this.log('period:end', pid, p.id, p.name);
             try {
               const acts = Array.isArray(p.actionsEnd) ? p.actionsEnd : [];
               if (acts.length) this.executeActions(acts, { reason: 'pluginTimer:end', pluginId: pid, now: d, period: p });
@@ -440,9 +459,9 @@ class AutomationManager {
   async tryExecute(item, ctx) {
     if (!this.evaluateConditions(item)) return;
     if (item?.confirm?.enabled) {
-      await this.showConfirmOverlay(item, ctx);
+      await this.showConfirmOverlay(item, { ...ctx, itemId: item.id });
     } else {
-      await this.executeActions(item.actions || [], ctx);
+      await this.executeActions(item.actions || [], { ...ctx, itemId: item.id });
     }
   }
 
@@ -465,7 +484,7 @@ class AutomationManager {
       let done = false;
       const finish = async (ok) => {
         if (done) return; done = true; try { if (!win.isDestroyed()) win.destroy(); } catch {}
-        if (ok) await this.executeActions(item.actions || [], ctx);
+        if (ok) await this.executeActions(item.actions || [], { ...ctx, itemId: item.id });
         resolve(ok);
       };
       // 监听渲染确认
@@ -489,8 +508,6 @@ class AutomationManager {
         // console.log(act);
         if (act.type === 'pluginEvent') {
           await this.pluginManager.callFunction(act.pluginId, act.event, act.params || []);
-          // console.log(act);
-          // console.log(`Plugin ${act.pluginId} event ${act.event} called with params ${JSON.stringify(act.params || [])}`);
         } else if (act.type === 'pluginAction') {
           const fn = String(act.target || act.action || '').trim();
           if (fn) {
@@ -499,7 +516,6 @@ class AutomationManager {
         } else if (act.type === 'power') {
           const platform = process.platform;
           if (platform === 'win32') {
-            // Windows: 显式定位 shutdown.exe，兼容 32/64 位
             const sysRoot = process.env.SystemRoot || 'C\\Windows';
             const p1 = path.join(sysRoot, 'System32', 'shutdown.exe');
             const p2 = path.join(sysRoot, 'Sysnative', 'shutdown.exe');
@@ -567,6 +583,53 @@ class AutomationManager {
           await new Promise((resolve) => setTimeout(resolve, Math.round(sec * 1000)));
         }
       } catch {}
+    }
+    // 记录上次成功执行时间
+    try {
+      const itemId = ctx?.itemId;
+      if (itemId) {
+        const item = this.get(itemId);
+        if (item) {
+          item.lastSuccessAt = nowDate().toISOString();
+          this.store.set('automation', 'list', this.items);
+        }
+      }
+    } catch {}
+  }
+
+  // 新增：插件分钟触发器接口（仅 HH:MM 列表与回调）
+  registerPluginMinuteTriggers(pluginId, hhmmList, callback) {
+    const canonId = String(pluginId || '').trim();
+    if (!canonId) return { ok: false, error: 'invalid_plugin_id' };
+    const times = Array.isArray(hhmmList) ? hhmmList.map((t) => String(t || '').slice(0,5)).filter((t) => /^(\d{2}:\d{2})$/.test(t)) : [];
+    if (typeof callback !== 'function') return { ok: false, error: 'callback_required' };
+    this.log('pluginMinute:register', canonId, times);
+    this.pluginMinuteTriggers.set(canonId, { times: Array.from(new Set(times)), cb: callback });
+    return { ok: true, count: times.length };
+  }
+  clearPluginMinuteTriggers(pluginId) {
+    const canonId = String(pluginId || '').trim();
+    this.pluginMinuteTriggers.delete(canonId);
+    return { ok: true };
+  }
+  listPluginMinuteTriggers(pluginId) {
+    const canonId = String(pluginId || '').trim();
+    const entry = this.pluginMinuteTriggers.get(canonId) || { times: [], cb: null };
+    return { ok: true, times: entry.times || [] };
+  }
+
+  _checkPluginMinuteTriggersAt(curHHMM, dateObj) {
+    const d = dateObj || nowDate();
+    for (const [pid, entry] of this.pluginMinuteTriggers.entries()) {
+      const times = Array.isArray(entry?.times) ? entry.times : [];
+      const cb = entry?.cb;
+      if (!times.length || typeof cb !== 'function') continue;
+      if (times.includes(curHHMM)) {
+        if (entry._lastMinute === curHHMM) continue;
+        entry._lastMinute = curHHMM;
+        this.log('pluginMinute:fire', pid, curHHMM);
+        try { cb(curHHMM, d); } catch {}
+      }
     }
   }
 }

@@ -60,12 +60,12 @@ module.exports.init = function init(paths) {
       if (fs.existsSync(metaPath)) {
         meta = readJsonSafe(metaPath, {});
       }
-      // 尝试从 package.json 读取版本
-      let detectedVersion = meta.version || null;
+      // 尝试从 package.json 读取版本与作者、依赖
+      // 已统一在下方读取 package.json 并解析版本与其它元信息
       const pkgPath = path.join(full, 'package.json');
-      if (!detectedVersion && fs.existsSync(pkgPath)) {
-        try { const pkg = readJsonSafe(pkgPath, {}); detectedVersion = pkg.version || null; } catch {}
-      }
+      let pkg = null;
+      if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+      let detectedVersion = meta.version || (pkg?.version || null);
       // 计算相对路径（用于 local 字段）
       const rel = path.relative(pluginsRoot, full).replace(/\\/g, '/');
       // 填充插件信息（name 来自 meta 或 index.js 导出）
@@ -92,6 +92,8 @@ module.exports.init = function init(paths) {
         enabled: meta.enabled !== undefined ? !!meta.enabled : true,
         icon: meta.icon || null,
         description: meta.description || '',
+        author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
+        dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)),
         // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
         actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
         // 保留 functions 以备后续扩展（如声明 backend 名称等）
@@ -128,6 +130,8 @@ module.exports.getPlugins = function getPlugins() {
     enabled: !!(config.enabled[p.id] ?? config.enabled[p.name]),
     icon: p.icon || null,
     description: p.description || '',
+    author: (p.author !== undefined ? p.author : null),
+    dependencies: (typeof p.dependencies === 'object' ? p.dependencies : undefined),
     actions: Array.isArray(p.actions) ? p.actions : [],
     version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
     studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : []
@@ -398,12 +402,12 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
     if (fs.existsSync(metaPath)) {
       meta = readJsonSafe(metaPath, {});
     }
-    // 尝试读取版本
-    let detectedVersion = meta.version || null;
+    // 尝试读取版本与作者、依赖
+
     const pkgPath = path.join(dest, 'package.json');
-    if (!detectedVersion && fs.existsSync(pkgPath)) {
-      try { const pkg = readJsonSafe(pkgPath, {}); detectedVersion = pkg.version || null; } catch {}
-    }
+    let pkg = null;
+    if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+    let detectedVersion = meta.version || (pkg?.version || null);
     const indexPath = path.join(dest, 'index.js');
     if (!fs.existsSync(indexPath)) {
       return { ok: false, error: '安装包缺少 index.js' };
@@ -440,6 +444,8 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       enabled: true,
       icon: meta.icon || null,
       description: meta.description || '',
+      author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
+      dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)),
       actions: (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : (Array.isArray(meta.actions) ? meta.actions : [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }])),
       functions: typeof meta.functions === 'object' ? meta.functions : undefined,
       packages: meta.packages,
@@ -453,7 +459,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       config.enabled[pluginName] = true;
       writeJsonSafe(configPath, config);
     }
-    return { ok: true, id: pluginId, name: pluginName };
+    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)) };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -529,28 +535,29 @@ function createPluginApi(pluginId) {
     registerAutomationEvents: (events) => module.exports.registerAutomationEvents(pluginId, events),
     // 为插件提供自动化计时器接口（减少插件自行创建定时器）
     automation: {
-      registerTimers: (periods) => {
+      // 新增：注册“分钟触发器”（仅 HH:MM 列表与回调）
+      registerMinuteTriggers: (times, cb) => {
         try {
           if (!automationManagerRef) return { ok: false, error: 'automation_manager_missing' };
-          return automationManagerRef.registerPluginTimers(pluginId, Array.isArray(periods) ? periods : []);
+          return automationManagerRef.registerPluginMinuteTriggers(pluginId, Array.isArray(times) ? times : [], cb);
         } catch (e) {
           return { ok: false, error: e?.message || String(e) };
         }
       },
-      clearTimers: () => {
+      clearMinuteTriggers: () => {
         try {
           if (!automationManagerRef) return { ok: false, error: 'automation_manager_missing' };
-          return automationManagerRef.clearPluginTimers(pluginId);
+          return automationManagerRef.clearPluginMinuteTriggers(pluginId);
         } catch (e) {
           return { ok: false, error: e?.message || String(e) };
         }
       },
-      listTimers: () => {
+      listMinuteTriggers: () => {
         try {
-          if (!automationManagerRef) return [];
-          return automationManagerRef.listPluginTimers(pluginId) || [];
-        } catch {
-          return [];
+          if (!automationManagerRef) return { ok: true, times: [] };
+          return automationManagerRef.listPluginMinuteTriggers(pluginId) || { ok: true, times: [] };
+        } catch (e) {
+          return { ok: false, error: e?.message || String(e) };
         }
       },
       // 为插件提供“创建动作快捷方式到桌面”的接口

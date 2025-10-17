@@ -8,6 +8,7 @@ const store = require(path.join(app.getAppPath(), 'src', 'main', 'store.js'));
 let runtimeWin = null;
 let settingsWin = null;
 let edgeTts = null;
+let pendingQueue = [];
 try {
   // 可选依赖：本地 EdgeTTS（若未安装则保持为 null）
   edgeTts = require('edge-tts');
@@ -58,12 +59,21 @@ function createRuntimeWindow() {
 
   runtimeWin.loadFile(path.join(__dirname, 'runtime.html'));
 
-  // 运行窗口加载完成后，主动同步一次当前配置
+  // 运行窗口加载完成后，主动同步一次当前配置，并刷新 pending 队列
   try {
     runtimeWin.webContents.on('did-finish-load', () => {
       try {
         const cfg = store.getAll('notify');
         runtimeWin?.webContents?.send('notify:config:update', cfg);
+        log('runtime:broadcast_config');
+      } catch {}
+      try {
+        if (pendingQueue.length) {
+          const list = pendingQueue.slice();
+          pendingQueue = [];
+          log('runtime:flush_pending', list.length);
+          runtimeWin?.webContents?.send('notify:enqueue', list);
+        }
       } catch {}
     });
   } catch {}
@@ -74,6 +84,154 @@ function createRuntimeWindow() {
 
   return runtimeWin;
 }
+
+module.exports = {
+  name: '通知插件',
+  version: '1.0.0',
+  // 插件初始化：创建运行窗口
+  init: () => {
+    if (app.isReady()) {
+      createRuntimeWindow();
+    } else {
+      app.once('ready', () => createRuntimeWindow());
+    }
+  },
+  // 可供 actions 调用的函数
+  functions: {
+    openSettings: () => { openSettingsWindow(); return true; },
+    reopenRuntime: () => { createRuntimeWindow(); return true; },
+    // 主动广播当前配置到运行窗口（供设置页调用实现实时生效）
+    broadcastConfig: () => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      try {
+        const cfg = store.getAll('notify');
+        win.webContents.send('notify:config:update', cfg);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    enqueue: (payload) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          log('enqueue:buffer', payload?.mode || 'unknown');
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        log('enqueue:send', payload?.mode || 'unknown');
+        return true;
+      } catch { return false; }
+    },
+    enqueueBatch: (list) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      try {
+        const payloads = Array.isArray(list) ? list : [list];
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(...payloads);
+          log('enqueueBatch:buffer', payloads.length);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payloads);
+        log('enqueueBatch:send', payloads.length);
+        return true;
+      } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：toast（内部调用 enqueue 构造 payload）
+    toast: (title, subText, type, duration, speak) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'toast', title, subText, type, duration, speak };
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        return true;
+      } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：overlay（卡片）
+    overlay: (title, subText, autoClose, duration, showClose, closeDelay) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'overlay', title, subText, autoClose, duration, showClose, closeDelay };
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        return true;
+      } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：overlay.text（纯文本遮罩）
+    ['overlay.text'](text, duration, animate) {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'overlay.text', text, duration, animate };
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        return true;
+      } catch { return false; }
+    },
+    // 兼容自动化事件的细分入口：sound（别名，内部调用 playSound）
+    sound: (which = 'in') => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        return true;
+      } catch { return false; }
+    },
+    // 自动化/运行窗口调用：本地 EdgeTTS 合成，返回文件 URL（暂时隐藏入口）
+    edgeSpeakLocal: async (text, voiceName) => {
+      const res = await synthEdgeTtsToFile(text, voiceName);
+      return res;
+    },
+    // 自动化动作/通用：播放内置音效（in 或 out）
+    playSound: (which = 'in') => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        return true;
+      } catch { return false; }
+    }
+  },
+  // 自动化事件声明：暴露可调用动作（更全面）
+  automationEvents: [
+    // 通用入口：直接传递 payload（模式与参数见 README）
+    { id: 'notify.enqueue', name: 'enqueue', desc: '通用通知（直接传对象）', params: [ { name: 'payload', type: 'object', hint: '模式与参数见文档' } ] },
+    // 细分入口：toast
+    { id: 'notify.toast', name: 'toast', desc: '左上角通知', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'type', type: 'string', hint: 'info/warn/error' }, { name: 'duration', type: 'number' }, { name: 'speak', type: 'boolean' } ] },
+    // 细分入口：遮罩卡片
+    { id: 'notify.overlay', name: 'overlay', desc: '全屏遮罩卡片', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'autoClose', type: 'boolean' }, { name: 'duration', type: 'number' }, { name: 'showClose', type: 'boolean' }, { name: 'closeDelay', type: 'number' } ] },
+    // 细分入口：纯文本遮罩
+    { id: 'notify.overlayText', name: 'overlay.text', desc: '全屏纯文本提示', params: [ { name: 'text', type: 'string' }, { name: 'duration', type: 'number' }, { name: 'animate', type: 'string', hint: 'fade/zoom' } ] },
+    // 细分入口：音效
+    { id: 'notify.sound', name: 'sound', desc: '播放通知音效', params: [ { name: 'which', type: 'string', hint: 'in/out' } ] }
+    // EdgeTTS 入口暂时隐藏
+  ]
+};
 
 function openSettingsWindow() {
   if (settingsWin && !settingsWin.isDestroyed()) {
@@ -156,96 +314,5 @@ async function synthEdgeTtsToFile(text, voiceName) {
   }
 }
 
-module.exports = {
-  name: '通知插件',
-  version: '1.0.0',
-  // 插件初始化：创建运行窗口
-  init: () => {
-    if (app.isReady()) {
-      createRuntimeWindow();
-    } else {
-      app.once('ready', () => createRuntimeWindow());
-    }
-  },
-  // 可供 actions 调用的函数
-  functions: {
-    openSettings: () => { openSettingsWindow(); return true; },
-    reopenRuntime: () => { createRuntimeWindow(); return true; },
-    // 主动广播当前配置到运行窗口（供设置页调用实现实时生效）
-    broadcastConfig: () => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      try {
-        const cfg = store.getAll('notify');
-        win.webContents.send('notify:config:update', cfg);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    enqueue: (payload) => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
-    },
-    enqueueBatch: (list) => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      try { win.webContents.send('notify:enqueue', Array.isArray(list) ? list : [list]); return true; } catch { return false; }
-    },
-    // 兼容自动化事件的细分入口：toast（内部调用 enqueue 构造 payload）
-    toast: (title, subText, type, duration, speak) => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'toast', title, subText, type, duration, speak };
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
-    },
-    // 兼容自动化事件的细分入口：overlay（卡片）
-    overlay: (title, subText, autoClose, duration, showClose, closeDelay) => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'overlay', title, subText, autoClose, duration, showClose, closeDelay };
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
-    },
-    // 兼容自动化事件的细分入口：overlay.text（纯文本遮罩）
-    ['overlay.text'](text, duration, animate) {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'overlay.text', text, duration, animate };
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
-    },
-    // 兼容自动化事件的细分入口：sound（别名，内部调用 playSound）
-    sound: (which = 'in') => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
-    },
-    // 自动化/运行窗口调用：本地 EdgeTTS 合成，返回文件 URL（暂时隐藏入口）
-    edgeSpeakLocal: async (text, voiceName) => {
-      const res = await synthEdgeTtsToFile(text, voiceName);
-      return res;
-    },
-    // 自动化动作/通用：播放内置音效（in 或 out）
-    playSound: (which = 'in') => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
-      try { win.webContents.send('notify:enqueue', payload); return true; } catch { return false; }
-    }
-  },
-  // 自动化事件声明：暴露可调用动作（更全面）
-  automationEvents: [
-    // 通用入口：直接传递 payload（模式与参数见 README）
-    { id: 'notify.enqueue', name: 'enqueue', desc: '通用通知（直接传对象）', params: [ { name: 'payload', type: 'object', hint: '模式与参数见文档' } ] },
-    // 细分入口：toast
-    { id: 'notify.toast', name: 'toast', desc: '左上角通知', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'type', type: 'string', hint: 'info/warn/error' }, { name: 'duration', type: 'number' }, { name: 'speak', type: 'boolean' } ] },
-    // 细分入口：遮罩卡片
-    { id: 'notify.overlay', name: 'overlay', desc: '全屏遮罩卡片', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'autoClose', type: 'boolean' }, { name: 'duration', type: 'number' }, { name: 'showClose', type: 'boolean' }, { name: 'closeDelay', type: 'number' } ] },
-    // 细分入口：纯文本遮罩
-    { id: 'notify.overlayText', name: 'overlay.text', desc: '全屏纯文本提示', params: [ { name: 'text', type: 'string' }, { name: 'duration', type: 'number' }, { name: 'animate', type: 'string', hint: 'fade/zoom' } ] },
-    // 细分入口：音效
-    { id: 'notify.sound', name: 'sound', desc: '播放通知音效', params: [ { name: 'which', type: 'string', hint: 'in/out' } ] }
-    // EdgeTTS 入口暂时隐藏
-  ]
-};
+// 在顶部注入轻日志函数（按 system.debugLog 或 LP_DEBUG 开关）
+function log(...args) { try { const enabled = (store.get('system','debugLog') || process.env.LP_DEBUG); if (enabled) console.log('[Notify]', ...args); } catch {} }

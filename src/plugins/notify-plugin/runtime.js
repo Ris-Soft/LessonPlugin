@@ -140,7 +140,6 @@
     el.toast.innerHTML = `
       <div class="title">${title}</div>
       ${sub ? `<div class="sub">${sub}</div>` : ''}
-      <div class="meta"><i class="ri-notification-3-line"></i> ${type.toUpperCase()}</div>
     `;
     // 初始进度背景（倒计时：默认 100%，左侧为突出色，右侧为背景）
     const color = typeColor(type);

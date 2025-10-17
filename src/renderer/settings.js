@@ -14,6 +14,18 @@ function renderPlugin(item) {
   const actionsHtml = Array.isArray(item.actions) && item.actions.length
     ? item.actions.map(a => `<button class="action-btn" data-action="${a.id}"><i class="${a.icon || ''}"></i> ${a.text || ''}</button>`).join('')
     : '<span class="muted">无操作</span>';
+  const authorText = (() => {
+    const a = item.author;
+    if (!a) return '未知作者';
+    if (typeof a === 'string') return a;
+    if (typeof a === 'object') return a.name || JSON.stringify(a);
+    return String(a);
+  })();
+  const depsObj = (item && typeof item.dependencies === 'object' && item.dependencies) ? item.dependencies : null;
+  const depsKeys = depsObj ? Object.keys(depsObj) : [];
+  const depsHtml = depsKeys.length
+    ? depsKeys.slice(0, 4).map(k => `<span class="pill small">${k}</span>`).join(' ') + (depsKeys.length > 4 ? ` <span class="pill small muted">+${depsKeys.length - 4}</span>` : '')
+    : '<span class="muted">无依赖</span>';
   el.innerHTML = `
     <div class="card-header">
       <i class="${item.icon || 'ri-puzzle-line'}"></i>
@@ -29,6 +41,7 @@ function renderPlugin(item) {
     <div class="card-actions">
       <div class="actions-left">${actionsHtml}</div>
       <div class="actions-right">
+        <button class="icon-btn about-btn" title="关于插件"><i class="ri-information-line"></i></button>
         <button class="icon-btn create-shortcut-btn" title="创建快捷方式"><i class="ri-links-line"></i></button>
         <button class="icon-btn uninstall-btn" title="卸载"><i class="ri-delete-bin-line"></i></button>
       </div>
@@ -75,6 +88,11 @@ function renderPlugin(item) {
     const list = await fetchPlugins();
     container.innerHTML = '';
     list.forEach((p) => container.appendChild(renderPlugin(p)));
+  });
+  // 关于插件
+  const aboutBtn = el.querySelector('.about-btn');
+  aboutBtn?.addEventListener('click', () => {
+    showPluginAboutModal(item);
   });
   // 创建快捷方式（选择 action；若唯一则直接创建）
   const shortcutBtn = el.querySelector('.create-shortcut-btn');
@@ -550,11 +568,164 @@ async function showShortcutCreateDialog(pluginItem, chosen, pluginId, action) {
   });
 }
 
+function showPluginAboutModal(pluginItem) {
+  const old = document.querySelector('.modal-overlay'); if (old) old.remove();
+  const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+  const box = document.createElement('div'); box.className = 'modal-box plugin-about';
+  const title = document.createElement('div'); title.className = 'modal-title';
+  title.innerHTML = `<i class="${pluginItem.icon || 'ri-puzzle-line'}"></i> 关于插件 - ${pluginItem.name}`;
+  const body = document.createElement('div'); body.className = 'modal-body';
+
+  const authorText = (() => {
+    const meta = pluginItem.author;
+    if (!meta) return '未知';
+    if (typeof meta === 'string') return meta;
+    const name = meta.name || meta.username || meta.id || '';
+    const link = meta.url || meta.link || meta.homepage || meta.repo || '';
+    const join = link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : name;
+    if (meta.email) return `${join} (${meta.email})`;
+    return join || '未知';
+  })();
+  const versionText = pluginItem.version || pluginItem.detectedVersion || '未知版本';
+  const descText = pluginItem.description || '无描述';
+  const homepage = pluginItem.homepage || pluginItem.url || pluginItem.link || pluginItem.repo || '';
+  const licenseText = pluginItem.license || '';
+
+  // 基本信息卡片
+  const infoGroup = document.createElement('div'); infoGroup.className = 'section';
+  const infoHeader = document.createElement('div'); infoHeader.className = 'section-title';
+  infoHeader.innerHTML = `<i class="ri-information-line"></i> 基本信息`;
+  const metaGrid = document.createElement('div');
+  metaGrid.style.display = 'grid';
+  metaGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(180px, 1fr))';
+  metaGrid.style.gap = '10px';
+  metaGrid.innerHTML = `
+    <div>
+      <div class="muted">版本</div>
+      <div><span class="pill small">${versionText}</span></div>
+    </div>
+    <div>
+      <div class="muted">作者</div>
+      <div>${authorText}</div>
+    </div>
+    ${homepage ? `<div><div class="muted">主页</div><div><a href="${homepage}" target="_blank" rel="noreferrer">${homepage}</a></div></div>` : ''}
+    ${licenseText ? `<div><div class="muted">许可证</div><div>${licenseText}</div></div>` : ''}
+  `;
+  const desc = document.createElement('div');
+  desc.style.marginTop = '12px';
+  desc.innerHTML = `<div class="muted">描述</div><div>${descText}</div>`;
+  infoGroup.appendChild(infoHeader);
+  infoGroup.appendChild(metaGrid);
+  infoGroup.appendChild(desc);
+
+  // 依赖卡片
+  const depsGroup = document.createElement('div'); depsGroup.className = 'section';
+  const depsHeader = document.createElement('div'); depsHeader.className = 'section-title';
+  depsHeader.innerHTML = `<i class="ri-box-3-line"></i> 依赖项`;
+  const chips = document.createElement('div'); chips.className = 'chips';
+  const deps = pluginItem.dependencies || pluginItem.deps || null;
+  if (deps && typeof deps === 'object') {
+    Object.keys(deps).forEach((name) => {
+      const ver = deps[name];
+      const chip = document.createElement('span'); chip.className = 'chip';
+      chip.textContent = `${name}${ver ? '@' + ver : ''}`;
+      chips.appendChild(chip);
+    });
+  } else {
+    const chip = document.createElement('span'); chip.className = 'chip'; chip.textContent = '无'; chips.appendChild(chip);
+  }
+  depsGroup.appendChild(depsHeader);
+  depsGroup.appendChild(chips);
+
+  const actions = document.createElement('div'); actions.className = 'modal-actions';
+  const createBtn = document.createElement('button'); createBtn.className = 'btn'; createBtn.textContent = '创建快捷方式';
+  const uninstallBtn = document.createElement('button'); uninstallBtn.className = 'btn danger'; uninstallBtn.textContent = '卸载插件';
+  const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.textContent = '关闭';
+
+  closeBtn.onclick = () => { document.body.removeChild(overlay); };
+
+  createBtn.onclick = async () => {
+    // 与卡片上的逻辑一致：收集候选动作后进入创建流程
+    const pluginId = pluginItem.id || pluginItem.name;
+    const metaActions = Array.isArray(pluginItem.actions) ? pluginItem.actions.filter(a => typeof a.target === 'string' && a.target) : [];
+    let eventDefs = [];
+    try {
+      const evRes = await window.settingsAPI?.pluginAutomationListEvents?.(pluginId);
+      eventDefs = Array.isArray(evRes?.events) ? evRes.events : [];
+    } catch {}
+    const candidates = [];
+    for (const a of metaActions) {
+      candidates.push({ kind: 'meta', id: a.id || a.target, label: a.text || a.id || a.target, icon: a.icon || pluginItem.icon || 'ri-links-line', target: a.target, args: Array.isArray(a.args) ? a.args : [] });
+    }
+    for (const e of eventDefs) {
+      candidates.push({ kind: 'event', id: e.id || e.name, label: e.name || e.id, icon: pluginItem.icon || 'ri-links-line', def: e });
+    }
+    if (!candidates.length) { await showAlert('该插件未定义可用于快捷方式的动作'); return; }
+
+    let chosen = null; let params = [];
+    if (candidates.length === 1) {
+      chosen = candidates[0];
+      if (chosen.kind === 'event' && Array.isArray(chosen.def?.params) && chosen.def.params.length) {
+        const edited = await showParamsEditorForEvent(chosen.def.params, []);
+        if (edited === null) return; params = edited;
+      } else if (chosen.kind === 'meta') {
+        params = Array.isArray(chosen.args) ? chosen.args : [];
+      }
+    } else {
+      const sel = await showActionSelector(candidates);
+      if (!sel) return;
+      chosen = candidates.find(c => c.kind === sel.kind && c.id === sel.id);
+      if (!chosen) return;
+      if (chosen.kind === 'event' && Array.isArray(chosen.def?.params) && chosen.def.params.length) {
+        const edited = await showParamsEditorForEvent(chosen.def.params, []);
+        if (edited === null) return; params = edited;
+      } else if (chosen.kind === 'meta') {
+        params = Array.isArray(chosen.args) ? chosen.args : [];
+      }
+    }
+    const eventName = (chosen.kind === 'meta') ? chosen.target : (chosen.def?.name || chosen.def?.id);
+    const action = (chosen.kind === 'meta')
+      ? { type: 'pluginAction', pluginId, target: eventName, params: Array.isArray(params) ? params : [] }
+      : { type: 'pluginEvent', pluginId, event: eventName, params: Array.isArray(params) ? params : [] };
+    const ok = await showShortcutCreateDialog(pluginItem, chosen, pluginId, action);
+    if (ok?.res) {
+      const proto = ok.res?.protocolText ? `LessonPlugin://task/${encodeURIComponent(ok.res.protocolText)}` : '';
+      const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式';
+      await showAlert(msg);
+    }
+  };
+
+  uninstallBtn.onclick = async () => {
+    const res = await showModal({ title: '卸载插件', message: `确认卸载插件：${pluginItem.name}？\n这将删除其目录与相关文件。`, confirmText: '卸载', cancelText: '取消' });
+    if (!res) return;
+    const key = pluginItem.id || pluginItem.name;
+    const out = await window.settingsAPI?.uninstallPlugin?.(key);
+    if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
+    // 关闭并刷新列表
+    document.body.removeChild(overlay);
+    const container = document.getElementById('plugins');
+    const list = await fetchPlugins();
+    container.innerHTML = ''; list.forEach((p) => container.appendChild(renderPlugin(p)));
+  };
+
+  body.appendChild(infoGroup);
+  body.appendChild(depsGroup);
+  box.appendChild(title);
+  box.appendChild(body);
+  actions.appendChild(createBtn);
+  actions.appendChild(uninstallBtn);
+  actions.appendChild(closeBtn);
+  box.appendChild(actions);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
 async function main() {
   // 左侧导航切换
   const navItems = document.querySelectorAll('.nav-item');
   const pages = {
     plugins: document.getElementById('page-plugins'),
+    market: document.getElementById('page-market'),
     general: document.getElementById('page-general'),
     profiles: document.getElementById('page-profiles'),
     automation: document.getElementById('page-automation'),
@@ -678,11 +849,16 @@ async function main() {
       return;
     }
     modal.hidden = true; pendingZipPath = null; pendingZipData = null;
-    // 重新刷新插件列表
+    const metaAuthor = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
+    const depsObj = (typeof res.dependencies === 'object' && res.dependencies) ? res.dependencies : null;
+    const depNames = depsObj ? Object.keys(depsObj) : [];
+    await showAlert(`安装成功：${res.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`);
+    // 重新刷新插件列表（仅显示包含动作的插件）
     const container = document.getElementById('plugins');
     const list = await fetchPlugins();
+    const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
     container.innerHTML = '';
-    list.forEach((p) => container.appendChild(renderPlugin(p)));
+    filtered.forEach((p) => container.appendChild(renderPlugin(p)));
   });
 }
 
@@ -840,18 +1016,55 @@ async function initProfilesSettings() {
 function initAboutPage() {
   const vEl = document.getElementById('about-version');
   const eEl = document.getElementById('about-electron');
-  // 优先通过主进程API获取版本信息；否则从UA解析Electron版本
+  const nEl = document.getElementById('about-node');
+  const cEl = document.getElementById('about-chrome');
+  const pEl = document.getElementById('about-platform');
+  const copyBtn = document.getElementById('about-copy');
+  const openDataBtn = document.getElementById('about-open-data');
+
+  // 优先通过主进程API获取版本与环境信息；否则从 UA 与 process 解析
   (async () => {
     try {
       const info = await window.settingsAPI?.getAppInfo?.();
       if (info?.appVersion) vEl.textContent = info.appVersion;
       const ev = info?.electronVersion || (navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—');
       eEl.textContent = ev;
+      const nv = info?.nodeVersion || (process?.versions?.node || '—');
+      const cv = info?.chromeVersion || (process?.versions?.chrome || '—');
+      const pv = info?.platform || (process?.platform || navigator?.platform || '—');
+      if (nEl) nEl.textContent = nv;
+      if (cEl) cEl.textContent = cv;
+      if (pEl) pEl.textContent = pv;
     } catch {
-      vEl.textContent = '—';
-      eEl.textContent = navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—';
+      vEl.textContent = vEl.textContent || '—';
+      eEl.textContent = eEl.textContent || (navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—');
+      if (nEl) nEl.textContent = process?.versions?.node || '—';
+      if (cEl) cEl.textContent = process?.versions?.chrome || '—';
+      if (pEl) pEl.textContent = process?.platform || navigator?.platform || '—';
     }
   })();
+
+  // 复制版本信息到剪贴板
+  copyBtn?.addEventListener('click', async () => {
+    const merged = [
+      `LessonPlugin ${vEl?.textContent || '—'}`,
+      `Electron ${eEl?.textContent || '—'}`,
+      `Node ${nEl?.textContent || '—'}`,
+      `Chrome ${cEl?.textContent || '—'}`,
+      `平台 ${pEl?.textContent || '—'}`
+    ].join(' | ');
+    try { await navigator.clipboard?.writeText(merged); } catch {}
+  });
+
+  // 打开数据目录（如主进程实现该接口）
+  if (openDataBtn) {
+    if (window.settingsAPI?.openUserData) {
+      openDataBtn.hidden = false;
+      openDataBtn.addEventListener('click', () => window.settingsAPI.openUserData());
+    } else {
+      openDataBtn.hidden = true;
+    }
+  }
 }
 
 // 通用设置：启动页与名言、基础设置
@@ -1126,6 +1339,74 @@ async function initAutomationSettings() {
   const listEl = document.getElementById('auto-list');
   const editorEl = document.getElementById('auto-editor');
   const addBtn = document.getElementById('auto-add');
+  const filterBar = document.getElementById('auto-filters');
+  const filterToggle = document.getElementById('auto-filters-toggle');
+  let selectedSources = new Set(['user', 'plugin']);
+  let filterEnabled = 'all';
+
+  const syncFilterChipSelection = () => {
+    if (!filterBar) return;
+    // 来源：多选（用户/插件/快捷）
+    [...filterBar.querySelectorAll('[data-filter-source]')].forEach(el => {
+      if (selectedSources.has(el.dataset.filterSource)) {
+        el.classList.add('selected');
+      } else {
+        el.classList.remove('selected');
+      }
+    });
+    // 启用状态：单选（不限/已启用/未启用）
+    [...filterBar.querySelectorAll('[data-filter-enabled]')].forEach(el => {
+      if (el.dataset.filterEnabled === filterEnabled) {
+        el.classList.add('selected');
+      } else {
+        el.classList.remove('selected');
+      }
+    });
+  };
+
+  const updateFilterToggleText = () => {
+    if (!filterToggle) return;
+    filterToggle.innerHTML = filterBar.hidden
+      ? '<i class="ri-filter-3-line"></i> 筛选'
+      : '<i class="ri-arrow-up-s-line"></i> 收起';
+  };
+
+  if (filterToggle && filterBar) {
+    updateFilterToggleText();
+    filterToggle.onclick = () => {
+      filterBar.hidden = !filterBar.hidden;
+      updateFilterToggleText();
+      // 展开时同步显示默认选中状态
+      if (!filterBar.hidden) syncFilterChipSelection();
+    };
+  }
+
+  if (filterBar) {
+    // 初始化选中状态（默认：来源选用户/插件，启用不限）
+    syncFilterChipSelection();
+    filterBar.onclick = (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      if (t.classList.contains('chip')) {
+        if (t.dataset.filterSource !== undefined) {
+          const v = t.dataset.filterSource;
+          if (selectedSources.has(v)) {
+            selectedSources.delete(v);
+            t.classList.remove('selected');
+          } else {
+            selectedSources.add(v);
+            t.classList.add('selected');
+          }
+        }
+        if (t.dataset.filterEnabled !== undefined) {
+          filterEnabled = t.dataset.filterEnabled;
+          [...filterBar.querySelectorAll('[data-filter-enabled]')].forEach(el => el.classList.remove('selected'));
+          t.classList.add('selected');
+        }
+        renderList();
+      }
+    };
+  }
 
   const summarize = (item) => {
     const triggers = (item.triggers || []).map((t) => t.type === 'time' ? `时间 ${t.at}` : (t.type === 'protocol' ? `协议 ${t.text}` : t.type)).join('，');
@@ -1133,11 +1414,22 @@ async function initAutomationSettings() {
   };
 
   const renderList = async (selectedId) => {
-    const items = await window.settingsAPI?.automationList?.() || [];
+    const allItems = await window.settingsAPI?.automationList?.() || [];
+    const filteredItems = allItems.filter((it) => {
+      const src = String(it.source || '');
+      const enabled = !!it.enabled;
+      const sourceOk = (selectedSources.size === 0)
+        || (selectedSources.has('user') && src === 'user')
+        || (selectedSources.has('plugin') && src.startsWith('plugin'))
+        || (selectedSources.has('shortcut') && src === 'shortcut');
+      const enabledOk = (filterEnabled === 'all') || (filterEnabled === 'enabled' && enabled) || (filterEnabled === 'disabled' && !enabled);
+      return sourceOk && enabledOk;
+    });
     listEl.innerHTML = '';
-    items.forEach((it) => {
+    filteredItems.forEach((it) => {
       const row = document.createElement('div');
       row.className = 'auto-item';
+      const src = String(it.source || '');
       row.innerHTML = `
         <div>
           <div class="title">${it.name || '未命名自动化'}</div>
@@ -1170,7 +1462,7 @@ async function initAutomationSettings() {
       listEl.appendChild(row);
     });
     if (selectedId) {
-      const idx = items.findIndex((x) => x.id === selectedId);
+      const idx = allItems.findIndex((x) => x.id === selectedId);
       if (idx >= 0) renderEditor(selectedId);
     }
   };
@@ -1581,6 +1873,7 @@ async function initAutomationSettings() {
         if (!res?.ok) { await showAlert(res?.error || '测试执行失败'); return; }
         if (res.executed) {
           await showAlert('测试执行完成。已执行配置的动作。');
+          await renderEditor(id);
         } else if (res.reason === 'conditions_not_met') {
           await showAlert('当前执行条件不满足，未执行。');
         } else if (res.reason === 'cancelled') {
@@ -1598,6 +1891,26 @@ async function initAutomationSettings() {
     confirmRow.appendChild(confirmEnabled); confirmRow.appendChild(timeoutLabel); confirmRow.appendChild(timeoutInput);
     secConf.appendChild(confirmRow);
     editorEl.appendChild(secConf);
+
+    // 任务信息（底部）
+    const secMeta = document.createElement('div'); secMeta.className = 'section';
+    secMeta.innerHTML = '<div class="section-title"><i class="ri-information-line"></i> 任务信息</div>';
+    const metaList = document.createElement('div');
+    metaList.className = 'inline';
+    const sourceText = (() => {
+      const s = String(it.source || '');
+      if (s === 'user') return '用户';
+      if (s === 'shortcut') return '快捷';
+      if (s.startsWith('plugin')) return '插件';
+      return '—';
+    })();
+    const lastText = it.lastSuccessAt ? new Date(it.lastSuccessAt).toLocaleString() : '—';
+    const metaId = document.createElement('div'); metaId.className = 'muted'; metaId.textContent = 'ID：' + (it.id || '—');
+    const metaSource = document.createElement('div'); metaSource.className = 'muted'; metaSource.textContent = '来源：' + sourceText;
+    const metaLast = document.createElement('div'); metaLast.className = 'muted'; metaLast.textContent = '上次成功执行：' + lastText;
+    metaList.appendChild(metaId); metaList.appendChild(metaSource); metaList.appendChild(metaLast);
+    secMeta.appendChild(metaList);
+    editorEl.appendChild(secMeta);
 
     // 保存
     saveBtn.addEventListener('click', async () => {
@@ -1620,7 +1933,7 @@ async function initAutomationSettings() {
     addBtn.addEventListener('click', async () => {
       try {
         addBtn.disabled = true;
-        const created = await window.settingsAPI?.automationCreate?.({ name: '新建自动化' });
+        const created = await window.settingsAPI?.automationCreate?.({ name: '新建自动化', source: 'user' });
         if (created?.id) { await renderList(created.id); }
       } finally {
         addBtn.disabled = false;

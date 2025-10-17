@@ -61,7 +61,7 @@ body {
 
 .sidebar {
   border-right: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .logo {
@@ -664,6 +664,12 @@ main {
   flex: 1;
   min-height: 0;
 }
+/* 右侧空状态容器：应用内边距与弱化颜色 */
+.auto-editor-empty {
+  margin: 10px;
+  padding: 12px 16px;
+  color: var(--muted);
+}
 
 /* 自动化页面占满内容区高度，禁用全局滚动影响 */
 #page-automation {
@@ -723,6 +729,14 @@ main {
 #page-automation .automation.panel {
   min-height: 0;
   overflow: hidden;
+}
+
+/* 自动执行筛选条外观优化 */
+.auto-filters {
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-radius: 0;
 }
 
 /* 左侧列表：统一每项高度，避免视觉错乱 */
@@ -910,10 +924,25 @@ label {
   gap: 6px;
 }
 
+/* 模态框内的辅文不加左侧缩进，保持紧凑排版 */
+.modal-body .muted {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* hidden 属性应强制隐藏，即使后续有 display 覆盖 */
+[hidden], .chips[hidden], .auto-filters[hidden] {
+  display: none !important;
+}
+
 .chips {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+/* 两组筛选换行后的间距 */
+.auto-filters .chips + .chips {
+  margin-top: 6px;
 }
 
 .chip {
@@ -922,6 +951,17 @@ label {
   padding: 4px 8px;
   font-size: 12px;
   color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.chips .chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+}
+.chips .chip.selected {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: var(--fg);
 }
 
 .group {
@@ -1661,4 +1701,123 @@ select:focus {
   .preview-square {
     margin: 0 auto;
   }
+}
+
+/* 关于页面样式 */
+.about-hero {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.about-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+}
+
+.about-title .name {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.about-title .tagline {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.about-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.about-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.about-links .spacer {
+  flex: 1;
+}
+
+.about-links a {
+  color: var(--fg);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.about-links a:not(.btn):hover {
+  color: var(--accent);
+}
+
+.contributors-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.contributors-list li {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contributors-list .name {
+  font-weight: 600;
+}
+
+/* 横向卡片布局（头像-名字-角色） */
+.contributors-list.horizontal {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.contributors-list.horizontal li {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
+  padding: 12px;
+  gap: 6px;
+}
+
+.contributors-list.horizontal .avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.contributors-list.horizontal .avatar i {
+  font-size: 28px;
+}
+
+.contributors-list.horizontal .name {
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.contributors-list.horizontal .role {
+  color: var(--muted);
+  font-size: 12px;
 }
