@@ -463,7 +463,8 @@ async function drawRemixIconCanvas(iconClass, canvas, bg = '#111827', fg = '#fff
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
-  ctx.fillStyle = bg; roundRect(0,0,size,size, Math.floor(size*0.18)); ctx.fill();
+  const bgNorm = String(bg || '').toLowerCase();
+  if (bg && bgNorm !== 'transparent' && bgNorm !== 'none') { ctx.fillStyle = bg; roundRect(0,0,size,size, Math.floor(size*0.18)); ctx.fill(); } else { ctx.clearRect(0,0,size,size); }
   const i = document.createElement('i'); i.className = iconClass; i.style.fontFamily = 'remixicon'; i.style.fontStyle = 'normal'; i.style.fontWeight = 'normal'; document.body.appendChild(i);
   try { await document.fonts.ready; } catch {}
   let ch = getRemixCharFromComputed(i);
@@ -729,8 +730,9 @@ async function main() {
     general: document.getElementById('page-general'),
     profiles: document.getElementById('page-profiles'),
     automation: document.getElementById('page-automation'),
-    about: document.getElementById('page-about'),
-    npm: document.getElementById('page-npm')
+    npm: document.getElementById('page-npm'),
+    debug: document.getElementById('page-debug'),
+    about: document.getElementById('page-about')
   };
   navItems.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -748,10 +750,50 @@ async function main() {
         initProfilesSettings();
       } else if (page === 'automation') {
         initAutomationSettings();
+      } else if (page === 'debug') {
+        initDebugSettings();
       } else if (page === 'about') {
         initAboutPage();
       }
     });
+  });
+
+  const navigateToPage = (page) => {
+    try {
+      const btn = Array.from(navItems).find(b => b.dataset.page === page);
+      navItems.forEach((b) => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      for (const key of Object.keys(pages)) {
+        pages[key].hidden = key !== page;
+      }
+      if (page === 'npm') {
+        renderInstalled();
+      } else if (page === 'general') {
+        initGeneralSettings();
+      } else if (page === 'profiles') {
+        initProfilesSettings();
+      } else if (page === 'automation') {
+        initAutomationSettings();
+      } else if (page === 'debug') {
+        initDebugSettings();
+      } else if (page === 'about') {
+        initAboutPage();
+      }
+    } catch {}
+  };
+  window.settingsAPI?.onNavigate?.((page) => navigateToPage(page));
+  window.settingsAPI?.onOpenPluginInfo?.(async (pluginKey) => {
+    try {
+      navigateToPage('plugins');
+      const list = await fetchPlugins();
+      const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+      const item = filtered.find((p) => (p.id || p.name) === pluginKey);
+      if (item) {
+        showPluginAboutModal(item);
+      } else {
+        await showAlert(`未找到插件：${pluginKey}`);
+      }
+    } catch {}
   });
 
   // 渲染插件列表
@@ -1942,6 +1984,97 @@ async function initAutomationSettings() {
   }
 
   await renderList();
+}
+
+async function initDebugSettings() {
+  try {
+    const iconClassInput = document.getElementById('debug-icon-class');
+    const fileNameInput = document.getElementById('debug-filename');
+    const bgInput = document.getElementById('debug-bg');
+    const transparentInput = document.getElementById('debug-transparent');
+    const fgInput = document.getElementById('debug-fg');
+    const sizeInput = document.getElementById('debug-size');
+    const canvas = document.getElementById('debug-canvas');
+    const releaseBtn = document.getElementById('debug-release');
+    const openDirBtn = document.getElementById('debug-open-dir');
+    const pathEl = document.getElementById('debug-icons-path');
+
+    let iconsDir = '';
+    try {
+      iconsDir = await window.settingsAPI?.getIconsDir?.();
+    } catch {}
+    if (pathEl) pathEl.textContent = String(iconsDir || '—');
+
+    const currentIconClass = () => (iconClassInput?.value?.trim() || 'ri-settings-3-line');
+    let lastDefaultName = '';
+    const computeDefaultName = () => `${currentIconClass().replace(/\s+/g, '')}.png`;
+
+    async function renderPreview() {
+      try {
+        const iconClass = currentIconClass();
+        let size = parseInt(sizeInput?.value || '256', 10);
+        if (Number.isNaN(size)) size = 256;
+        size = Math.max(64, Math.min(1024, size));
+        const transparent = !!transparentInput?.checked;
+        const bg = transparent ? 'transparent' : (bgInput?.value || '#111827');
+        const fg = fgInput?.value || '#ffffff';
+        await drawRemixIconCanvas(iconClass, canvas, bg, fg, size);
+        if (fileNameInput) {
+          const def = computeDefaultName();
+          if (!fileNameInput.value || fileNameInput.value === lastDefaultName) {
+            fileNameInput.value = def;
+            lastDefaultName = def;
+          }
+        }
+      } catch {}
+    }
+
+    iconClassInput?.addEventListener('input', renderPreview);
+    bgInput?.addEventListener('input', renderPreview);
+    transparentInput?.addEventListener('change', renderPreview);
+    fgInput?.addEventListener('input', renderPreview);
+    sizeInput?.addEventListener('input', renderPreview);
+
+    releaseBtn?.addEventListener('click', async () => {
+      try {
+        releaseBtn.disabled = true;
+        releaseBtn.innerHTML = '<i class="ri-loader-4-line"></i> 释放中...';
+        const iconClass = currentIconClass();
+        if (!iconClass) {
+          await showAlert('请输入 RemixIcon 类名');
+          return;
+        }
+        const nameRaw = (fileNameInput?.value || '').trim();
+        let filename = nameRaw || computeDefaultName();
+        if (!filename.toLowerCase().endsWith('.png')) filename = `${filename}.png`;
+        const dataUrl = canvas?.toDataURL('image/png');
+        if (!dataUrl) {
+          await showAlert('Canvas 不可用');
+          return;
+        }
+        const res = await window.settingsAPI?.writeIconPng?.(filename, dataUrl);
+        if (!res?.ok) {
+          await showAlert(res?.error || '写入失败');
+          return;
+        }
+        if (pathEl) pathEl.textContent = String(res.dir || iconsDir || '—');
+        await showAlert(`已保存：${res.filePath || (res.dir ? (res.dir + '\\' + filename) : filename)}`);
+      } catch (e) {
+        await showAlert(e?.message || '写入失败');
+      } finally {
+        releaseBtn.disabled = false;
+        releaseBtn.innerHTML = '<i class="ri-upload-2-line"></i> 释放到 icons 目录';
+      }
+    });
+
+    openDirBtn?.addEventListener('click', async () => {
+      try {
+        await window.settingsAPI?.openIconsDir?.();
+      } catch {}
+    });
+
+    await renderPreview();
+  } catch {}
 }
 
 main();

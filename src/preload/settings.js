@@ -34,6 +34,14 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   pluginAutomationCreateShortcut: (pluginId, options) => ipcRenderer.invoke('plugin:automation:createShortcut', pluginId, options),
   // 直接调用插件函数（用于 actions 目标指向 functions 中的函数）
   pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
+  // 设置页导航事件订阅（供主进程触发页面切换）
+  onNavigate: (handler) => {
+    ipcRenderer.on('settings:navigate', (_e, page) => handler && handler(page));
+  },
+  // 打开插件信息模态框事件订阅
+  onOpenPluginInfo: (handler) => {
+    ipcRenderer.on('settings:openPluginInfo', (_e, pluginKey) => handler && handler(pluginKey));
+  },
   // 自动化执行确认覆盖层通信
   onAutomationConfirmInit: (handler) => {
     ipcRenderer.on('automation:confirm:init', (_e, payload) => handler && handler(payload));
@@ -50,4 +58,11 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   ,getUserDataPath: () => ipcRenderer.invoke('system:getUserDataPath')
   ,openUserData: () => ipcRenderer.invoke('system:openUserData')
   ,changeUserData: () => ipcRenderer.invoke('system:changeUserData')
+  // 图标释放（Canvas PNG -> 用户数据 renderer/icons）
+  ,getIconsDir: () => ipcRenderer.invoke('icons:dir')
+  ,writeIconPng: (fileName, dataUrl) => ipcRenderer.invoke('icons:write', fileName, dataUrl)
+  ,openIconsDir: async () => {
+    const dir = await ipcRenderer.invoke('icons:dir');
+    return require('electron').shell.openPath(dir);
+  }
 });

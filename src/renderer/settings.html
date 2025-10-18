@@ -24,6 +24,7 @@
         <button class="nav-item" data-page="profiles"><i class="ri-archive-line"></i> 档案管理</button>
         <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
         <button class="nav-item" data-page="npm" style="display: none;"><i class="ri-box-3-line"></i> 依赖管理</button>
+        <button class="nav-item" data-page="debug" style="display: none;"><i class="ri-tools-line"></i> 调试功能</button>
         <button class="nav-item" data-page="about"><i class="ri-information-line"></i> 关于软件</button>
       </nav>
     </aside>
@@ -388,6 +389,54 @@
             <div class="auto-right">
               <div id="auto-editor" class="auto-editor">
                 <div class="auto-editor-empty">从左侧选择任务或新建</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 调试页面 -->
+        <section id="page-debug" hidden>
+          <header>
+            <h1>调试</h1>
+            <p>通过 Canvas 生成并释放 RemixIcon 到 icons 目录，用作托盘菜单一级图标。</p>
+          </header>
+          <div class="panel">
+            <div class="form">
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-tools-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">图标参数</div>
+                  <div class="setting-desc">输入 RemixIcon 类名与颜色，渲染预览并保存为 PNG。</div>
+                  <div class="inline">
+                    <input id="debug-icon-class" type="text" placeholder="ri-settings-3-line" style="flex:1;" />
+                    <input id="debug-filename" type="text" placeholder="文件名（如 ri-settings-3-line.png）"
+                      style="flex:1; margin-left:8px;" />
+                  </div>
+                  <div class="inline" style="margin-top:8px;">
+                    <label class="muted" style="margin-right:6px;">背景</label>
+                    <input id="debug-bg" class="color-input" type="color" value="#111827" />
+                    <label class="muted" style="margin-left:8px;">透明背景</label>
+                    <input id="debug-transparent" type="checkbox" />
+                    <label class="muted" style="margin:0 6px 0 12px;">前景</label>
+                    <input id="debug-fg" class="color-input" type="color" value="#ffffff" />
+                    <label class="muted" style="margin:0 6px 0 12px;">尺寸</label>
+                    <input id="debug-size" type="number" value="256" min="64" max="1024" step="16" />
+                  </div>
+                </div>
+                <div class="setting-action">
+                  <button id="debug-release" class="btn primary"><i class="ri-upload-2-line"></i> 释放到 icons 目录</button>
+                  <button id="debug-open-dir" class="btn secondary" style="margin-left:8px;"><i
+                      class="ri-folder-2-line"></i> 打开 icons 目录</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="shortcut-preview-grid">
+              <canvas id="debug-canvas" class="preview-canvas" width="256" height="256"></canvas>
+              <div class="preview-meta">
+                <div class="muted">输出目录：<span id="debug-icons-path">—</span></div>
+                <div class="muted" style="margin-top:6px;">提示：托盘图标来源优先用户数据 icons，其次应用内置。</div>
               </div>
             </div>
           </div>

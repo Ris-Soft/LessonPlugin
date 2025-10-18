@@ -75,17 +75,104 @@ function createTray() {
   const iconPath = path.join(app.getAppPath(), 'icon.ico');
   const image = nativeImage.createFromPath(iconPath);
   tray = new Tray(image);
-  const menu = Menu.buildFromTemplate([
-    {
-      label: '打开设置',
-      click: () => {
-        if (!settingsWindow) createSettingsWindow();
-        settingsWindow.show();
-        settingsWindow.focus();
+
+  const openSettingsTo = (page) => {
+    if (!settingsWindow) createSettingsWindow();
+    if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+    settingsWindow.show();
+    settingsWindow.focus();
+    const sendNav = () => { try { settingsWindow.webContents.send('settings:navigate', page); } catch {} };
+    if (settingsWindow.webContents.isLoading()) {
+      settingsWindow.webContents.once('did-finish-load', sendNav);
+    } else {
+      sendNav();
+    }
+  };
+
+  const openPluginInfo = (pluginKey) => {
+    openSettingsTo('plugins');
+    const sendInfo = () => { try { settingsWindow.webContents.send('settings:openPluginInfo', pluginKey); } catch {} };
+    if (settingsWindow.webContents.isLoading()) {
+      settingsWindow.webContents.once('did-finish-load', sendInfo);
+    } else {
+      sendInfo();
+    }
+  };
+
+  // 解析 RemixIcon 位图（优先用户数据 renderer/icons，其次应用内置 src/renderer/icons）
+  const resolveMenuIcon = (riName) => {
+    try {
+      const userIconsRoot = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer', 'icons');
+      const candidates = [
+        path.join(userIconsRoot, `${riName}.png`),
+        path.join(userIconsRoot, `${riName}.ico`),
+        path.join(userIconsRoot, `${riName}.jpg`),
+        path.join(app.getAppPath(), 'src', 'renderer', 'icons', `${riName}.png`),
+        path.join(app.getAppPath(), 'src', 'renderer', 'icons', `${riName}.ico`),
+        path.join(app.getAppPath(), 'src', 'renderer', 'icons', `${riName}.jpg`),
+        path.join(app.getAppPath(), 'src', 'renderer', `${riName}.png`)
+      ];
+      for (const fp of candidates) {
+        if (fs.existsSync(fp)) {
+          try {
+            const img = nativeImage.createFromPath(fp);
+            // 缩小菜单图标尺寸，避免托盘菜单图标过大
+            return img && img.resize ? img.resize({ width: 24, height: 24 }) : img;
+          } catch {}
+        }
       }
-    },
+    } catch {}
+    return null;
+  };
+
+  const buildPluginActionsMenu = () => {
+    try {
+      const list = pluginManager.getPlugins() || [];
+      const items = [];
+      for (const p of list) {
+        const acts = Array.isArray(p.actions) ? p.actions : [];
+        if (!acts.length) continue;
+        const sub = [];
+        for (const a of acts) {
+          const label = a.text || a.label || a.name || a.id || a.target || '动作';
+          sub.push({
+            label,
+            click: async () => {
+              try {
+                if (a.id === 'installNpm') {
+                  await pluginManager.installNpm(p.id || p.name, (status) => sendSplashProgress(status));
+                } else if (a.target) {
+                  await pluginManager.callFunction(p.id || p.name, a.target, a.args || {});
+                }
+              } catch (e) {
+                try { require('electron').dialog.showErrorBox('执行插件动作失败', e?.message || String(e)); } catch {}
+              }
+            }
+          });
+        }
+        sub.push({ type: 'separator' });
+        sub.push({
+          label: '插件信息',
+          click: () => { openPluginInfo(p.id || p.name); }
+        });
+        items.push({ label: p.name || p.id, submenu: sub });
+      }
+      if (!items.length) return [{ label: '暂无可用插件动作', enabled: false }];
+      return items;
+    } catch { return [{ label: '加载失败', enabled: false }]; }
+  };
+
+  const menu = Menu.buildFromTemplate([
+    { label: '打开设置', icon: resolveMenuIcon('ri-settings-3-line'), click: () => openSettingsTo('plugins') },
+    { label: '功能市场', icon: resolveMenuIcon('ri-store-2-line'), click: () => openSettingsTo('market') },
+    { label: '插件管理', icon: resolveMenuIcon('ri-puzzle-line'), click: () => openSettingsTo('plugins') },
+    { label: '自动化', icon: resolveMenuIcon('ri-robot-line'), click: () => openSettingsTo('automation') },
+    { label: '档案', icon: resolveMenuIcon('ri-file-user-line'), click: () => openSettingsTo('profiles') },
+    { label: '关于', icon: resolveMenuIcon('ri-information-line'), click: () => openSettingsTo('about') },
     { type: 'separator' },
-    { label: '退出', click: () => app.quit() }
+    { label: '插件动作', icon: resolveMenuIcon('ri-play-line'), submenu: buildPluginActionsMenu() },
+    { type: 'separator' },
+    { label: '退出', icon: resolveMenuIcon('ri-close-circle-line'), click: () => app.quit() }
   ]);
   tray.setToolTip('LessonPlugin');
   tray.setContextMenu(menu);
@@ -261,11 +348,19 @@ app.whenReady().then(async () => {
   // 注册协议处理（LessonPlugin://task/<text>）
   try { app.setAsDefaultProtocolClient('LessonPlugin'); } catch {}
   app.on('second-instance', (_e, argv) => {
+    // 处理自定义协议（LessonPlugin://task/<text>）
     const arg = argv.find((s) => /^LessonPlugin:\/\//i.test(s));
     if (arg) {
       const m = arg.match(/^LessonPlugin:\/\/task\/(.+)$/i);
       if (m) automationManager?.invokeProtocol(decodeURIComponent(m[1]));
     }
+    // 重复启动时打开设置页面（创建并置顶显示）
+    try {
+      if (!settingsWindow) createSettingsWindow();
+      if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+      settingsWindow.show();
+      settingsWindow.focus();
+    } catch {}
   });
   app.on('open-url', (_e, url) => {
     const m = String(url || '').match(/^LessonPlugin:\/\/task\/(.+)$/i);
@@ -633,6 +728,33 @@ function applyUserDataOverride() {
 }
 
 applyUserDataOverride();
+
+// 图标目录与释放（将Canvas生成的PNG写入用户数据 renderer/icons）
+ipcMain.handle('icons:dir', async () => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer', 'icons');
+    try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+    return dir;
+  } catch (e) {
+    return '';
+  }
+});
+ipcMain.handle('icons:write', async (_e, fileName, dataUrl) => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer', 'icons');
+    try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+    const safe = String(fileName || 'icon.png').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const target = path.join(dir, safe);
+    const m = String(dataUrl || '').match(/^data:image\/png;base64,(.+)$/i);
+    if (!m) return { ok: false, error: '无效PNG数据' };
+    const buf = Buffer.from(m[1], 'base64');
+    fs.writeFileSync(target, buf);
+    return { ok: true, path: target };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
 // 资源路径解析：为插件窗口提供统一的资源URL（优先用户数据镜像，其次应用内置）
 ipcMain.handle('asset:url', async (_e, relPath) => {
   try {
