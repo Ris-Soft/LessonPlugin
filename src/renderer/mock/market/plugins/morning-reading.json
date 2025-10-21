@@ -1,0 +1,16 @@
+{
+  "id": "morning-reading",
+  "type": "plugin",
+  "name": "早读助手",
+  "version": "0.9.1",
+  "author": "官方",
+  "description": "支持早读打卡与朗读统计，适合语文课堂。",
+  "screenshots": ["/renderer/assets/mock/morning-1.png"],
+  "homepage": "https://example.com/morning",
+  "npm": "@lp/morning-reading",
+  "installed": false,
+  "configurable": false,
+  "permissions": ["storage"],
+  "tags": ["课堂辅助"],
+  "readme": "早读助手的功能介绍与配置说明。"
+}

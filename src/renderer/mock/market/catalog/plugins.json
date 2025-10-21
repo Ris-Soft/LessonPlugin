@@ -1,0 +1,32 @@
+[
+  {
+    "id": "example-plugin",
+    "type": "plugin",
+    "name": "示例插件",
+    "version": "1.0.0",
+    "description": "用于演示的功能插件",
+    "author": "官方",
+    "icon": "ri-puzzle-line",
+    "npm": "@lp/example-plugin"
+  },
+  {
+    "id": "notify-plugin",
+    "type": "plugin",
+    "name": "通知插件",
+    "version": "1.2.3",
+    "description": "在课堂内发送通知",
+    "author": "官方",
+    "icon": "ri-notification-2-line",
+    "npm": "@lp/notify-plugin"
+  },
+  {
+    "id": "morning-reading",
+    "type": "plugin",
+    "name": "早读助手",
+    "version": "0.9.1",
+    "description": "支持早读打卡与朗读",
+    "author": "官方",
+    "icon": "ri-book-read-line",
+    "npm": "@lp/morning-reading"
+  }
+]

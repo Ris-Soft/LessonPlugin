@@ -1,0 +1,20 @@
+[
+  {
+    "id": "ui-panel",
+    "type": "component",
+    "name": "UI 面板",
+    "version": "1.0.0",
+    "description": "提供可复用的界面面板",
+    "author": "官方",
+    "icon": "ri-layout-grid-line"
+  },
+  {
+    "id": "basic-grid",
+    "type": "component",
+    "name": "基础栅格",
+    "version": "0.1.0",
+    "description": "快速构建布局",
+    "author": "官方",
+    "icon": "ri-shape-line"
+  }
+]

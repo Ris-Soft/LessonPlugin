@@ -1,0 +1,9 @@
+[
+  { "id": "all", "label": "全部", "icon": "ri-apps-2-line" },
+  { "id": "hot", "label": "热门", "icon": "ri-fire-line" },
+  { "id": "assist", "label": "课堂辅助", "icon": "ri-book-read-line" },
+  { "id": "notify", "label": "通知", "icon": "ri-notification-2-line" },
+  { "id": "tools", "label": "工具", "icon": "ri-tools-line" },
+  { "id": "system", "label": "系统", "icon": "ri-settings-3-line" },
+  { "id": "other", "label": "其它", "icon": "ri-more-line" }
+]

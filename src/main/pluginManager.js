@@ -142,6 +142,27 @@ function findPluginByIdOrName(key) {
   return manifest.plugins.find((p) => p.id === key || p.name === key);
 }
 
+// 新增：读取插件 README 文本（优先本地插件目录）
+module.exports.getPluginReadme = function getPluginReadme(idOrName) {
+  try {
+    const p = findPluginByIdOrName(idOrName);
+    if (!p) return null;
+    // 仅支持本地插件目录读取（npm 包暂不提供 README 路径）
+    const baseDir = path.dirname(manifestPath);
+    const fullDir = p.local ? path.join(baseDir, p.local) : null;
+    if (fullDir && fs.existsSync(fullDir)) {
+      const candidates = ['README.md', 'readme.md', 'README', 'readme'];
+      for (const name of candidates) {
+        const f = path.join(fullDir, name);
+        if (fs.existsSync(f) && fs.statSync(f).isFile()) {
+          try { return fs.readFileSync(f, 'utf-8'); } catch {}
+        }
+      }
+    }
+    return null;
+  } catch { return null; }
+};
+
 module.exports.toggle = function toggle(idOrName, enabled) {
   const p = findPluginByIdOrName(idOrName);
   if (!p) return { ok: false, error: 'not_found' };

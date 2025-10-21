@@ -54,10 +54,38 @@
         <section id="page-market" hidden>
           <header>
             <h1>功能市场</h1>
-            <p>浏览、发现与获取功能模块（即将上线）</p>
+            <p>浏览、发现与获取功能模块</p>
           </header>
-          <div class="panel">
-            <div class="muted" style="padding: 12px;">功能市场正在建设中，敬请期待。</div>
+          <!-- 顶部大分类 Tabs（复用通用设置的子导航样式） -->
+          <div class="subnav store-tabs" style="display:flex;align-items:center;gap:8px;">
+            <div class="tabs-left inline" style="gap:8px;">
+              <button class="sub-item active" data-store-tab="comprehensive"><i class="ri-apps-2-line"></i> 综合</button>
+              <button class="sub-item" data-store-tab="plugins"><i class="ri-puzzle-line"></i> 插件</button>
+              <button class="sub-item" data-store-tab="automation"><i class="ri-timer-line"></i> 自动化</button>
+              <button class="sub-item" data-store-tab="components"><i class="ri-layout-3-line"></i> 组件</button>
+              <button class="sub-item" data-store-tab="updates"><i class="ri-refresh-line"></i> 功能更新</button>
+            </div>
+            <div class="tabs-right inline" style="gap:8px; margin-left:auto;">
+              <input id="market-search-input" type="text" placeholder="搜索所有功能（插件/自动化/组件）" />
+              <button id="market-search-btn" class="btn"><i class="ri-search-line"></i> 搜索</button>
+              <button id="market-back-btn" class="btn secondary" hidden><i class="ri-arrow-go-back-line"></i>
+                返回</button>
+              <button id="store-filter-toggle" class="btn secondary"><i class="ri-filter-3-line"></i> 筛选</button>
+            </div>
+          </div>
+          <!-- 左侧小分类 + 右侧内容区 -->
+          <div class="panel store-panel"
+            style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start;">
+            <div class="store-left">
+              <div class="section-title"><i class="ri-list-check-2"></i> 分类</div>
+              <div id="store-subnav" class="store-subnav" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div class="store-right">
+              <div id="store-filters" class="auto-filters" hidden></div>
+              <div id="store-grid" class="plugins"></div>
+              <div id="store-empty" class="muted" style="padding:12px;" hidden>暂无内容</div>
+              <div id="store-details" class="panel" hidden></div>
+            </div>
           </div>
         </section>
         <section id="page-general" hidden>
@@ -530,7 +558,24 @@
       </main>
     </div>
   </div>
-  <script src="./settings.js"></script>
+  <!-- <script src="./settings.js"></script> -->
+  <script src="./settings/processor/icon.js"></script>
+  <script src="./settings/processor/text.js"></script>
+  <script src="./settings/modals/message.js"></script>
+  <script src="./settings/modals/editor.js"></script>
+  <script src="./settings/modals/market.js"></script>
+  <script src="./settings/modals/shortcut.js"></script>
+  <script src="./settings/modals/plugin.js"></script>
+  <script src="./settings/handler/about.js"></script>
+  <script src="./settings/handler/automation.js"></script>
+  <script src="./settings/handler/debug.js"></script>
+  <script src="./settings/handler/general.js"></script>
+  <script src="./settings/handler/market.js"></script>
+  <script src="./settings/handler/plugin.js"></script>
+  <script src="./settings/handler/profile.js"></script>
+  <script src="./settings/main.js"></script>
+
+
 </body>
 
 </html>

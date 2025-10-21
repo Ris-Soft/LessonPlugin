@@ -1,0 +1,5 @@
+{
+  "plugins": "../catalog/plugins.json",
+  "automation": "../catalog/automation.json",
+  "components": "../catalog/components.json"
+}

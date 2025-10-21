@@ -14,6 +14,13 @@ try {
   edgeTts = require('edge-tts');
 } catch {}
 
+// 可选依赖：系统音量控制（未安装时静默降级）
+let volumeLib = null;
+let previousVolume = null;
+try {
+  volumeLib = require('loudness');
+} catch {}
+
 function createRuntimeWindow() {
   if (runtimeWin && !runtimeWin.isDestroyed()) {
     return runtimeWin;
@@ -275,6 +282,38 @@ ipcMain.handle('notify:setVisible', (_evt, visible) => {
     if (visible) runtimeWin.show(); else runtimeWin.hide();
     return true;
   } catch { return false; }
+});
+
+// 系统音量暂调：播放前设置指定百分比，播放后恢复
+ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
+  try {
+    if (!volumeLib || typeof volumeLib.setVolume !== 'function') return false;
+    const target = Math.max(0, Math.min(100, Number(level || 0)));
+    if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
+      try { previousVolume = await volumeLib.getVolume(); } catch {}
+    }
+    await volumeLib.setVolume(target);
+    log('volume:set', target);
+    return true;
+  } catch (e) {
+    log('volume:set:error', e?.message || String(e));
+    return false;
+  }
+});
+
+ipcMain.handle('notify:restoreSystemVolume', async () => {
+  try {
+    if (!volumeLib || typeof volumeLib.setVolume !== 'function') return false;
+    const pv = previousVolume;
+    previousVolume = null;
+    if (pv == null) return true;
+    await volumeLib.setVolume(Math.max(0, Math.min(100, Number(pv))));
+    log('volume:restore', pv);
+    return true;
+  } catch (e) {
+    log('volume:restore:error', e?.message || String(e));
+    return false;
+  }
 });
 
 // 辅助：使用本地 EdgeTTS 合成并返回音频文件路径（file:///）

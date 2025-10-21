@@ -1,5 +1,6 @@
 (() => {
   const el = {
+    enableNotify: document.getElementById('enableNotify'),
     enableTTS: document.getElementById('enableTTS'),
     ttsEngine: document.getElementById('ttsEngine'),
     ttsVoice: document.getElementById('ttsVoice'),
@@ -7,7 +8,7 @@
     ttsRate: document.getElementById('ttsRate'),
     ttsEndpoint: document.getElementById('ttsEndpoint'),
     ttsEdgeVoice: document.getElementById('ttsEdgeVoice'),
-    soundVolume: document.getElementById('soundVolume'),
+    systemSoundVolume: document.getElementById('systemSoundVolume'),
     btnPlayIn: document.getElementById('btnPlayIn'),
     btnPlayOut: document.getElementById('btnPlayOut'),
     btnTestOverlayText: document.getElementById('btnTestOverlayText'),
@@ -17,13 +18,14 @@
   (async () => {
     try {
       const cfg = await window.settingsAPI?.configGetAll?.('notify');
+      if (el.enableNotify) el.enableNotify.checked = (cfg?.enabled ?? true);
       if (el.enableTTS) el.enableTTS.checked = !!cfg?.tts;
       if (el.ttsEngine) el.ttsEngine.value = (cfg?.ttsEngine ?? 'system');
       if (el.ttsPitch) el.ttsPitch.value = (cfg?.ttsPitch ?? 1);
       if (el.ttsRate) el.ttsRate.value = (cfg?.ttsRate ?? 1);
       if (el.ttsEndpoint) el.ttsEndpoint.value = (cfg?.ttsEndpoint ?? '');
       if (el.ttsEdgeVoice) el.ttsEdgeVoice.value = (cfg?.ttsEdgeVoice ?? '');
-      if (el.soundVolume) el.soundVolume.value = Math.round(((cfg?.soundVolume ?? 0.9) * 100));
+      if (el.systemSoundVolume) el.systemSoundVolume.value = Math.round((cfg?.systemSoundVolume ?? 80));
       // 加载语音列表
       initVoices(cfg?.ttsVoiceURI);
       // 音频存在性无需展示，运行窗口会直接使用配置中的 dataURL
@@ -84,6 +86,18 @@
         const payload = { mode: 'overlay.text', text: '这是一条纯文本提示', animate: 'fade', duration: 2500 };
         window.settingsAPI?.pluginCall?.('notify.plugin', 'enqueue', [payload]);
       } catch {}
+    });
+  }
+
+  if (el.enableNotify) {
+    el.enableNotify.addEventListener('change', () => {
+      const enabled = !!el.enableNotify.checked;
+      (async () => {
+        try {
+          await window.settingsAPI?.configSet?.('notify', 'enabled', enabled);
+          await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
+        } catch {}
+      })();
     });
   }
 
@@ -158,20 +172,20 @@
     el.ttsRate.addEventListener('input', handler);
   }
 
-  // 音量滑块：设置通知音效相对音量（0–1）
-  if (el.soundVolume) {
+  // 系统音量滑块：设置播放通知音效时的系统主音量（0–100）
+  if (el.systemSoundVolume) {
     const handler = () => {
-      const v = Math.max(0, Math.min(100, Number(el.soundVolume.value || 90)));
-      const norm = Math.round(v) / 100;
+      const v = Math.max(0, Math.min(100, Number(el.systemSoundVolume.value || 80)));
+      const norm = Math.round(v);
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'soundVolume', norm);
+          await window.settingsAPI?.configSet?.('notify', 'systemSoundVolume', norm);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
     };
-    el.soundVolume.addEventListener('input', handler);
-    el.soundVolume.addEventListener('change', handler);
+    el.systemSoundVolume.addEventListener('input', handler);
+    el.systemSoundVolume.addEventListener('change', handler);
   }
 
   // 标题栏窗口控件绑定（复用主程序 settings preload 的 windowControl）

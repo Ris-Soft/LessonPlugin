@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   installPluginZip: (zipPath) => ipcRenderer.invoke('plugin:installZip', zipPath),
   installPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:installZipData', fileName, data),
   uninstallPlugin: (name) => ipcRenderer.invoke('plugin:uninstall', name),
+  // 新增：获取插件 README Markdown 文本（如果存在）
+  getPluginReadme: (name) => ipcRenderer.invoke('plugin:readme', name),
+  // 新增：在线获取插件 README（优先 npm registry）
+  getPluginReadmeOnline: (name) => ipcRenderer.invoke('plugin:readmeOnline', name),
   windowControl: (action) => ipcRenderer.invoke('window:control', action),
   npmGetVersions: (name) => ipcRenderer.invoke('npm:versions', name),
   npmDownload: (name, version) => ipcRenderer.invoke('npm:download', name, version),

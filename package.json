@@ -36,6 +36,7 @@
   "dependencies": {
     "edge-tts": "^1.0.1",
     "extract-zip": "^2.0.1",
+    "loudness": "^0.4.2",
     "uuid": "^13.0.0"
   }
 }

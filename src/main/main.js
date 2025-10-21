@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const dgram = require('dgram');
 const os = require('os');
+const https = require('https');
 
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
@@ -418,6 +419,41 @@ ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
+});
+
+// 新增：读取插件 README 文本（本地）
+ipcMain.handle('plugin:readme', async (_e, key) => {
+  try { return pluginManager.getPluginReadme(key); } catch { return null; }
+});
+// 新增：在线读取插件 README（优先 npm registry）
+ipcMain.handle('plugin:readmeOnline', async (_e, key) => {
+  try {
+    const all = await pluginManager.getPlugins();
+    const p = (all || []).find(x => (x.id === key) || (x.name === key));
+    const pkgName = p?.npm || p?.name;
+    if (!pkgName) return null;
+    const url = `https://registry.npmmirror.com/${encodeURIComponent(pkgName)}`;
+    const content = await new Promise((resolve) => {
+      try {
+        https.get(url, (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              const md = json?.readme || '';
+              resolve(md || null);
+            } catch {
+              resolve(null);
+            }
+          });
+        }).on('error', () => resolve(null));
+      } catch { resolve(null); }
+    });
+    if (content) return content;
+    // 回退到本地读取
+    try { return pluginManager.getPluginReadme(key); } catch { return null; }
+  } catch { return null; }
 });
 
 // 窗口控制（用于自定义标题栏按钮）

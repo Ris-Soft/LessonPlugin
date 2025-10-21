@@ -15,6 +15,9 @@
       onConfigUpdate: (handler) => {
         try { ipcRenderer.on('notify:config:update', (_e, cfg) => handler && handler(cfg)); } catch {}
       },
+      // 系统音量暂调：播放通知音效前设置、结束后恢复
+      setSystemVolume: (level) => ipcRenderer.invoke('notify:setSystemVolume', Number(level)),
+      restoreSystemVolume: () => ipcRenderer.invoke('notify:restoreSystemVolume'),
       // 运行窗口可调用主进程插件函数（用于本地 EdgeTTS 等）
       pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args)
     });

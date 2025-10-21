@@ -1,0 +1,20 @@
+[
+  {
+    "id": "auto-class-schedule",
+    "type": "automation",
+    "name": "课堂排程",
+    "version": "0.5.0",
+    "description": "根据课程表自动切换场景",
+    "author": "官方",
+    "icon": "ri-timer-line"
+  },
+  {
+    "id": "auto-reminder",
+    "type": "automation",
+    "name": "提醒助手",
+    "version": "0.3.2",
+    "description": "定时提醒与广播",
+    "author": "官方",
+    "icon": "ri-notification-2-line"
+  }
+]

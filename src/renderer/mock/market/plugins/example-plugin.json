@@ -1,0 +1,16 @@
+{
+  "id": "example-plugin",
+  "type": "plugin",
+  "name": "示例插件",
+  "version": "1.0.0",
+  "author": "官方",
+  "description": "用于演示的功能插件，包含基础配置和启用状态。",
+  "screenshots": ["/renderer/assets/mock/example-1.png"],
+  "homepage": "https://example.com/plugin",
+  "npm": "@lp/example-plugin",
+  "installed": false,
+  "configurable": true,
+  "permissions": ["storage", "network"],
+  "tags": ["课堂辅助", "工具"],
+  "readme": "这是一个示例插件的说明文档。"
+}

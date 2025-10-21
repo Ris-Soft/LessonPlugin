@@ -1,5 +1,5 @@
 (() => {
-  const state = { queue: [], active: false, audio: { info: null, warn: null, error: null }, soundVolume: 0.9, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '' };
+  const state = { queue: [], active: false, enabled: true, audio: { info: null, warn: null, error: null }, systemSoundVolume: 80, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '' };
   const el = {
     toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovCountdown: document.getElementById('ovCountdown'),
     overlayText: document.getElementById('overlayText'), overlayTextContent: document.getElementById('overlayTextContent')
@@ -19,8 +19,9 @@
         state.ttsRate = Number(cfg?.ttsRate ?? 1);
         state.ttsEndpoint = cfg?.ttsEndpoint || '';
         state.ttsEdgeVoice = cfg?.ttsEdgeVoice || '';
+        state.enabled = (cfg?.enabled ?? true);
+        state.systemSoundVolume = Math.max(0, Math.min(100, Number(cfg?.systemSoundVolume ?? state.systemSoundVolume)));
         const audio = cfg?.audio || {};
-        state.soundVolume = Math.max(0, Math.min(1, Number(cfg?.soundVolume ?? state.soundVolume)));
         ['info','warn','error'].forEach((k) => { state.audio[k] = audio?.[k] || null; });
       } catch {}
     });
@@ -31,8 +32,19 @@
     try {
       const file = which === 'out' ? 'out.mp3' : 'in.mp3';
       const a = new Audio(`./sounds/${file}`);
-      a.volume = Math.max(0, Math.min(1, Number(state.soundVolume || 0.9)));
-      a.play().catch(() => {});
+      // 程序内音量保持 100%，改为系统音量暂调
+      a.volume = 1.0;
+      try {
+        const target = Math.max(0, Math.min(100, Number(state.systemSoundVolume || 80)));
+        window.notifyAPI?.setSystemVolume?.(target);
+      } catch {}
+      a.addEventListener('ended', () => {
+        try { window.notifyAPI?.restoreSystemVolume?.(); } catch {}
+      });
+      a.play().catch(() => {
+        // 播放失败也尝试恢复
+        try { window.notifyAPI?.restoreSystemVolume?.(); } catch {}
+      });
     } catch {}
   };
 
@@ -84,6 +96,8 @@
 
   // 队列控制
   const enqueue = (n) => {
+    // 全局关闭通知时直接忽略
+    if (!state.enabled) return;
     state.queue.push(n);
     try { window.notifyAPI?.setVisible(true); } catch {}
     if (!state.active) next();
