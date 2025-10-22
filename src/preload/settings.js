@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   installPluginZip: (zipPath) => ipcRenderer.invoke('plugin:installZip', zipPath),
   installPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:installZipData', fileName, data),
   uninstallPlugin: (name) => ipcRenderer.invoke('plugin:uninstall', name),
+  // 新增：重载本地插件（仅开发环境）
+  reloadPlugin: (name) => ipcRenderer.invoke('plugin:reload', name),
   // 新增：获取插件 README Markdown 文本（如果存在）
   getPluginReadme: (name) => ipcRenderer.invoke('plugin:readme', name),
   // 新增：在线获取插件 README（优先 npm registry）

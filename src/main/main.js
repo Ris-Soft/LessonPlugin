@@ -12,6 +12,10 @@ const store = require('./store');
 // 让插件管理器可以访问 ipcMain（用于事件回调注册）
 pluginManager._ipcMain = ipcMain;
 
+// 供各处使用的全局路径（在 app.whenReady 后赋值）
+let userPluginsRoot = '';
+let shippedPluginsRoot = '';
+
 // 进程锁：防止重复运行（单实例）
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -211,12 +215,48 @@ app.whenReady().then(async () => {
 
   // 将插件根目录迁移到用户数据目录，避免升级或安装覆盖应用资源导致用户插件与配置丢失
   const userRoot = path.join(app.getPath('userData'), 'LessonPlugin');
-  const userPluginsRoot = path.join(userRoot, 'plugins');
+  userPluginsRoot = path.join(userRoot, 'plugins');
   const userRendererRoot = path.join(userRoot, 'renderer');
-  const shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
+  shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
   const shippedRendererRoot = path.join(app.getAppPath(), 'src', 'renderer');
   try { fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch {}
   try { fs.mkdirSync(userRendererRoot, { recursive: true }); } catch {}
+  // 可选：强制同步内置插件到用户目录（用于开发或修复用户目录旧版本）
+  try {
+    const forceSyncEnv = String(process.env.LP_FORCE_PLUGIN_SYNC || '').toLowerCase();
+    const shouldForceSync = forceSyncEnv === '1' || forceSyncEnv === 'true';
+    if (shouldForceSync) {
+      const shippedEntries = fs.readdirSync(shippedPluginsRoot).filter((n) => {
+        const p = path.join(shippedPluginsRoot, n);
+        return fs.existsSync(p) && fs.statSync(p).isDirectory();
+      });
+      for (const entry of shippedEntries) {
+        const src = path.join(shippedPluginsRoot, entry);
+        const dest = path.join(userPluginsRoot, entry);
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        const stack = [{ s: src, d: dest }];
+        while (stack.length) {
+          const { s, d } = stack.pop();
+          const items = fs.readdirSync(s);
+          for (const it of items) {
+            const sp = path.join(s, it);
+            const dp = path.join(d, it);
+            const stat = fs.statSync(sp);
+            if (stat.isDirectory()) {
+              if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
+              stack.push({ s: sp, d: dp });
+            } else {
+              try { fs.copyFileSync(sp, dp); } catch {}
+            }
+          }
+        }
+      }
+      // 配置文件也覆盖更新
+      const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
+      const userCfg = path.join(userPluginsRoot, 'config.json');
+      try { if (fs.existsSync(shippedCfg)) fs.copyFileSync(shippedCfg, userCfg); } catch {}
+    }
+  } catch {}
   // 首次运行填充内置插件与默认配置（仅当用户插件目录为空时）
   try {
     const entries = fs.readdirSync(userPluginsRoot).filter((n) => {
@@ -416,6 +456,51 @@ ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
     const res = await pluginManager.installFromZip(tmpPath);
     try { fs.unlinkSync(tmpPath); } catch {}
     return res;
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+// 新增：开发环境重载指定插件（卸载 -> 从开发目录复制 -> 重新加载）
+ipcMain.handle('plugin:reload', async (_e, key) => {
+  try {
+    const isDev = !app.isPackaged;
+    if (!isDev) return { ok: false, error: 'only_dev' };
+    const all = await pluginManager.getPlugins();
+    const p = (all || []).find(x => (x.id === key) || (x.name === key));
+    if (!p) return { ok: false, error: 'not_found' };
+    if (!p.local) return { ok: false, error: 'not_local_plugin' };
+    const dirName = String(p.local).split(/[\\\/]/).filter(Boolean).pop();
+    const srcDir = path.join(shippedPluginsRoot, dirName);
+    const dstDir = path.join(userPluginsRoot, dirName);
+    if (!fs.existsSync(srcDir)) return { ok: false, error: 'dev_source_missing' };
+    // 卸载并清理旧目录
+    try { await pluginManager.uninstall(key); } catch {}
+    try { if (fs.existsSync(dstDir)) fs.rmSync(dstDir, { recursive: true, force: true }); } catch {}
+    // 复制开发目录到用户目录
+    try { fs.mkdirSync(dstDir, { recursive: true }); } catch {}
+    const stack = [ { s: srcDir, d: dstDir } ];
+    while (stack.length) {
+      const { s, d } = stack.pop();
+      const items = fs.readdirSync(s);
+      for (const it of items) {
+        const sp = path.join(s, it);
+        const dp = path.join(d, it);
+        const stat = fs.statSync(sp);
+        if (stat.isDirectory()) {
+          if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
+          stack.push({ s: sp, d: dp });
+        } else {
+          try { fs.copyFileSync(sp, dp); } catch {}
+        }
+      }
+    }
+    // 重新扫描并加载插件
+    const manifestPath = path.join(userPluginsRoot, 'plugins.json');
+    const configPath = path.join(userPluginsRoot, 'config.json');
+    pluginManager.init({ manifestPath, configPath });
+    try { await pluginManager.loadPlugins((status) => sendSplashProgress(status)); } catch {}
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
@@ -699,7 +784,8 @@ ipcMain.handle('system:getAppInfo', async () => {
     electronVersion: process.versions.electron,
     nodeVersion: process.versions.node,
     chromeVersion: process.versions.chrome,
-    platform: `${platformText} (${archLabel})`
+    platform: `${platformText} (${archLabel})`,
+    isDev: !app.isPackaged
   };
 });
 ipcMain.handle('system:getAutostart', async () => {

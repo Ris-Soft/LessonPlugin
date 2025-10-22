@@ -1,4 +1,12 @@
 async function main() {
+  // 获取开发环境标记
+  let isDev = true;
+  try {
+    const info = await window.settingsAPI?.getAppInfo?.();
+    isDev = !!info?.isDev;
+  } catch {}
+  window.__isDev__ = isDev;
+
   // 左侧导航切换
   const navItems = document.querySelectorAll('.nav-item');
   const pages = {

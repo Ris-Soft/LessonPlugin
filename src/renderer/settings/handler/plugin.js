@@ -54,6 +54,32 @@ function renderPlugin(item) {
     await window.settingsAPI?.togglePlugin(key, e.target.checked);
   });
 
+  // 开发环境：追加“重载”按钮
+  try {
+    if (window.__isDev__) {
+      const right = el.querySelector('.actions-right');
+      const reloadBtn = document.createElement('button');
+      reloadBtn.className = 'icon-btn reload-btn';
+      reloadBtn.title = '重载（开发环境）';
+      reloadBtn.innerHTML = '<i class="ri-refresh-line"></i>';
+      right.appendChild(reloadBtn);
+      reloadBtn.addEventListener('click', async () => {
+        const key = item.id || item.name;
+        const res = await window.settingsAPI?.reloadPlugin?.(key);
+        if (!res?.ok) {
+          await showAlert(`重载失败：${res?.error || '未知错误'}`);
+          return;
+        }
+        // 重新刷新插件列表
+        const container = document.getElementById('plugins');
+        const list = await fetchPlugins();
+        container.innerHTML = '';
+        list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0).forEach((p) => container.appendChild(renderPlugin(p)));
+        await showAlert('已重载插件（开发目录 -> 用户目录）');
+      });
+    }
+  } catch {}
+
   el.querySelectorAll('.action-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const act = btn.dataset.action;

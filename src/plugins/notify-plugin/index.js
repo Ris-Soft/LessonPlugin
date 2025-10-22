@@ -4,6 +4,7 @@ const os = require('os');
 const { BrowserWindow, ipcMain, screen, app } = require('electron');
 // 读取统一配置存储，用于向运行窗口广播配置更新
 const store = require(path.join(app.getAppPath(), 'src', 'main', 'store.js'));
+const Module = require('module');
 
 let runtimeWin = null;
 let settingsWin = null;
@@ -18,9 +19,12 @@ try {
 let volumeLib = null;
 let previousVolume = null;
 try {
-  volumeLib = require('loudness');
-} catch {}
-
+  const cr = Module.createRequire(path.join(app.getAppPath(), 'package.json'));
+  volumeLib = cr('loudness');
+  log('volume:require:ok', 'loudness', 'via createRequire(app)');
+} catch (e) {
+  log('volume:require:fail', 'loudness', e?.message || String(e));
+}
 function createRuntimeWindow() {
   if (runtimeWin && !runtimeWin.isDestroyed()) {
     return runtimeWin;
@@ -287,7 +291,10 @@ ipcMain.handle('notify:setVisible', (_evt, visible) => {
 // 系统音量暂调：播放前设置指定百分比，播放后恢复
 ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
   try {
-    if (!volumeLib || typeof volumeLib.setVolume !== 'function') return false;
+    if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
+      log('volume:lib_missing');
+      return false;
+    }
     const target = Math.max(0, Math.min(100, Number(level || 0)));
     if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
       try { previousVolume = await volumeLib.getVolume(); } catch {}
@@ -303,7 +310,10 @@ ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
 
 ipcMain.handle('notify:restoreSystemVolume', async () => {
   try {
-    if (!volumeLib || typeof volumeLib.setVolume !== 'function') return false;
+    if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
+      log('volume:lib_missing');
+      return false;
+    }
     const pv = previousVolume;
     previousVolume = null;
     if (pv == null) return true;

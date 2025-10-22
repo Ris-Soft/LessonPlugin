@@ -3,6 +3,8 @@ const path = require('path');
 const { spawn } = require('child_process');
 const extract = require('extract-zip');
 const { v4: uuidv4 } = require('uuid');
+const Module = require('module');
+const { app } = require('electron');
 
 let manifestPath = '';
 let pluginsRoot = '';
@@ -32,6 +34,42 @@ function readJsonSafe(jsonPath, fallback) {
 
 function writeJsonSafe(jsonPath, data) {
   fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+function addNodeModulesToGlobalPaths(baseDir) {
+  try {
+    if (!baseDir || !fs.existsSync(baseDir)) return;
+    const names = fs.readdirSync(baseDir);
+    for (const name of names) {
+      const nameDir = path.join(baseDir, name);
+      try { if (!fs.statSync(nameDir).isDirectory()) continue; } catch { continue; }
+      const versions = fs.readdirSync(nameDir);
+      for (const v of versions) {
+        const nm = path.join(nameDir, v, 'node_modules');
+        try {
+          if (fs.existsSync(nm) && fs.statSync(nm).isDirectory()) {
+            if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm);
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
+function refreshGlobalModulePaths() {
+  // 用户数据 npm_store 与内置 src/npm_store 都加入查找路径
+  try {
+    addNodeModulesToGlobalPaths(storeRoot);
+    const shippedStore = path.join(app.getAppPath(), 'src', 'npm_store');
+    addNodeModulesToGlobalPaths(shippedStore);
+    // 兼容在项目根目录安装的依赖（例如 d:\LessonPlugin\node_modules）
+    const appNodeModules = path.join(app.getAppPath(), 'node_modules');
+    try {
+      if (fs.existsSync(appNodeModules) && fs.statSync(appNodeModules).isDirectory()) {
+        if (!Module.globalPaths.includes(appNodeModules)) Module.globalPaths.push(appNodeModules);
+      }
+    } catch {}
+  } catch {}
 }
 
 // 由主进程注入自动化管理器实例，使插件可通过统一 API 访问计时器能力
@@ -108,6 +146,7 @@ module.exports.init = function init(paths) {
   config = readJsonSafe(configPath, { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} });
   storeRoot = path.resolve(path.dirname(manifestPath), '..', 'npm_store');
   if (!fs.existsSync(storeRoot)) fs.mkdirSync(storeRoot, { recursive: true });
+  refreshGlobalModulePaths();
 
   for (const p of manifest.plugins) {
     // 兼容旧配置：优先使用 id 键，其次回退 name 键
@@ -317,6 +356,8 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   const result = await runNpm(args, path.dirname(manifestPath));
   if (result.code !== 0) return { ok: false, error: result.err || 'npm install 失败' };
   onProgress && onProgress({ stage: 'npm', message: `完成 ${name}@${version}` });
+  const nm = path.join(dest, 'node_modules');
+  try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch {}
   return { ok: true, path: path.join(dest, 'node_modules', name) };
 };
 
