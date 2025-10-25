@@ -110,7 +110,25 @@ async function initAutomationSettings() {
       `;
       const toggle = row.querySelector('input[type="checkbox"]');
       toggle.addEventListener('click', async (e) => {
-        await window.settingsAPI?.automationToggle?.(it.id, !!e.target.checked);
+        try {
+          const enable = !!e.target.checked;
+          if (enable) {
+            // 启用前检查该自动化引用的插件是否存在并启用
+            const plugins = await window.settingsAPI?.getPlugins?.() || [];
+            const used = (it.actions || []).filter(a => a && (a.type === 'pluginAction' || a.type === 'pluginEvent'));
+            const missing = [];
+            used.forEach(a => {
+              const pid = a.pluginId;
+              const found = plugins.find(p => (p.id === pid) || (p.name === pid));
+              if (!found || !found.enabled) { missing.push(pid); }
+            });
+            if (missing.length) {
+              const ok = await showConfirm(`该自动化引用以下插件未安装或未启用：\n${missing.join('，')}\n仍要启用吗？`);
+              if (!ok) { e.target.checked = false; return; }
+            }
+          }
+          await window.settingsAPI?.automationToggle?.(it.id, enable);
+        } catch {}
       });
       const delBtn = row.querySelector('.del');
       delBtn.addEventListener('click', async (e) => {

@@ -1,0 +1,12 @@
+{
+  "id": "morning.reading",
+  "type": "plugin",
+  "name": "早读助手",
+  "version": "1.0.0",
+  "description": "站立早读提醒、早读看板等功能",
+  "author": "LessonPlugin",
+  "icon": "ri-sun-foggy-line",
+  "dependencies": ["notify-plugin"],
+  "npmDependencies": {},
+  "categories": "2,6"
+}

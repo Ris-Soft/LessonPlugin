@@ -53,7 +53,7 @@ function showPluginAboutModal(pluginItem) {
   const depsHeader = document.createElement('div'); depsHeader.className = 'section-title';
   depsHeader.innerHTML = `<i class="ri-box-3-line"></i> 依赖项`;
   const chips = document.createElement('div'); chips.className = 'chips';
-  const deps = pluginItem.dependencies || pluginItem.deps || null;
+  const deps = pluginItem.npmDependencies || pluginItem.dependencies || pluginItem.deps || null;
   if (deps && typeof deps === 'object') {
     Object.keys(deps).forEach((name) => {
       const ver = deps[name];

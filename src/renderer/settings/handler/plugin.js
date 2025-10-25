@@ -21,7 +21,7 @@ function renderPlugin(item) {
     if (typeof a === 'object') return a.name || JSON.stringify(a);
     return String(a);
   })();
-  const depsObj = (item && typeof item.dependencies === 'object' && item.dependencies) ? item.dependencies : null;
+  const depsObj = (item && typeof item.npmDependencies === 'object' && item.npmDependencies) ? item.npmDependencies : null;
   const depsKeys = depsObj ? Object.keys(depsObj) : [];
   const depsHtml = depsKeys.length
     ? depsKeys.slice(0, 4).map(k => `<span class="pill small">${k}</span>`).join(' ') + (depsKeys.length > 4 ? ` <span class="pill small muted">+${depsKeys.length - 4}</span>` : '')
@@ -102,12 +102,30 @@ function renderPlugin(item) {
   });
   const uninstallBtn = el.querySelector('.uninstall-btn');
   uninstallBtn?.addEventListener('click', async () => {
-    const res = await showModal({ title: '卸载插件', message: `确认卸载插件：${item.name}？\n这将删除其目录与相关文件。`, confirmText: '卸载', cancelText: '取消' });
-    console.log('卸载插件确认结果:', res);
-    if (!res) return;
     const key = item.id || item.name;
+    // 先查询依赖反向引用
+    let dep = null;
+    try { dep = await window.settingsAPI?.pluginDependents?.(key); } catch {}
+    const pluginNames = Array.isArray(dep?.plugins) ? dep.plugins.map(p => p.name).join('，') : '';
+    const autoNames = Array.isArray(dep?.automations) ? dep.automations.map(a => `${a.name}${a.enabled ? '(已启用)' : ''}`).join('，') : '';
+    const extra = [
+      pluginNames ? `被以下插件依赖：${pluginNames}` : '',
+      autoNames ? `被以下自动化引用：${autoNames}` : ''
+    ].filter(Boolean).join('\n');
+    const msg = extra ? `确认卸载插件：${item.name}？\n${extra}\n您可以选择继续卸载，已启用的自动化将被禁用。` : `确认卸载插件：${item.name}？\n这将删除其目录与相关文件。`;
+    const res = await showModal({ title: '卸载插件', message: msg, confirmText: '卸载', cancelText: '取消' });
+    if (!res) return;
+    // 自动禁用引用该插件的已启用自动化
+    try {
+      if (Array.isArray(dep?.automations)) {
+        for (const a of dep.automations) {
+          if (a.enabled) {
+            try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch {}
+          }
+        }
+      }
+    } catch {}
     const out = await window.settingsAPI?.uninstallPlugin?.(key);
-    console.log('卸载插件结果:', out);
     if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
     // 重新刷新插件列表
     const container = document.getElementById('plugins');
@@ -175,6 +193,29 @@ function renderPlugin(item) {
       const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式';
       await showAlert(msg);
     }
+  });
+  // 启用/禁用切换，启用前检查缺失依赖
+  const toggleEl = el.querySelector('.toggle input[type="checkbox"]');
+  toggleEl?.addEventListener('change', async (e) => {
+    try {
+      const checked = !!e.target.checked;
+      const key = item.id || item.name;
+      if (checked) {
+        // 启用前检查 pluginDepends 是否满足
+        const list = await fetchPlugins();
+        const depends = Array.isArray(item.pluginDepends) ? item.pluginDepends : [];
+        const missing = [];
+        for (const d of depends) {
+          const target = list.find(pp => (pp.id === d) || (pp.name === d));
+          if (!target || !target.enabled) missing.push(d);
+        }
+        if (missing.length) {
+          const ok = await showConfirm(`该插件依赖以下插件未安装或未启用：\n${missing.join('，')}\n仍要启用吗？`);
+          if (!ok) { e.target.checked = false; return; }
+        }
+      }
+      await window.settingsAPI?.togglePlugin?.(key, checked);
+    } catch {}
   });
   return el;
 }

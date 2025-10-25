@@ -108,6 +108,20 @@ function renderStoreCard(item, installedList) {
               if (!res.ok) throw new Error('ZIP 下载失败');
               const buf = await res.arrayBuffer();
               const name = item.id ? `${item.id}.zip` : `${item.name || 'plugin'}.zip`;
+              // 安装前检查ZIP显示依赖并确认
+              try {
+                const inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf));
+                if (inspect?.ok) {
+                  const author = (typeof inspect.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect.author || '未知作者');
+                  const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : (Array.isArray(inspect.pluginDepends) ? inspect.pluginDepends : []);
+                  const depsObj = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
+                  const depNames = depsObj ? Object.keys(depsObj) : [];
+                  const permissions = Array.isArray(inspect.permissions) ? inspect.permissions : [];
+                  const msg = `将安装：${inspect.name || item.name}\n作者：${author}\n插件依赖：${pluginDepends.length ? pluginDepends.join('，') : '无'}\nNPM依赖：${depNames.length ? depNames.join('，') : '无'}\n权限：${permissions.length ? permissions.join('，') : '无'}\n是否继续？`;
+                  const ok = await showConfirm(msg);
+                  if (!ok) { btnInstall.disabled = false; btnInstall.innerHTML = '<i class=\"ri-download-2-line\"></i> 安装'; return; }
+                }
+              } catch {}
               const out = await window.settingsAPI?.installPluginZipData?.(name, new Uint8Array(buf));
               if (!out?.ok) throw new Error(out?.error || '安装失败');
               await showAlert('安装完成');

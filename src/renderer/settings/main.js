@@ -162,9 +162,41 @@ async function main() {
         return;
       }
     }
+    // 安装前检查ZIP以展示依赖与安全提示
+    try {
+      let inspect = null;
+      if (pendingZipPath) inspect = await window.settingsAPI?.inspectPluginZip?.(pendingZipPath);
+      else inspect = await window.settingsAPI?.inspectPluginZipData?.(pendingZipData.name, pendingZipData.data);
+      if (inspect?.ok) {
+        const name = inspect.name || file.name.replace(/\.zip$/i, '');
+        const author = (typeof inspect.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect.author || '未知作者');
+        const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : (Array.isArray(inspect.pluginDepends) ? inspect.pluginDepends : []);
+        const depsObj = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
+        const depNames = depsObj ? Object.keys(depsObj) : [];
+        const permissions = Array.isArray(inspect.permissions) ? inspect.permissions : [];
+        // 计算插件依赖的安装状态
+        const list = await window.settingsAPI?.getPlugins?.();
+        const installedSet = new Set((Array.isArray(list) ? list : []).flatMap(p => [p.id, p.name]));
+        const depPills = pluginDepends.map(d => {
+          const ok = installedSet.has(d);
+          return `<span class="pill small${ok ? '' : ' danger'}">${d}${ok ? '' : '（未安装）'}</span>`;
+        }).join(' ');
+        const npmPills = depNames.map(k => `<span class="pill small">${k}</span>`).join(' ');
+        const permPills = permissions.length ? permissions.map(p => `<span class="pill small">${p}</span>`).join(' ') : '<span class="muted">无权限</span>';
+        const msg = `
+将安装：${name}
+作者：${author}
+插件依赖：${pluginDepends.length ? pluginDepends.join('，') : '无'}
+NPM依赖：${depNames.length ? depNames.join('，') : '无'}
+权限：${permissions.length ? permissions.join('，') : '无'}
+`;
+        const ok = await showConfirm(msg);
+        if (!ok) return;
+      }
+    } catch {}
     modal.hidden = false;
   });
-  btnCancel?.addEventListener('click', () => { pendingZipPath = null; modal.hidden = true; });
+  btnCancel?.addEventListener('click', () => { pendingZipPath = null; pendingZipData = null; modal.hidden = true; });
   btnConfirm?.addEventListener('click', async () => {
     if (!pendingZipPath && !pendingZipData) return;
     btnConfirm.disabled = true; btnConfirm.innerHTML = '<i class="ri-loader-4-line"></i> 安装中...';
@@ -181,7 +213,7 @@ async function main() {
     }
     modal.hidden = true; pendingZipPath = null; pendingZipData = null;
     const metaAuthor = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
-    const depsObj = (typeof res.dependencies === 'object' && res.dependencies) ? res.dependencies : null;
+    const depsObj = (typeof res.npmDependencies === 'object' && res.npmDependencies) ? res.npmDependencies : null;
     const depNames = depsObj ? Object.keys(depsObj) : [];
     await showAlert(`安装成功：${res.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`);
     // 重新刷新插件列表（仅显示包含动作的插件）

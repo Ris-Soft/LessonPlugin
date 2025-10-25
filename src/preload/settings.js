@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   installNpm: (name) => ipcRenderer.invoke('plugin:install', name),
   installPluginZip: (zipPath) => ipcRenderer.invoke('plugin:installZip', zipPath),
   installPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:installZipData', fileName, data),
+  // 新增：安装前ZIP检查
+  inspectPluginZip: (zipPath) => ipcRenderer.invoke('plugin:inspectZip', zipPath),
+  inspectPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:inspectZipData', fileName, data),
   uninstallPlugin: (name) => ipcRenderer.invoke('plugin:uninstall', name),
   // 新增：重载本地插件（仅开发环境）
   reloadPlugin: (name) => ipcRenderer.invoke('plugin:reload', name),
@@ -59,16 +62,18 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getAppInfo: () => ipcRenderer.invoke('system:getAppInfo'),
   getAutostart: () => ipcRenderer.invoke('system:getAutostart'),
   setAutostart: (enabled, highPriority) => ipcRenderer.invoke('system:setAutostart', enabled, highPriority),
-  getCurrentTime: () => ipcRenderer.invoke('system:getTime')
-  ,cleanupUserData: () => ipcRenderer.invoke('system:cleanupUserData')
-  ,getUserDataPath: () => ipcRenderer.invoke('system:getUserDataPath')
-  ,openUserData: () => ipcRenderer.invoke('system:openUserData')
-  ,changeUserData: () => ipcRenderer.invoke('system:changeUserData')
+  getCurrentTime: () => ipcRenderer.invoke('system:getTime'),
+  cleanupUserData: () => ipcRenderer.invoke('system:cleanupUserData'),
+  getUserDataPath: () => ipcRenderer.invoke('system:getUserDataPath'),
+  openUserData: () => ipcRenderer.invoke('system:openUserData'),
+  changeUserData: () => ipcRenderer.invoke('system:changeUserData'),
   // 图标释放（Canvas PNG -> 用户数据 renderer/icons）
-  ,getIconsDir: () => ipcRenderer.invoke('icons:dir')
-  ,writeIconPng: (fileName, dataUrl) => ipcRenderer.invoke('icons:write', fileName, dataUrl)
-  ,openIconsDir: async () => {
+  getIconsDir: () => ipcRenderer.invoke('icons:dir'),
+  writeIconPng: (fileName, dataUrl) => ipcRenderer.invoke('icons:write', fileName, dataUrl),
+  openIconsDir: async () => {
     const dir = await ipcRenderer.invoke('icons:dir');
     return require('electron').shell.openPath(dir);
-  }
+  },
+  // 查询依赖反向引用（依赖此插件的插件与自动化）
+  pluginDependents: (idOrName) => ipcRenderer.invoke('plugin:dependents', idOrName)
 });

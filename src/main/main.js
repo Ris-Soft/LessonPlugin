@@ -462,6 +462,10 @@ ipcMain.handle('plugin:installZip', async (_e, zipPath) => {
 ipcMain.handle('plugin:uninstall', async (_e, name) => {
   return pluginManager.uninstall(name);
 });
+// 新增：安装前ZIP检查（路径）
+ipcMain.handle('plugin:inspectZip', async (_e, zipPath) => {
+  return pluginManager.inspectZip(zipPath);
+});
 ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
   try {
     const tmpDir = path.join(app.getPath('temp'), 'LessonPlugin');
@@ -477,8 +481,24 @@ ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
     return { ok: false, error: e?.message || String(e) };
   }
 });
+// 新增：安装前ZIP检查（二进制数据）
+ipcMain.handle('plugin:inspectZipData', async (_e, fileName, data) => {
+  try {
+    const tmpDir = path.join(app.getPath('temp'), 'LessonPlugin');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const safeName = String(fileName || 'plugin.zip').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const tmpPath = path.join(tmpDir, `${Date.now()}_${safeName}`);
+    const buf = Buffer.from(data);
+    fs.writeFileSync(tmpPath, buf);
+    const res = await pluginManager.inspectZip(tmpPath);
+    try { fs.unlinkSync(tmpPath); } catch {}
+    return res;
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
 
-// 新增：开发环境重载指定插件（卸载 -> 从开发目录复制 -> 重新加载）
+// 开发环境重载指定插件（卸载 -> 从开发目录复制 -> 重新加载）
 ipcMain.handle('plugin:reload', async (_e, key) => {
   try {
     const isDev = !app.isPackaged;
@@ -914,4 +934,7 @@ ipcMain.handle('asset:url', async (_e, relPath) => {
   } catch (e) {
     return null;
   }
+});
+ipcMain.handle('plugin:dependents', async (_e, idOrName) => {
+  return pluginManager.listDependents(idOrName);
 });

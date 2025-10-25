@@ -132,14 +132,18 @@ module.exports.init = function init(paths) {
         icon: meta.icon || null,
         description: meta.description || '',
         author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
-        dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)),
+        // 统一 npmDependencies：对象表示 NPM 依赖；dependencies 为数组表示插件依赖
+        npmDependencies: (typeof meta.npmDependencies === 'object' ? meta.npmDependencies : (Array.isArray(meta.dependencies) ? undefined : (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)))),
         // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
         actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
         // 保留 functions 以备后续扩展（如声明 backend 名称等）
         functions: typeof meta.functions === 'object' ? meta.functions : undefined,
         packages: Array.isArray(meta.packages) ? meta.packages : undefined,
         version: detectedVersion,
-        studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
+        studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
+        // pluginDepends 兼容：优先 meta.pluginDepends；其次 meta.dependencies 为数组视为插件依赖
+        pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : (Array.isArray(meta.dependencies) ? meta.dependencies : undefined),
+        permissions: Array.isArray(meta.permissions) ? meta.permissions : undefined
       });
       nameToId.set(name, id);
     }
@@ -171,10 +175,13 @@ module.exports.getPlugins = function getPlugins() {
     icon: p.icon || null,
     description: p.description || '',
     author: (p.author !== undefined ? p.author : null),
-    dependencies: (typeof p.dependencies === 'object' ? p.dependencies : undefined),
+    npmDependencies: (typeof p.npmDependencies === 'object' ? p.npmDependencies : undefined),
     actions: Array.isArray(p.actions) ? p.actions : [],
     version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
-    studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : []
+    studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : [],
+    // 输出时兼容插件依赖来源（pluginDepends 或 dependencies 为数组）
+    pluginDepends: Array.isArray(p.pluginDepends) ? p.pluginDepends : (Array.isArray(p.dependencies) ? p.dependencies : undefined),
+    permissions: Array.isArray(p.permissions) ? p.permissions : undefined
   }));
 };
 
@@ -662,12 +669,18 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       icon: meta.icon || null,
       description: meta.description || '',
       author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
-      dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)),
-      actions: (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : (Array.isArray(meta.actions) ? meta.actions : [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }])),
+      // 统一 npmDependencies：对象表示 NPM 依赖；dependencies 为数组表示插件依赖
+      npmDependencies: (typeof meta.npmDependencies === 'object' ? meta.npmDependencies : (Array.isArray(meta.dependencies) ? undefined : (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)))),
+      // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
+      actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
+      // 保留 functions 以备后续扩展（如声明 backend 名称等）
       functions: typeof meta.functions === 'object' ? meta.functions : undefined,
-      packages: meta.packages,
+      packages: Array.isArray(meta.packages) ? meta.packages : undefined,
       version: detectedVersion,
-      studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
+      studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
+      // pluginDepends 兼容：优先 meta.pluginDepends；其次 meta.dependencies 为数组视为插件依赖
+      pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : (Array.isArray(meta.dependencies) ? meta.dependencies : undefined),
+      permissions: Array.isArray(meta.permissions) ? meta.permissions : undefined
     };
     if (existingIdx >= 0) {
       manifest.plugins[existingIdx] = updated;
@@ -715,7 +728,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       }
     } catch {}
 
-    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)) };
+    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -856,4 +869,86 @@ module.exports.emitEvent = function emitEvent(eventName, payload) {
     }
   }
   return { ok: true, delivered };
+};
+
+module.exports.inspectZip = async function inspectZip(zipPath) {
+  try {
+    const pluginsRootLocal = path.dirname(manifestPath);
+    const tempId = `plugin_inspect_${Date.now()}`;
+    const tempDir = path.join(pluginsRootLocal, tempId);
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    const unzip = await expandZip(zipPath, tempDir);
+    if (!unzip.ok) return { ok: false, error: unzip.error };
+    // 读取元数据
+    let meta = {};
+    const metaPath = path.join(tempDir, 'plugin.json');
+    if (fs.existsSync(metaPath)) meta = readJsonSafe(metaPath, {});
+    const pkgPath = path.join(tempDir, 'package.json');
+    let pkg = null;
+    if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+    const indexPathTmp = path.join(tempDir, 'index.js');
+    let pluginName = meta.name;
+    if (!pluginName) {
+      try { const mod = require(indexPathTmp); if (mod?.name) pluginName = mod.name; } catch {}
+    }
+    if (!pluginName) pluginName = 'plugin';
+    const rawId = String(meta.id || '').trim();
+    const cleanId = rawId.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const slugFromName = String(pluginName || '').toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const pluginId = cleanId || slugFromName || `plugin_${Date.now()}`;
+    const detectedVersion = meta.version || (pkg?.version || null);
+    const info = {
+      ok: true,
+      id: pluginId,
+      name: pluginName,
+      author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
+      version: detectedVersion,
+      // 统一 npmDependencies：对象表示 NPM 依赖；dependencies 为数组表示插件依赖
+      npmDependencies: (typeof meta.npmDependencies === 'object' ? meta.npmDependencies : (Array.isArray(meta.dependencies) ? undefined : (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)))),
+      actions: (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : (Array.isArray(meta.actions) ? meta.actions : [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }])),
+      functions: typeof meta.functions === 'object' ? meta.functions : undefined,
+      packages: meta.packages,
+      version: detectedVersion,
+      studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
+      // pluginDepends 兼容：优先 meta.pluginDepends；其次 meta.dependencies 为数组视为插件依赖
+      pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : (Array.isArray(meta.dependencies) ? meta.dependencies : undefined),
+      permissions: Array.isArray(meta.permissions) ? meta.permissions : undefined
+    };
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+    return info;
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.listDependents = function listDependents(idOrName) {
+  try {
+    const canonId = nameToId.get(idOrName) || idOrName;
+    // 依赖此插件的其他插件（按 pluginDepends 声明）
+    const pluginDeps = (manifest.plugins || []).filter((p) => {
+      const deps = Array.isArray(p.pluginDepends) ? p.pluginDepends : (Array.isArray(p.dependencies) ? p.dependencies : []);
+      return deps.some((d) => (d === canonId) || (d === p.name) || (nameToId.get(d) === canonId));
+    }).map((p) => ({ id: p.id, name: p.name }));
+    // 引用此插件的自动化（actions 中包含 pluginAction 或 pluginEvent 的 pluginId）
+    const autos = [];
+    try {
+      const items = Array.isArray(automationManagerRef?.items) ? automationManagerRef.items : [];
+      for (const it of items) {
+        const actions = Array.isArray(it.actions) ? it.actions : [];
+        const uses = actions.some((a) => {
+          if (!a || typeof a !== 'object') return false;
+          if (a.type === 'pluginAction' || a.type === 'pluginEvent') {
+            const pid = a.pluginId;
+            const canon = nameToId.get(pid) || pid;
+            return canon === canonId;
+          }
+          return false;
+        });
+        if (uses) autos.push({ id: it.id, name: it.name, enabled: !!it.enabled });
+      }
+    } catch {}
+    return { ok: true, plugins: pluginDeps, automations: autos };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 };
