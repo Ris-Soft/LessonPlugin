@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const dgram = require('dgram');
@@ -78,8 +78,8 @@ function createSettingsWindow() {
 
 function createTray() {
   const iconPath = path.join(app.getAppPath(), 'icon.ico');
-  const image = nativeImage.createFromPath(iconPath);
-  tray = new Tray(image);
+  // 托盘主图标保持原样，不做反色
+  tray = new Tray(nativeImage.createFromPath(iconPath));
 
   const openSettingsTo = (page) => {
     if (!settingsWindow) createSettingsWindow();
@@ -120,9 +120,23 @@ function createTray() {
       for (const fp of candidates) {
         if (fs.existsSync(fp)) {
           try {
-            const img = nativeImage.createFromPath(fp);
-            // 缩小菜单图标尺寸，避免托盘菜单图标过大
-            return img && img.resize ? img.resize({ width: 24, height: 24 }) : img;
+            const base = nativeImage.createFromPath(fp);
+            const scaled = base && base.resize ? base.resize({ width: 24, height: 24 }) : base;
+            // 浅色模式下反色菜单项图标（提高可见性），保留 alpha
+            if (!nativeTheme.shouldUseDarkColors && scaled && scaled.getBitmap) {
+              try {
+                const size = scaled.getSize();
+                const buf = scaled.getBitmap();
+                for (let i = 0; i < buf.length; i += 4) {
+                  buf[i] = 255 - buf[i];
+                  buf[i + 1] = 255 - buf[i + 1];
+                  buf[i + 2] = 255 - buf[i + 2];
+                }
+                const inv = nativeImage.createFromBitmap(buf, { width: size.width, height: size.height });
+                return inv || scaled;
+              } catch {}
+            }
+            return scaled;
           } catch {}
         }
       }
@@ -156,10 +170,7 @@ function createTray() {
           });
         }
         sub.push({ type: 'separator' });
-        sub.push({
-          label: '插件信息',
-          click: () => { openPluginInfo(p.id || p.name); }
-        });
+        sub.push({ label: '插件信息', click: () => { openPluginInfo(p.id || p.name); } });
         items.push({ label: p.name || p.id, submenu: sub });
       }
       if (!items.length) return [{ label: '暂无可用插件动作', enabled: false }];
@@ -167,8 +178,8 @@ function createTray() {
     } catch { return [{ label: '加载失败', enabled: false }]; }
   };
 
-  const menu = Menu.buildFromTemplate([
-    { label: '打开设置', icon: resolveMenuIcon('ri-settings-3-line'), click: () => openSettingsTo('plugins') },
+  const buildMenu = () => Menu.buildFromTemplate([
+    { label: '通用设置', icon: resolveMenuIcon('ri-settings-3-line'), click: () => openSettingsTo('general') },
     { label: '功能市场', icon: resolveMenuIcon('ri-store-2-line'), click: () => openSettingsTo('market') },
     { label: '插件管理', icon: resolveMenuIcon('ri-puzzle-line'), click: () => openSettingsTo('plugins') },
     { label: '自动化', icon: resolveMenuIcon('ri-robot-line'), click: () => openSettingsTo('automation') },
@@ -179,8 +190,14 @@ function createTray() {
     { type: 'separator' },
     { label: '退出', icon: resolveMenuIcon('ri-close-circle-line'), click: () => app.quit() }
   ]);
+
   tray.setToolTip('LessonPlugin');
-  tray.setContextMenu(menu);
+  tray.setContextMenu(buildMenu());
+
+  // 监听主题变化以刷新菜单项图标
+  nativeTheme.on('updated', () => {
+    try { tray.setContextMenu(buildMenu()); } catch {}
+  });
 }
 
 function sendSplashProgress(payload) {
@@ -631,7 +648,14 @@ ipcMain.handle('config:ensureDefaults', async (_e, scope, defaults) => {
 // 自动化 IPC
 ipcMain.handle('automation:list', async () => automationManager.list());
 ipcMain.handle('automation:get', async (_e, id) => automationManager.get(id));
-ipcMain.handle('automation:create', async (_e, payload) => automationManager.create(payload));
+ipcMain.handle('automation:create', async (_e, payload) => {
+  try {
+    const item = await automationManager.create(payload);
+    return { ok: true, item };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
 ipcMain.handle('automation:update', async (_e, id, patch) => automationManager.update(id, patch));
 ipcMain.handle('automation:remove', async (_e, id) => automationManager.remove(id));
 ipcMain.handle('automation:toggle', async (_e, id, enabled) => automationManager.toggle(id, enabled));

@@ -3,7 +3,7 @@
   "type": "plugin",
   "name": "示例插件",
   "version": "1.0.0",
-  "author": "官方",
+  "author": "LessonPlugin",
   "description": "用于演示的功能插件，包含基础配置和启用状态。",
   "screenshots": ["/renderer/assets/mock/example-1.png"],
   "homepage": "https://example.com/plugin",

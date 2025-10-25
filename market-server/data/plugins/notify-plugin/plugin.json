@@ -1,0 +1,11 @@
+{
+  "id": "notify-plugin",
+  "type": "plugin",
+  "name": "消息通知",
+  "version": "1.0.0",
+  "description": "系统通知提醒插件",
+  "author": "LessonPlugin",
+  "icon": "ri-notification-2-line",
+  "categories": "3,5",
+  "npm": "@lp/notify-plugin"
+}

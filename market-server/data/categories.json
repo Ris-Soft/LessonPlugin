@@ -1,0 +1,20 @@
+{
+  "plugins": {
+    "all": { "label": "全部", "icon": "ri-apps-2-line" },
+    "1": { "label": "热门", "icon": "ri-fire-line" },
+    "2": { "label": "课堂助手", "icon": "ri-book-read-line" },
+    "3": { "label": "通知提醒", "icon": "ri-notification-2-line" },
+    "4": { "label": "工具", "icon": "ri-tools-line" },
+    "5": { "label": "系统", "icon": "ri-settings-3-line" },
+    "6": { "label": "其他", "icon": "ri-more-line" }
+  },
+  "automation": {
+    "all": { "label": "全部", "icon": "ri-apps-2-line" },
+    "1": { "label": "课堂自动化", "icon": "ri-school-line" },
+    "2": { "label": "通知提醒", "icon": "ri-notification-2-line" },
+    "3": { "label": "工具", "icon": "ri-tools-line" }
+  },
+  "components": {
+    "all": { "label": "暂时无用", "icon": "ri-apps-2-line" }
+  }
+}

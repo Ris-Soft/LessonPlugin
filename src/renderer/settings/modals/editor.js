@@ -224,3 +224,77 @@ async function showParamsEditorForEvent(paramDefs, initial) {
     document.body.appendChild(overlay);
   });
 }
+
+// 源JSON编辑器（模态）：隐藏/忽略id字段，保存时强制保留原ID
+async function showAutomationJsonEditorModal(initial) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '源JSON编辑器';
+    const body = document.createElement('div'); body.className = 'modal-body';
+    const desc = document.createElement('div'); desc.className = 'muted'; desc.textContent = '提示：ID不可更改，保存时将强制保留当前任务ID';
+    const ta = document.createElement('textarea'); ta.style.width = '100%'; ta.style.minHeight = '240px'; ta.style.fontFamily = 'var(--mono, monospace)'; ta.spellcheck = false;
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const btnCopy = document.createElement('button'); btnCopy.className = 'btn secondary'; btnCopy.innerHTML = '<i class="ri-file-copy-2-line"></i> 复制JSON';
+    const btnPaste = document.createElement('button'); btnPaste.className = 'btn secondary'; btnPaste.innerHTML = '<i class="ri-clipboard-line"></i> 粘贴';
+    const btnCancel = document.createElement('button'); btnCancel.className = 'btn secondary'; btnCancel.textContent = '取消';
+    const btnSave = document.createElement('button'); btnSave.className = 'btn primary'; btnSave.innerHTML = '<i class="ri-save-3-line"></i> 保存';
+
+    const composeInitial = () => {
+      const clone = { ...initial };
+      // 展示时移除id，避免误改
+      delete clone.id;
+      return JSON.stringify(clone, null, 2);
+    };
+    try { ta.value = composeInitial(); } catch { ta.value = '{}'; }
+
+    btnCopy.onclick = async () => {
+      try {
+        const text = JSON.stringify({ id: initial.id, ...JSON.parse(ta.value || '{}') }, null, 2);
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const tmp = document.createElement('textarea'); tmp.value = text; document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); tmp.remove();
+        }
+        await showAlert('已复制到剪贴板');
+      } catch (e) {
+        await showAlert('复制失败：' + (e?.message || '未知错误'));
+      }
+    };
+    btnPaste.onclick = async () => {
+      try {
+        let text = '';
+        if (navigator.clipboard?.readText) text = await navigator.clipboard.readText();
+        if (!text) { await showAlert('剪贴板为空'); return; }
+        const parsed = JSON.parse(text);
+        delete parsed.id; // 粘贴时忽略外部ID
+        ta.value = JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        await showAlert('粘贴解析失败：' + (e?.message || '未知错误'));
+      }
+    };
+    btnCancel.onclick = () => { overlay.remove(); resolve(null); };
+    btnSave.onclick = async () => {
+      try {
+        const parsed = JSON.parse(ta.value || '{}');
+        // 返回不含id的字段，调用方负责覆盖id并保存
+        overlay.remove();
+        resolve(parsed);
+      } catch (e) {
+        await showAlert('JSON解析失败：' + (e?.message || '未知错误'));
+      }
+    };
+
+    box.appendChild(title);
+    body.appendChild(desc);
+    body.appendChild(ta);
+    box.appendChild(body);
+    actions.appendChild(btnCopy);
+    actions.appendChild(btnPaste);
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnSave);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}

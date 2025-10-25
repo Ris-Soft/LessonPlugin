@@ -3,7 +3,7 @@
   "type": "plugin",
   "name": "通知插件",
   "version": "1.2.3",
-  "author": "官方",
+  "author": "LessonPlugin",
   "description": "在课堂内发送通知，支持定时与手动广播。",
   "screenshots": ["/renderer/assets/mock/notify-1.png"],
   "homepage": "https://example.com/notify",

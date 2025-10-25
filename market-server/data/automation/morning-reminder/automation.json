@@ -1,0 +1,42 @@
+{
+  "id": "morning-reminder",
+  "name": "早晨提醒",
+  "author": "LessonPlugin",
+  "version": "1.0.0",
+  "description": "每天早上7:30提醒查看课表。",
+  "triggers": [
+    { "type": "time", "at": "07:30" }
+  ],
+  "conditions": {
+    "mode": "and",
+    "groups": [
+      {
+        "mode": "and",
+        "items": [
+          { "type": "weekdayIn", "value": [1, 2, 3, 4, 5] }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "pluginEvent",
+      "pluginId": "notify-plugin",
+      "event": "notify",
+      "params": [
+        { "key": "title", "value": "早晨提醒" },
+        { "key": "message", "value": "新的一天开始，查看课表与计划" }
+      ]
+    },
+    {
+      "type": "pluginAction",
+      "pluginId": "lesson-board",
+      "action": "open_today"
+    }
+  ],
+  "confirm": { "enabled": false, "timeout": 60 },
+  "dependencies": {
+    "lesson-board": ">=1.0.0",
+    "notify-plugin": ">=1.0.0"
+  }
+}

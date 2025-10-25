@@ -33,6 +33,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 10px;
+  flex-direction: column;
 }
 h1 {
   margin: 0 0 6px 0;
@@ -98,3 +99,8 @@ h1 {
 .btn.icon-only i { font-size: 16px; }
 /* 顶部右侧控制区域（关闭按钮 + 倒计时） */
 .top-controls { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 8px; }
+/* EngQuote 专用样式 */
+.quote .quote-en { font-size: 26px; line-height: 1.8; }
+.quote .quote-cn { margin-top: 2px; font-size: 20px; color: var(--muted); }
+.quote .quote-note { margin-top: 1px; font-size: 10px; color: var(--muted); }
+.quote .quote-origin { margin-top: 4px; font-size: 10px; opacity: 0.9; }

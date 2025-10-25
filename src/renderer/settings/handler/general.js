@@ -37,7 +37,8 @@ async function initGeneralSettings() {
     autoOffsetDaily: 0,
     offsetBaseDate: new Date().toISOString().slice(0, 10),
     semesterStart: new Date().toISOString().slice(0, 10),
-    biweekOffset: false
+    biweekOffset: false,
+    marketApiBase: 'http://localhost:3030/'
   };
   await window.settingsAPI?.configEnsureDefaults('system', defaults);
   const cfg = await window.settingsAPI?.configGetAll('system');
@@ -62,9 +63,17 @@ async function initGeneralSettings() {
   const apiSample = document.getElementById('api-sample');
   const openArrayEditor = document.getElementById('open-array-editor');
 
+  const getSelectedSource = () => document.querySelector('input[name="quoteSource"]:checked')?.value || (cfg.quoteSource || 'hitokoto');
+
   radios.forEach((r) => { r.checked = r.value === (cfg.quoteSource || 'hitokoto'); });
   apiUrl.value = cfg.quoteApiUrl || 'https://v1.hitokoto.cn/';
-  const switchSource = (val) => { fieldApi.hidden = val !== 'hitokoto'; fieldLocal.hidden = val !== 'local'; };
+  const switchSource = (val) => {
+    fieldApi.hidden = val !== 'custom';
+    fieldLocal.hidden = val !== 'local';
+    apiUrl.disabled = val !== 'custom';
+    apiTest.disabled = val !== 'custom';
+    apiSample.textContent = '';
+  };
   switchSource(cfg.quoteSource || 'hitokoto');
 
   radios.forEach((r) => {
@@ -80,11 +89,20 @@ async function initGeneralSettings() {
   });
 
   apiTest.addEventListener('click', async () => {
+    const source = getSelectedSource();
+    if (source !== 'custom') {
+      apiSample.textContent = '仅在“自定义地址”模式下可测试。';
+      return;
+    }
     const url = apiUrl.value.trim() || 'https://v1.hitokoto.cn/';
     try {
       const resp = await fetch(url);
       const data = await resp.json();
-      const txt = `「${data.hitokoto}」—— ${data.from || ''}`;
+      const txt = (data && typeof data === 'object')
+        ? (data.hitokoto ? `「${data.hitokoto}」—— ${data.from || ''}`
+          : (data.text ? `「${data.text}」—— ${data.from || ''}`
+            : JSON.stringify(data)))
+        : String(data);
       apiSample.textContent = txt;
     } catch (e) {
       apiSample.textContent = '获取失败，请检查API地址或网络。';
@@ -190,6 +208,35 @@ async function initGeneralSettings() {
     ntpServer.addEventListener('change', async () => {
       const val = String(ntpServer.value || '').trim() || 'ntp.aliyun.com';
       await window.settingsAPI?.configSet('system', 'ntpServer', val);
+    });
+  }
+
+  // 在线服务地址绑定与测试
+  const marketApiUrl = document.getElementById('market-api-url');
+  const marketApiTest = document.getElementById('market-api-test');
+  const marketApiSample = document.getElementById('market-api-sample');
+  if (marketApiUrl) {
+    marketApiUrl.value = String(cfg.serviceBase || cfg.marketApiBase || 'http://localhost:3030/');
+    marketApiUrl.addEventListener('change', async () => {
+      const val = String(marketApiUrl.value || '').trim() || 'http://localhost:3030/';
+      await window.settingsAPI?.configSet('system', 'serviceBase', val);
+    });
+  }
+  if (marketApiTest) {
+    marketApiTest.addEventListener('click', async () => {
+      const base = String(marketApiUrl?.value || '').trim() || 'http://localhost:3030/';
+      try {
+        const url = new URL('/api/market/catalog', base).toString();
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('failed');
+        const data = await resp.json();
+        const count = (Array.isArray(data.plugins) ? data.plugins.length : 0)
+          + (Array.isArray(data.automation) ? data.automation.length : 0)
+          + (Array.isArray(data.components) ? data.components.length : 0);
+        marketApiSample.textContent = `连接成功，可用条目共 ${count} 个`;
+      } catch {
+        marketApiSample.textContent = '连接失败，请检查地址或服务是否启动。';
+      }
     });
   }
 

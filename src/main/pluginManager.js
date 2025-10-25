@@ -118,8 +118,9 @@ module.exports.init = function init(paths) {
 
       // 生成稳定 id：优先 meta.id，否则根据 name 生成 slug；若 slug 为空则回退到目录名或随机
       const rawId = String(meta.id || '').trim();
-      const slugFromName = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      let id = rawId || slugFromName || String(entry).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const cleanId = rawId.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+      const slugFromName = String(name || '').toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+      let id = cleanId || slugFromName || String(entry).toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
       if (!id) id = `plugin_${Date.now()}`;
 
       manifest.plugins.push({
@@ -418,23 +419,98 @@ module.exports.uninstall = function uninstall(idOrName) {
     // 仅支持卸载本地插件
     if (!p.local) return { ok: false, error: 'not_local_plugin' };
     const fullDir = path.join(path.dirname(manifestPath), p.local);
+    
+    // 获取插件的规范化ID用于清理各种注册项
+    const canonId = p.id || p.name;
+    
+    // 1. 先收集插件窗口信息（用于后续清理）
+    const winById = pluginWindows.get(p.id);
+    const winByName = pluginWindows.get(p.name);
+    const pluginWebContentsIds = [];
+    
+    if (winById?.webContents?.id) {
+      pluginWebContentsIds.push(winById.webContents.id);
+    }
+    if (winByName?.webContents?.id && winByName !== winById) {
+      pluginWebContentsIds.push(winByName.webContents.id);
+    }
+    
     try {
-      // 关闭该插件可能打开的窗口
-      const win = pluginWindows.get(p.id) || pluginWindows.get(p.name);
-      if (win?.webContents?.id) {
-        try { win.webContents.destroy(); } catch {}
+      // 2. 清理插件的事件订阅（在关闭窗口前进行）
+      for (const [eventName, subscriberSet] of eventSubscribers.entries()) {
+        pluginWebContentsIds.forEach(id => subscriberSet.delete(id));
+        // 如果该事件没有订阅者了，删除整个事件
+        if (subscriberSet.size === 0) {
+          eventSubscribers.delete(eventName);
+        }
       }
+    } catch {}
+    
+    try {
+      // 3. 清理插件注册的API和函数
+      apiRegistry.delete(canonId);
+      functionRegistry.delete(canonId);
+    } catch {}
+    
+    try {
+      // 4. 清理插件注册的自动化事件
+      automationEventRegistry.delete(canonId);
+    } catch {}
+    
+    try {
+      // 5. 关闭该插件所有已打开的窗口
+      // 处理通过ID注册的窗口
+      if (winById) {
+        if (winById.webContents && !winById.webContents.isDestroyed()) {
+          try { winById.webContents.destroy(); } catch {}
+        }
+        if (winById.destroy && !winById.isDestroyed()) {
+          try { winById.destroy(); } catch {}
+        }
+      }
+      
+      // 处理通过名称注册的窗口（可能与ID窗口不同）
+      if (winByName && winByName !== winById) {
+        if (winByName.webContents && !winByName.webContents.isDestroyed()) {
+          try { winByName.webContents.destroy(); } catch {}
+        }
+        if (winByName.destroy && !winByName.isDestroyed()) {
+          try { winByName.destroy(); } catch {}
+        }
+      }
+      
+      // 从窗口注册表中移除
       pluginWindows.delete(p.id);
       pluginWindows.delete(p.name);
     } catch {}
+    
     try {
+      // 5. 清理插件的分钟触发器和计时器（通过自动化管理器）
+      if (automationManagerRef) {
+        try {
+          automationManagerRef.clearPluginMinuteTriggers(canonId);
+        } catch {}
+        
+        // 清理插件计时器（如果自动化管理器有相关方法）
+        try {
+          if (typeof automationManagerRef.clearPluginTimers === 'function') {
+            automationManagerRef.clearPluginTimers(canonId);
+          }
+        } catch {}
+      }
+    } catch {}
+    
+    try {
+      // 6. 删除插件目录
       if (fs.existsSync(fullDir)) fs.rmSync(fullDir, { recursive: true, force: true });
     } catch {}
-    // 从清单与配置移除
+    
+    // 7. 从清单与配置移除
     manifest.plugins.splice(idx, 1);
     try { delete config.enabled[p.id]; } catch {}
     try { delete config.enabled[p.name]; } catch {}
     writeJsonSafe(configPath, config);
+    
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -452,54 +528,133 @@ function expandZip(zipPath, dest) {
 module.exports.installFromZip = async function installFromZip(zipPath) {
   try {
     const pluginsRootLocal = path.dirname(manifestPath);
-    const tempId = `plugin_${Date.now()}`;
-    const dest = path.join(pluginsRootLocal, tempId);
-    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-    const unzip = await expandZip(zipPath, dest);
+    const tempId = `plugin_tmp_${Date.now()}`;
+    const tempDir = path.join(pluginsRootLocal, tempId);
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    const unzip = await expandZip(zipPath, tempDir);
     if (!unzip.ok) return { ok: false, error: unzip.error };
 
-    // 读取插件元数据
+    // 读取插件元数据（先从plugin.json，再从package.json回退）
     let meta = {};
-    const metaPath = path.join(dest, 'plugin.json');
+    const metaPath = path.join(tempDir, 'plugin.json');
     if (fs.existsSync(metaPath)) {
       meta = readJsonSafe(metaPath, {});
     }
-    // 尝试读取版本与作者、依赖
-
-    const pkgPath = path.join(dest, 'package.json');
+    const pkgPath = path.join(tempDir, 'package.json');
     let pkg = null;
     if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
     let detectedVersion = meta.version || (pkg?.version || null);
-    const indexPath = path.join(dest, 'index.js');
-    if (!fs.existsSync(indexPath)) {
+
+    // 检查入口
+    const indexPathTmp = path.join(tempDir, 'index.js');
+    if (!fs.existsSync(indexPathTmp)) {
       return { ok: false, error: '安装包缺少 index.js' };
     }
-    const pluginName = meta.name || tempId;
+    // 获取插件名称（优先 meta.name，其次从入口导出）
+    let pluginName = meta.name;
+    if (!pluginName) {
+      try {
+        const mod = require(indexPathTmp);
+        if (mod?.name) pluginName = mod.name;
+      } catch {}
+    }
+    if (!pluginName) pluginName = 'plugin';
+
+    // 计算稳定目录名：优先 meta.id，否则使用名称 slug
+    const rawId = String(meta.id || '').trim();
+    const cleanId = rawId.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const slugFromName = String(pluginName || '').toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const pluginId = cleanId || slugFromName || `plugin_${Date.now()}`;
+    const finalDir = path.join(pluginsRootLocal, pluginId);
+
+    // 若已存在同名目录，先删除以避免残留
+    try {
+      if (fs.existsSync(finalDir)) {
+        fs.rmSync(finalDir, { recursive: true, force: true });
+      }
+    } catch {}
+    // 将临时目录重命名为稳定目录，失败则复制回退
+    try {
+      fs.renameSync(tempDir, finalDir);
+    } catch (e) {
+      try {
+        fs.mkdirSync(finalDir, { recursive: true });
+        const copyDir = (src, dst) => {
+          const names = fs.readdirSync(src);
+          for (const name of names) {
+            const s = path.join(src, name);
+            const d = path.join(dst, name);
+            const stat = fs.statSync(s);
+            if (stat.isDirectory()) { fs.mkdirSync(d, { recursive: true }); copyDir(s, d); }
+            else { fs.copyFileSync(s, d); }
+          }
+        };
+        copyDir(tempDir, finalDir);
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch (err) {
+        return { ok: false, error: '移动插件目录失败：' + (err?.message || String(err)) };
+      }
+    }
 
     // Node 模块补全：如果声明packages，尝试下载，否则要求手动导入
     if (Array.isArray(meta.packages)) {
-      for (const pkg of meta.packages) {
-        const versions = Array.isArray(pkg.versions) ? pkg.versions : (pkg.version ? [pkg.version] : []);
+      for (const pkgDef of meta.packages) {
+        const versions = Array.isArray(pkgDef.versions) ? pkgDef.versions : (pkgDef.version ? [pkgDef.version] : []);
         for (const v of versions) {
-          const destPath = path.join(storeRoot, pkg.name, v, 'node_modules', pkg.name);
+          const destPath = path.join(storeRoot, pkgDef.name, v, 'node_modules', pkgDef.name);
           if (fs.existsSync(destPath)) continue; // 已有版本
-          const dl = await module.exports.downloadPackageVersion(pkg.name, v);
+          const dl = await module.exports.downloadPackageVersion(pkgDef.name, v);
           if (!dl.ok) {
             // 无法下载且本地不存在
-            return { ok: false, error: `无法下载依赖 ${pkg.name}@${v}，请手动导入到 src/npm_store/${pkg.name}/${v}/node_modules/${pkg.name}` };
+            return { ok: false, error: `无法下载依赖 ${pkgDef.name}@${v}，请手动导入到 src/npm_store/${pkgDef.name}/${v}/node_modules/${pkgDef.name}` };
           }
         }
       }
     }
 
-    // 更新内存清单（下次启动会通过目录扫描重建，无需写入集中式文件）
-    const rel = path.relative(path.dirname(manifestPath), dest).replace(/\\/g, '/');
-    // 生成 id：优先 meta.id，否则基于名称生成 slug
-    const rawId = String(meta.id || '').trim();
-    const slugFromName = String(pluginName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    const pluginId = rawId || slugFromName || tempId;
+    // 如存在同名或同ID插件，先清理其已注册资源与窗口，避免残留
+    const existingIdx = manifest.plugins.findIndex((pp) => pp.id === pluginId || pp.name === pluginName);
+    if (existingIdx >= 0) {
+      const canonId = manifest.plugins[existingIdx].id || manifest.plugins[existingIdx].name;
+      try {
+        // 收集该插件相关的 webContents ID 并从事件订阅中移除
+        const ids = [];
+        const winById = pluginWindows.get(canonId);
+        const winByName = pluginWindows.get(manifest.plugins[existingIdx].name);
+        if (winById?.webContents?.id) ids.push(winById.webContents.id);
+        if (winByName?.webContents?.id && winByName !== winById) ids.push(winByName.webContents.id);
+        for (const [eventName, subs] of eventSubscribers.entries()) {
+          ids.forEach((id) => subs.delete(id));
+          if (subs.size === 0) eventSubscribers.delete(eventName);
+        }
+      } catch {}
+      try {
+        apiRegistry.delete(canonId);
+        functionRegistry.delete(canonId);
+        automationEventRegistry.delete(canonId);
+      } catch {}
+      try {
+        const w1 = pluginWindows.get(canonId);
+        const w2 = pluginWindows.get(manifest.plugins[existingIdx].name);
+        for (const w of [w1, w2]) {
+          if (!w) continue;
+          try { if (w.webContents && !w.webContents.isDestroyed()) w.webContents.destroy(); } catch {}
+          try { if (w.destroy && !w.isDestroyed()) w.destroy(); } catch {}
+        }
+        pluginWindows.delete(canonId);
+        pluginWindows.delete(manifest.plugins[existingIdx].name);
+      } catch {}
+      try {
+        if (automationManagerRef) {
+          try { automationManagerRef.clearPluginMinuteTriggers(canonId); } catch {}
+          try { if (typeof automationManagerRef.clearPluginTimers === 'function') automationManagerRef.clearPluginTimers(canonId); } catch {}
+        }
+      } catch {}
+    }
 
-    manifest.plugins.push({
+    // 更新内存清单（使用稳定目录），若存在则覆盖更新
+    const rel = path.relative(path.dirname(manifestPath), finalDir).replace(/\\/g, '/');
+    const updated = {
       id: pluginId,
       name: pluginName,
       local: rel,
@@ -513,7 +668,12 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       packages: meta.packages,
       version: detectedVersion,
       studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : []
-    });
+    };
+    if (existingIdx >= 0) {
+      manifest.plugins[existingIdx] = updated;
+    } else {
+      manifest.plugins.push(updated);
+    }
     nameToId.set(pluginName, pluginId);
     if (typeof config.enabled[pluginId] !== 'boolean') {
       config.enabled[pluginId] = true;
@@ -521,6 +681,40 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       config.enabled[pluginName] = true;
       writeJsonSafe(configPath, config);
     }
+
+    // 重新注册并初始化插件核心资源（functions、automationEvents），并执行插件自身 init
+    try {
+      const modPath = path.resolve(finalDir, 'index.js');
+      try { delete require.cache[require.resolve(modPath)]; } catch {}
+      if (fs.existsSync(modPath)) {
+        const mod = require(modPath);
+        // 注册主进程函数
+        const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
+        if (fnObj) {
+          if (!functionRegistry.has(pluginId)) functionRegistry.set(pluginId, new Map());
+          const map = functionRegistry.get(pluginId);
+          for (const [fn, impl] of Object.entries(fnObj)) {
+            if (fn === 'actions') continue;
+            if (typeof impl === 'function') map.set(fn, impl);
+          }
+        }
+        // 注册自动化事件（若插件导出）
+        if (mod && Array.isArray(mod.automationEvents)) {
+          module.exports.registerAutomationEvents(pluginId, mod.automationEvents);
+        }
+        // 执行插件初始化
+        if (mod && typeof mod.init === 'function') {
+          try {
+            progressReporter && progressReporter({ stage: 'plugin:init', message: `初始化插件 ${pluginName}...` });
+            await Promise.resolve(mod.init(createPluginApi(pluginId)));
+            progressReporter && progressReporter({ stage: 'plugin:init', message: `插件 ${pluginName} 初始化完成` });
+          } catch (e) {
+            progressReporter && progressReporter({ stage: 'plugin:error', message: `插件 ${pluginName} 初始化失败：${e?.message || e}` });
+          }
+        }
+      }
+    } catch {}
+
     return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)) };
   } catch (e) {
     return { ok: false, error: e.message };

@@ -68,6 +68,7 @@
             <div class="tabs-right inline" style="gap:8px; margin-left:auto;">
               <input id="market-search-input" type="text" placeholder="搜索所有功能（插件/自动化/组件）" />
               <button id="market-search-btn" class="btn"><i class="ri-search-line"></i> 搜索</button>
+              <button id="market-refresh-btn" class="btn secondary"><i class="ri-refresh-line"></i> 刷新</button>
               <button id="market-back-btn" class="btn secondary" hidden><i class="ri-arrow-go-back-line"></i>
                 返回</button>
               <button id="store-filter-toggle" class="btn secondary"><i class="ri-filter-3-line"></i> 筛选</button>
@@ -139,12 +140,16 @@
                 <div class="setting-icon"><i class="ri-chat-quote-line"></i></div>
                 <div class="setting-main">
                   <div class="setting-title">名言来源</div>
-                  <div class="setting-desc">可从 API 获取或使用本地列表。</div>
+                  <div class="setting-desc">支持 Hitokoto、EngQuote、本地列表或自定义地址。</div>
                   <div class="options" role="group" aria-label="名言来源">
                     <input type="radio" id="quote-hitokoto" name="quoteSource" value="hitokoto" />
-                    <label for="quote-hitokoto"><i class="ri-link-m"></i> 一言 API</label>
+                    <label for="quote-hitokoto"><i class="ri-link-m"></i> Hitokoto</label>
+                    <input type="radio" id="quote-engquote" name="quoteSource" value="engquote" />
+                    <label for="quote-engquote"><i class="ri-translate-2"></i> EngQuote</label>
                     <input type="radio" id="quote-local" name="quoteSource" value="local" />
                     <label for="quote-local"><i class="ri-file-text-line"></i> 本地列表</label>
+                    <input type="radio" id="quote-custom" name="quoteSource" value="custom" />
+                    <label for="quote-custom"><i class="ri-tools-line"></i> 自定义地址</label>
                   </div>
                 </div>
                 <div class="setting-action"></div>
@@ -155,9 +160,9 @@
                 <div class="setting-icon"><i class="ri-link-m"></i></div>
                 <div class="setting-main">
                   <div class="setting-title">API 地址</div>
-                  <div class="setting-desc">默认 https://v1.hitokoto.cn/</div>
+                  <div class="setting-desc">自定义Api地址</div>
                   <div class="inline">
-                    <input id="api-url" type="text" placeholder="https://v1.hitokoto.cn/" />
+                    <input id="api-url" type="text" placeholder="https://example.com/api" />
                     <button id="api-test" class="btn primary"><i class="ri-refresh-line"></i> 测试获取</button>
                   </div>
                   <div id="api-sample" class="muted"></div>
@@ -193,6 +198,22 @@
                     <input id="autostart-enabled" type="checkbox" />
                     <span class="slider"></span>
                   </label>
+                </div>
+              </div>
+
+              <!-- LessonPlugin 在线服务地址 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-store-2-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">在线服务地址</div>
+                  <div class="setting-desc">用于加载在线服务（功能市场/更新等，默认 http://localhost:3030/）</div>
+                </div>
+                <div class="setting-action">
+                  <div class="inline">
+                    <input id="market-api-url" type="text" placeholder="http://localhost:3030/" />
+                    <button id="market-api-test" class="btn primary"><i class="ri-refresh-line"></i> 测试连接</button>
+                  </div>
+                  <div id="market-api-sample" class="muted"></div>
                 </div>
               </div>
 
@@ -291,8 +312,6 @@
                   </div>
                 </div>
               </div>
-
-
             </div>
           </div>
 
@@ -403,7 +422,7 @@
               <div id="auto-filters" class="auto-filters" hidden>
                 <div class="chips">
                   <span class="chip" data-filter-source="user">来源：用户</span>
-                  <span class="chip" data-filter-source="plugin">来源：插件</span>
+                  <span class="chip" data-filter-source="plugin">来源：市场</span>
                   <span class="chip" data-filter-source="shortcut">来源：快捷</span>
                 </div>
                 <div class="chips">
@@ -534,7 +553,7 @@
         <section id="page-npm" hidden>
           <header>
             <h1>依赖管理</h1>
-            <p>仅展示已安装的Node模块及其版本（安装随插件进行）</p>
+            <p>仅展示插件依赖的 Node 模块列表（随插件安装或手动导入）</p>
           </header>
           <div class="panel">
             <div id="npm-installed" class="npm-installed"></div>
@@ -571,6 +590,7 @@
   <script src="./settings/handler/debug.js"></script>
   <script src="./settings/handler/general.js"></script>
   <script src="./settings/handler/market.js"></script>
+  <script src="./settings/handler/market.init.js"></script>
   <script src="./settings/handler/plugin.js"></script>
   <script src="./settings/handler/profile.js"></script>
   <script src="./settings/main.js"></script>

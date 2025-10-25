@@ -21,8 +21,14 @@ function maybeClose() {
 function startQuoteCountdownFromText(text) {
   if (countdownStarted) return;
   countdownStarted = true;
-  const len = String(text || '').replace(/\s+/g, '').length;
-  const durationMs = Math.max(0, len * 200); // 每字0.2秒
+  const clean = String(text || '').replace(/\s+/g, '');
+  let english = 0, chinese = 0, other = 0;
+  for (const ch of clean) {
+    if (/[A-Za-z]/.test(ch)) english++;
+    else if (/[\u4e00-\u9fff]/.test(ch)) chinese++;
+    else other++;
+  }
+  const durationMs = Math.max(0, english * 120 + chinese * 200 + other * 200);
   // 启动倒计时（加载期间也在跑）
   countdownEndAt = Date.now() + durationMs;
   const update = () => {
@@ -83,6 +89,46 @@ async function loadQuote() {
       const resp = await fetch(url);
       const data = await resp.json();
       const txt = `「${data.hitokoto}」—— ${data.from || ''}`;
+      if (showQuote && quoteEl) quoteEl.textContent = txt;
+      await window.splashAPI.configSet('system', 'lastQuote', txt);
+      if (showQuote) startQuoteCountdownFromText(txt);
+    } else if (source === 'engquote') {
+      const url = 'https://api.limeasy.cn/engquote/';
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const en = String(data?.text || '');
+      const cn = String(data?.chinese || '');
+      const rawOrigin = String(data?.source || data?.subject || '').trim();
+      const originNormalized = rawOrigin && rawOrigin.toLowerCase() !== 'null' ? rawOrigin : '';
+      const typeNum = Number(data?.type || 0);
+      const aiNote = typeNum === 1 ? '（英文为AI翻译）' : (typeNum === 2 ? '（中文为AI翻译）' : '');
+      const plain = `「${en}」${cn ? `\n【译】${cn}` : ''}${aiNote ? `\n${aiNote}` : ''}${originNormalized ? `\n${originNormalized}` : ''}`;
+      if (showQuote && quoteEl) {
+        quoteEl.innerHTML = `
+          <div class="quote-en">「${en}」</div>
+          ${cn ? `<div class=\"quote-cn\">【译】${cn}</div>` : ''}
+          ${aiNote ? `<div class=\"quote-note\">${aiNote}</div>` : ''}
+          ${originNormalized ? `<div class=\"quote-origin\">${originNormalized}</div>` : ''}
+        `;
+      }
+      await window.splashAPI.configSet('system', 'lastQuote', plain);
+      if (showQuote) startQuoteCountdownFromText(`${en} ${cn}`);
+    } else if (source === 'custom') {
+      const url = (await window.splashAPI.configGet('system', 'quoteApiUrl')) || 'https://v1.hitokoto.cn/';
+      const resp = await fetch(url);
+      let txt = '';
+      try {
+        const data = await resp.json();
+        if (data && typeof data === 'object') {
+          if (data.hitokoto) txt = `「${data.hitokoto}」—— ${data.from || ''}`;
+          else if (data.text) txt = `「${data.text}」—— ${data.from || ''}`;
+          else txt = JSON.stringify(data);
+        } else {
+          txt = String(data);
+        }
+      } catch {
+        txt = await resp.text();
+      }
       if (showQuote && quoteEl) quoteEl.textContent = txt;
       await window.splashAPI.configSet('system', 'lastQuote', txt);
       if (showQuote) startQuoteCountdownFromText(txt);

@@ -32,23 +32,48 @@ body {
   box-sizing: border-box;
 }
 
-/* 插件页面滚动条样式（与设置页保持一致） */
-.wrap::-webkit-scrollbar {
+/* 全局滚动条样式（统一定义） */
+.wrap::-webkit-scrollbar,
+#content::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar,
+.auto-list::-webkit-scrollbar,
+.auto-editor::-webkit-scrollbar,
+.profiles-table-wrap::-webkit-scrollbar,
+textarea::-webkit-scrollbar {
   width: 10px;
+  height: 10px;
 }
 
-.wrap::-webkit-scrollbar-track {
+.wrap::-webkit-scrollbar-track,
+#content::-webkit-scrollbar-track,
+.modal-body::-webkit-scrollbar-track,
+.auto-list::-webkit-scrollbar-track,
+.auto-editor::-webkit-scrollbar-track,
+.profiles-table-wrap::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.04);
   border-left: 1px solid var(--border);
 }
 
-.wrap::-webkit-scrollbar-thumb {
+.wrap::-webkit-scrollbar-thumb,
+#content::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb,
+.auto-list::-webkit-scrollbar-thumb,
+.auto-editor::-webkit-scrollbar-thumb,
+.profiles-table-wrap::-webkit-scrollbar-thumb,
+textarea::-webkit-scrollbar-thumb {
   background: rgba(64, 75, 88, 0.685);
   border: 1px solid rgba(72, 87, 107, 0.45);
   border-radius: 999px;
 }
 
-.wrap::-webkit-scrollbar-thumb:hover {
+.wrap::-webkit-scrollbar-thumb:hover,
+#content::-webkit-scrollbar-thumb:hover,
+.modal-body::-webkit-scrollbar-thumb:hover,
+.auto-list::-webkit-scrollbar-thumb:hover,
+.auto-editor::-webkit-scrollbar-thumb:hover,
+.profiles-table-wrap::-webkit-scrollbar-thumb:hover,
+textarea::-webkit-scrollbar-thumb:hover {
   background: rgba(69, 83, 90, 0.5);
 }
 
@@ -116,25 +141,7 @@ body {
   overflow-y: auto;
 }
 
-/* 自定义滚动条（Chromium/Electron） */
-#content::-webkit-scrollbar {
-  width: 10px;
-}
-
-#content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-left: 1px solid var(--border);
-}
-
-#content::-webkit-scrollbar-thumb {
-  background: rgba(64, 75, 88, 0.685);
-  border: 1px solid rgba(72, 87, 107, 0.45);
-  border-radius: 999px;
-}
-
-#content::-webkit-scrollbar-thumb:hover {
-  background: rgba(69, 83, 90, 0.5);
-}
+/* 滚动条样式统一至全局规则（见上方全局滚动条样式） */
 
 
 /* 拖拽安装区域 */
@@ -200,25 +207,7 @@ body {
   overflow-y: auto;
 }
 
-/* 选择动作对话框：滚动条与整体一致 */
-.modal-body::-webkit-scrollbar {
-  width: 10px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-left: 1px solid var(--border);
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background: rgba(64, 75, 88, 0.685);
-  border: 1px solid rgba(72, 87, 107, 0.45);
-  border-radius: 999px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(69, 83, 90, 0.5);
-}
+/* 滚动条样式统一至全局规则（见上方全局滚动条样式） */
 
 .modal-actions {
   display: flex;
@@ -363,7 +352,6 @@ main {
 .muted {
   color: var(--muted);
   font-size: 12px;
-  margin-bottom: 8px;
 }
 
 .array-list {
@@ -686,29 +674,7 @@ main {
   margin: 0 20px 20px 20px;
 }
 
-/* 左右滚动区保持与全局滚动条样式一致 */
-.auto-list::-webkit-scrollbar,
-.auto-editor::-webkit-scrollbar {
-  width: 10px;
-}
-
-.auto-list::-webkit-scrollbar-track,
-.auto-editor::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-left: 1px solid var(--border);
-}
-
-.auto-list::-webkit-scrollbar-thumb,
-.auto-editor::-webkit-scrollbar-thumb {
-  background: rgba(64, 75, 88, 0.685);
-  border: 1px solid rgba(72, 87, 107, 0.45);
-  border-radius: 999px;
-}
-
-.auto-list::-webkit-scrollbar-thumb:hover,
-.auto-editor::-webkit-scrollbar-thumb:hover {
-  background: rgba(69, 83, 90, 0.5);
-}
+/* 滚动条样式统一至全局规则（见上方全局滚动条样式） */
 
 /* --- 修复自动化页面隐藏与高度布局、优化样式（覆盖前面规则） --- */
 
@@ -1517,24 +1483,7 @@ label {
   z-index: 2;
 }
 
-/* 自定义横向滚动条样式，仅作用于表格容器 */
-.profiles-table-wrap::-webkit-scrollbar {
-  height: 10px;
-}
-
-.profiles-table-wrap::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-}
-
-.profiles-table-wrap::-webkit-scrollbar-thumb {
-  background: rgba(42, 53, 46, 0.35);
-  border-radius: 6px;
-}
-
-.profiles-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 82, 67, 0.5);
-}
+/* 滚动条样式统一至全局规则（见上方全局滚动条样式） */
 
 /* 限制档案管理页整体不出现页面级横向滚动，仅表格容器滚动 */
 #page-profiles .panel {
