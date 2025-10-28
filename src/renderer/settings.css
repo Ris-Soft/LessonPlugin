@@ -1261,6 +1261,16 @@ label {
   padding: 2px 6px;
 }
 
+/* 依赖满足/不满足标签样式 */
+.pill.ok {
+  background: rgba(46, 204, 113, 0.25);
+  border-color: rgba(46, 204, 113, 0.6);
+}
+.pill.danger {
+  background: rgba(231, 76, 60, 0.25);
+  border-color: rgba(231, 76, 60, 0.6);
+}
+
 .card-title .plugin-version {
   margin-left: 0px;
   vertical-align: middle;

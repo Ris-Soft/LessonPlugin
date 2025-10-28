@@ -39,6 +39,16 @@ async function main() {
         initDebugSettings();
       } else if (page === 'market') {
         initMarketPage();
+      } else if (page === 'plugins') {
+        (async () => {
+          try {
+            const container = document.getElementById('plugins');
+            const list = await fetchPlugins();
+            container.innerHTML = '';
+            const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+            filtered.forEach((p) => container.appendChild(renderPlugin(p)));
+          } catch {}
+        })();
       } else if (page === 'about') {
         initAboutPage();
       }
@@ -65,6 +75,16 @@ async function main() {
       initDebugSettings();
     } else if (page === 'market') {
       initMarketPage();
+    } else if (page === 'plugins') {
+      (async () => {
+        try {
+          const container = document.getElementById('plugins');
+          const list = await fetchPlugins();
+          container.innerHTML = '';
+          const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+          filtered.forEach((p) => container.appendChild(renderPlugin(p)));
+        } catch {}
+      })();
     } else if (page === 'about') {
       initAboutPage();
     }
@@ -170,25 +190,50 @@ async function main() {
       if (inspect?.ok) {
         const name = inspect.name || file.name.replace(/\.zip$/i, '');
         const author = (typeof inspect.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect.author || '未知作者');
-        const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : (Array.isArray(inspect.pluginDepends) ? inspect.pluginDepends : []);
+        const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : [];
         const depsObj = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
         const depNames = depsObj ? Object.keys(depsObj) : [];
-        const permissions = Array.isArray(inspect.permissions) ? inspect.permissions : [];
-        // 计算插件依赖的安装状态
+        // 计算插件依赖的安装状态（支持 name@version 范式）
         const list = await window.settingsAPI?.getPlugins?.();
-        const installedSet = new Set((Array.isArray(list) ? list : []).flatMap(p => [p.id, p.name]));
+        const installed = Array.isArray(list) ? list : [];
+        const parseVer = (v) => {
+          const m = String(v || '0.0.0').split('.').map(x => parseInt(x, 10) || 0);
+          return { m: m[0]||0, n: m[1]||0, p: m[2]||0 };
+        };
+        const cmp = (a, b) => {
+          if (a.m !== b.m) return a.m - b.m;
+          if (a.n !== b.n) return a.n - b.n;
+          return a.p - b.p;
+        };
+        const satisfies = (ver, range) => {
+          if (!range) return !!ver;
+          const v = parseVer(ver);
+          const r = String(range).trim();
+          const plain = r.replace(/^[~^]/, '');
+          const base = parseVer(plain);
+          if (r.startsWith('^')) return (v.m === base.m) && (cmp(v, base) >= 0);
+          if (r.startsWith('~')) return (v.m === base.m) && (v.n === base.n) && (cmp(v, base) >= 0);
+          if (r.startsWith('>=')) return cmp(v, parseVer(r.slice(2))) >= 0;
+          if (r.startsWith('>')) return cmp(v, parseVer(r.slice(1))) > 0;
+          if (r.startsWith('<=')) return cmp(v, parseVer(r.slice(2))) <= 0;
+          if (r.startsWith('<')) return cmp(v, parseVer(r.slice(1))) < 0;
+          // 精确匹配 x.y.z
+          const exact = parseVer(r);
+          return cmp(v, exact) === 0;
+        };
         const depPills = pluginDepends.map(d => {
-          const ok = installedSet.has(d);
-          return `<span class="pill small${ok ? '' : ' danger'}">${d}${ok ? '' : '（未安装）'}</span>`;
+          const [depName, depRange] = String(d).split('@');
+          const target = installed.find(pp => (pp.id === depName) || (pp.name === depName));
+          const ok = !!target && satisfies(target?.version, depRange);
+          const hint = !target ? '（未安装）' : (!satisfies(target?.version, depRange) ? `（版本不满足，已装${target?.version || '未知'}）` : '');
+          return `<span class="pill small${ok ? '' : ' danger'}">${depName}${depRange ? '@'+depRange : ''}${hint}</span>`;
         }).join(' ');
         const npmPills = depNames.map(k => `<span class="pill small">${k}</span>`).join(' ');
-        const permPills = permissions.length ? permissions.map(p => `<span class="pill small">${p}</span>`).join(' ') : '<span class="muted">无权限</span>';
         const msg = `
 将安装：${name}
 作者：${author}
 插件依赖：${pluginDepends.length ? pluginDepends.join('，') : '无'}
 NPM依赖：${depNames.length ? depNames.join('，') : '无'}
-权限：${permissions.length ? permissions.join('，') : '无'}
 `;
         const ok = await showConfirm(msg);
         if (!ok) return;
@@ -215,7 +260,11 @@ NPM依赖：${depNames.length ? depNames.join('，') : '无'}
     const metaAuthor = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
     const depsObj = (typeof res.npmDependencies === 'object' && res.npmDependencies) ? res.npmDependencies : null;
     const depNames = depsObj ? Object.keys(depsObj) : [];
-    await showAlert(`安装成功：${res.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`);
+    await showAlertWithLogs(
+      '安装完成',
+      `安装成功：${res.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`,
+      Array.isArray(res?.logs) ? res.logs : []
+    );
     // 重新刷新插件列表（仅显示包含动作的插件）
     const container = document.getElementById('plugins');
     const list = await fetchPlugins();

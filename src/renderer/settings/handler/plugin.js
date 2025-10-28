@@ -48,11 +48,10 @@ function renderPlugin(item) {
     </div>
   `;
 
-  const checkbox = el.querySelector('input[type="checkbox"]');
-  checkbox.addEventListener('change', async (e) => {
-    const key = item.id || item.name;
-    await window.settingsAPI?.togglePlugin(key, e.target.checked);
-  });
+  // 初始根据启用状态禁用/启用动作按钮
+  try {
+    el.querySelectorAll('.action-btn').forEach((btn) => { btn.disabled = !item.enabled; });
+  } catch {}
 
   // 开发环境：追加“重载”按钮
   try {
@@ -201,20 +200,44 @@ function renderPlugin(item) {
       const checked = !!e.target.checked;
       const key = item.id || item.name;
       if (checked) {
-        // 启用前检查 pluginDepends 是否满足
+        // 启用前检查 dependencies 是否满足（支持 name@version 范式）
         const list = await fetchPlugins();
-        const depends = Array.isArray(item.pluginDepends) ? item.pluginDepends : [];
-        const missing = [];
+        const depends = Array.isArray(item.dependencies) ? item.dependencies : (Array.isArray(item.pluginDepends) ? item.pluginDepends : []);
+        const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
+        const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
+        const satisfies = (ver, range) => {
+          if (!range) return !!ver;
+          const v = parseVer(ver);
+          const r = String(range).trim();
+          const plain = r.replace(/^[~^]/, '');
+          const base = parseVer(plain);
+          if (r.startsWith('^')) return (v.m === base.m) && (cmp(v, base) >= 0);
+          if (r.startsWith('~')) return (v.m === base.m) && (v.n === base.n) && (cmp(v, base) >= 0);
+          if (r.startsWith('>=')) return cmp(v, parseVer(r.slice(2))) >= 0;
+          if (r.startsWith('>')) return cmp(v, parseVer(r.slice(1))) > 0;
+          if (r.startsWith('<=')) return cmp(v, parseVer(r.slice(2))) <= 0;
+          if (r.startsWith('<')) return cmp(v, parseVer(r.slice(1))) < 0;
+          const exact = parseVer(r);
+          return cmp(v, exact) === 0;
+        };
+        const problems = [];
         for (const d of depends) {
-          const target = list.find(pp => (pp.id === d) || (pp.name === d));
-          if (!target || !target.enabled) missing.push(d);
+          const [depName, depRange] = String(d).split('@');
+          const target = list.find(pp => (pp.id === depName) || (pp.name === depName));
+          if (!target || !target.enabled) { problems.push(`${depName}（未安装或未启用）`); continue; }
+          if (!satisfies(target.version, depRange)) { problems.push(`${depName}（版本不满足，已装${target.version || '未知'}）`); }
         }
-        if (missing.length) {
-          const ok = await showConfirm(`该插件依赖以下插件未安装或未启用：\n${missing.join('，')}\n仍要启用吗？`);
+        if (problems.length) {
+          const ok = await showConfirm(`该插件存在以下依赖问题：\n${problems.join('，')}\n仍要启用吗？`);
           if (!ok) { e.target.checked = false; return; }
         }
       }
-      await window.settingsAPI?.togglePlugin?.(key, checked);
+      const res = await window.settingsAPI?.togglePlugin?.(key, checked);
+      try { el.querySelectorAll('.action-btn').forEach((btn) => { btn.disabled = !checked; }); } catch {}
+      // 启用时显示初始化日志（若返回）
+      if (checked && Array.isArray(res?.logs) && res.logs.length) {
+        try { await showLogModal('插件初始化日志', res.logs); } catch {}
+      }
     } catch {}
   });
   return el;

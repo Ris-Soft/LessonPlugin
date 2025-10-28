@@ -1,4 +1,4 @@
-function showPluginAboutModal(pluginItem) {
+async function showPluginAboutModal(pluginItem) {
   const old = document.querySelector('.modal-overlay'); if (old) old.remove();
   const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
   const box = document.createElement('div'); box.className = 'modal-box plugin-about';
@@ -7,14 +7,17 @@ function showPluginAboutModal(pluginItem) {
   const body = document.createElement('div'); body.className = 'modal-body';
 
   const authorText = (() => {
-    const meta = pluginItem.author;
-    if (!meta) return '未知';
-    if (typeof meta === 'string') return meta;
-    const name = meta.name || meta.username || meta.id || '';
-    const link = meta.url || meta.link || meta.homepage || meta.repo || '';
-    const join = link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : name;
-    if (meta.email) return `${join} (${meta.email})`;
-    return join || '未知';
+    const a = pluginItem.author;
+    if (a === null || a === undefined) return '未知';
+    if (typeof a === 'string') return a;
+    if (typeof a === 'object') {
+      const name = a.name || a.username || a.id || '';
+      const link = a.url || a.link || a.homepage || a.repo || '';
+      const join = link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : name;
+      if (a.email) return `${join} (${a.email})`;
+      return join || '未知';
+    }
+    return String(a);
   })();
   const versionText = pluginItem.version || pluginItem.detectedVersion || '未知版本';
   const descText = pluginItem.description || '无描述';
@@ -51,21 +54,49 @@ function showPluginAboutModal(pluginItem) {
   // 依赖卡片
   const depsGroup = document.createElement('div'); depsGroup.className = 'section';
   const depsHeader = document.createElement('div'); depsHeader.className = 'section-title';
-  depsHeader.innerHTML = `<i class="ri-box-3-line"></i> 依赖项`;
+  depsHeader.innerHTML = `<i class=\"ri-git-repository-line\"></i> 插件依赖`;
   const chips = document.createElement('div'); chips.className = 'chips';
-  const deps = pluginItem.npmDependencies || pluginItem.dependencies || pluginItem.deps || null;
-  if (deps && typeof deps === 'object') {
-    Object.keys(deps).forEach((name) => {
-      const ver = deps[name];
-      const chip = document.createElement('span'); chip.className = 'chip';
-      chip.textContent = `${name}${ver ? '@' + ver : ''}`;
+  // 计算依赖满足状态（插件依赖为数组，NPM 依赖为对象）
+  let installedList = [];
+  try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch {}
+  const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
+  const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
+  const satisfies = (ver, range) => {
+    if (!range) return !!ver; const v=parseVer(ver); const r=String(range).trim(); const plain=r.replace(/^[~^]/,''); const base=parseVer(plain);
+    if (r.startsWith('^')) return (v.m===base.m) && (cmp(v,base)>=0);
+    if (r.startsWith('~')) return (v.m===base.m) && (v.n===base.n) && (cmp(v,base)>=0);
+    if (r.startsWith('>=')) return cmp(v, parseVer(r.slice(2)))>=0;
+    if (r.startsWith('>')) return cmp(v, parseVer(r.slice(1)))>0;
+    if (r.startsWith('<=')) return cmp(v, parseVer(r.slice(2)))<=0;
+    if (r.startsWith('<')) return cmp(v, parseVer(r.slice(1)))<0;
+    const exact=parseVer(r); return cmp(v, exact)===0;
+  };
+  const pluginDeps = Array.isArray(pluginItem.dependencies) ? pluginItem.dependencies : (Array.isArray(pluginItem.pluginDepends) ? pluginItem.pluginDepends : []);
+  if (pluginDeps.length) {
+    pluginDeps.forEach((d) => {
+      const [depName, depRange] = String(d).split('@');
+      const target = installedList.find(pp => (pp.id === depName) || (pp.name === depName));
+      const ok = !!target && satisfies(target?.version, depRange);
+      const icon = ok ? 'ri-check-line' : 'ri-close-line';
+      const cls = ok ? 'pill small ok' : 'pill small danger';
+      const chip = document.createElement('span'); chip.className = cls;
+      // 按需移除文本提示，仅保留图标与名称@版本范围
+      chip.innerHTML = `<i class=\"${icon}\"></i> ${depName}${depRange ? '@'+depRange : ''}`;
       chips.appendChild(chip);
     });
   } else {
-    const chip = document.createElement('span'); chip.className = 'chip'; chip.textContent = '无'; chips.appendChild(chip);
+    const chip = document.createElement('span'); chip.className = 'pill small muted'; chip.textContent = '无依赖'; chips.appendChild(chip);
   }
+  // 将标题与标签容器加入依赖分组
   depsGroup.appendChild(depsHeader);
   depsGroup.appendChild(chips);
+  // NPM 依赖（对象名列表）
+  const npmGroup = document.createElement('div'); npmGroup.className = 'section';
+  const npmHeader = document.createElement('div'); npmHeader.className = 'section-title'; npmHeader.innerHTML = `<i class=\"ri-box-3-line\"></i> NPM 依赖`;
+  const npmChips = document.createElement('div'); npmChips.className = 'chips';
+  const npmDeps = (pluginItem && typeof pluginItem.npmDependencies === 'object' && pluginItem.npmDependencies) ? pluginItem.npmDependencies : null;
+  if (npmDeps) { Object.keys(npmDeps).forEach((name) => { const chip = document.createElement('span'); chip.className = 'pill small'; chip.textContent = name; npmChips.appendChild(chip); }); }
+  else { const chip = document.createElement('span'); chip.className = 'pill small muted'; chip.textContent = '无依赖'; npmChips.appendChild(chip); }
 
   const actions = document.createElement('div'); actions.className = 'modal-actions';
   const createBtn = document.createElement('button'); createBtn.className = 'btn'; createBtn.textContent = '创建快捷方式';
@@ -140,6 +171,9 @@ function showPluginAboutModal(pluginItem) {
 
   body.appendChild(infoGroup);
   body.appendChild(depsGroup);
+  npmGroup.appendChild(npmHeader);
+  npmGroup.appendChild(npmChips);
+  body.appendChild(npmGroup);
   box.appendChild(title);
   box.appendChild(body);
   actions.appendChild(createBtn);

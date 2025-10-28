@@ -110,25 +110,7 @@ async function initAutomationSettings() {
       `;
       const toggle = row.querySelector('input[type="checkbox"]');
       toggle.addEventListener('click', async (e) => {
-        try {
-          const enable = !!e.target.checked;
-          if (enable) {
-            // 启用前检查该自动化引用的插件是否存在并启用
-            const plugins = await window.settingsAPI?.getPlugins?.() || [];
-            const used = (it.actions || []).filter(a => a && (a.type === 'pluginAction' || a.type === 'pluginEvent'));
-            const missing = [];
-            used.forEach(a => {
-              const pid = a.pluginId;
-              const found = plugins.find(p => (p.id === pid) || (p.name === pid));
-              if (!found || !found.enabled) { missing.push(pid); }
-            });
-            if (missing.length) {
-              const ok = await showConfirm(`该自动化引用以下插件未安装或未启用：\n${missing.join('，')}\n仍要启用吗？`);
-              if (!ok) { e.target.checked = false; return; }
-            }
-          }
-          await window.settingsAPI?.automationToggle?.(it.id, enable);
-        } catch {}
+        await window.settingsAPI?.automationToggle?.(it.id, !!e.target.checked);
       });
       const delBtn = row.querySelector('.del');
       delBtn.addEventListener('click', async (e) => {
@@ -137,8 +119,8 @@ async function initAutomationSettings() {
         if (ok) {
           await window.settingsAPI?.automationRemove?.(it.id);
           renderList();
-          editorEl.innerHTML = '从左侧选择任务或新建';
-          editorEl.className = 'auto-editor muted';
+          editorEl.innerHTML = '<div class="auto-editor-empty">从左侧选择任务或新建</div>';
+          editorEl.className = 'auto-editor';
         }
       });
       row.addEventListener('click', () => renderEditor(it.id));
@@ -708,7 +690,9 @@ async function initAutomationSettings() {
       try {
         addBtn.disabled = true;
         const created = await window.settingsAPI?.automationCreate?.({ name: '新建自动化', source: 'user' });
-        if (created?.id) { await renderList(created.id); }
+        // automation:create 返回 { ok, item }，需使用 item.id 刷新并选中
+        const newId = created?.item?.id || created?.id;
+        await renderList(newId);
       } finally {
         addBtn.disabled = false;
       }
@@ -719,35 +703,35 @@ async function initAutomationSettings() {
 }
 
 window.AutomationView = window.AutomationView || {
-  renderTriggersHTML: function(trigs) {
+  renderTriggersHTML: function (trigs) {
     const arr = Array.isArray(trigs) ? trigs : [];
     if (!arr.length) return '<div class="muted">无触发条件</div>';
-    return '<ul>' + arr.map(function(t){
+    return '<ul>' + arr.map(function (t) {
       if (t.type === 'time') return `<li>时间：<code>${t.at || ''}</code></li>`;
       if (t.type === 'protocol') return `<li>协议：<code>${t.text || ''}</code></li>`;
       return `<li>${t.type || '未知'}</li>`;
     }).join('') + '</ul>';
   },
-  renderConditionsHTML: function(conds) {
+  renderConditionsHTML: function (conds) {
     const mode = (conds && conds.mode) === 'or' ? '或(OR)' : '且(AND)';
     const groups = (conds && Array.isArray(conds.groups)) ? conds.groups : [];
     if (!groups.length) return `<div class="muted">无条件（顶层: ${mode}）</div>`;
-    const htmlGroups = groups.map(function(g, gi){
+    const htmlGroups = groups.map(function (g, gi) {
       const gm = g.mode === 'or' ? '或(OR)' : '且(AND)';
       const items = Array.isArray(g.items) ? g.items : [];
-      const itemsHtml = items.map(function(c){
+      const itemsHtml = items.map(function (c) {
         const neg = c.negate ? '<span class="pill small danger">反</span> ' : '';
         const value = (c.value !== undefined) ? JSON.stringify(c.value) : '';
         return `<li>${neg}${c.type || '未知'} ${value ? `<code>${value}</code>` : ''}</li>`;
       }).join('');
-      return `<div class="group"><div class="muted">条件组${gi+1}（${gm}）</div><ul>${itemsHtml || '<li>空</li>'}</ul></div>`;
+      return `<div class="group"><div class="muted">条件组${gi + 1}（${gm}）</div><ul>${itemsHtml || '<li>空</li>'}</ul></div>`;
     }).join('');
     return `<div class="muted">顶层: ${mode}</div>${htmlGroups}`;
   },
-  renderActionsHTML: function(acts) {
+  renderActionsHTML: function (acts) {
     const arr = Array.isArray(acts) ? acts : [];
     if (!arr.length) return '<div class="muted">无执行动作</div>';
-    return '<ul>' + arr.map(function(a){
+    return '<ul>' + arr.map(function (a) {
       if (a.type === 'pluginEvent') return `<li>插件事件：<code>${a.pluginId || ''}</code> → <code>${a.event || ''}</code></li>`;
       if (a.type === 'pluginAction') return `<li>插件动作：<code>${a.pluginId || ''}</code> → <code>${a.target || a.action || ''}</code></li>`;
       if (a.type === 'power') return `<li>电源：<code>${a.op || ''}</code></li>`;
@@ -757,7 +741,7 @@ window.AutomationView = window.AutomationView || {
       return `<li>${a.type || '未知'}</li>`;
     }).join('') + '</ul>';
   },
-  renderSummaryHTML: function(autoJson) {
+  renderSummaryHTML: function (autoJson) {
     const trigCount = Array.isArray(autoJson?.triggers) ? autoJson.triggers.length : 0;
     const condGroupCount = (autoJson?.conditions && Array.isArray(autoJson.conditions.groups)) ? autoJson.conditions.groups.length : 0;
     const actCount = Array.isArray(autoJson?.actions) ? autoJson.actions.length : 0;

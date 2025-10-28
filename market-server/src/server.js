@@ -121,6 +121,16 @@ function readCatalogFromDirs() {
         if (fs.existsSync(f) && fs.statSync(f).isFile()) { readmePath = `/data/plugins/${id}/${name}`; break; }
       }
       const singularType = (type === 'plugins') ? 'plugin' : (type === 'components' ? 'component' : 'automation');
+      const depsRaw = info.dependencies;
+      const dependencies = (() => {
+        try {
+          if (Array.isArray(depsRaw)) return depsRaw;
+          if (depsRaw && typeof depsRaw === 'object') {
+            return Object.keys(depsRaw).map((k) => `${k}@${depsRaw[k]}`);
+          }
+          return undefined;
+        } catch { return undefined; }
+      })();
       const item = {
         id: info.id || id,
         type: singularType,
@@ -131,7 +141,8 @@ function readCatalogFromDirs() {
         icon: info.icon || 'ri-puzzle-line',
         categories,
         readme: readmePath,
-        dependencies: (info.dependencies && typeof info.dependencies === 'object') ? info.dependencies : undefined,
+        // 统一输出 dependencies 为字符串数组（name@range），便于前端直接展示
+        dependencies,
         zip: fs.existsSync(path.join(PLUGINS_DIR, id, 'plugin.zip')) ? `/data/plugins/${id}/plugin.zip` : undefined
       };
       // 不再从 plugins 目录产出 automation 类型

@@ -11,7 +11,7 @@ let pluginsRoot = '';
 let configPath = '';
 let manifest = { plugins: [] };
 let config = { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} };
-let nameToId = new Map(); // 兼容旧行为：允许通过中文名查找
+  let nameToId = new Map(); // 名称/原始ID/清洗ID -> 规范ID 映射
 let windows = [];
 let pluginWindows = new Map(); // pluginId -> BrowserWindow
 let apiRegistry = new Map(); // pluginId -> Set(functionName)
@@ -116,7 +116,7 @@ module.exports.init = function init(paths) {
       }
       if (!name) name = entry; // 回退到目录名
 
-      // 生成稳定 id：优先 meta.id，否则根据 name 生成 slug；若 slug 为空则回退到目录名或随机
+      // 生成稳定 id：优先 meta.id（清洗为规范），否则根据 name 生成 slug；若 slug 为空则回退到目录名或随机
       const rawId = String(meta.id || '').trim();
       const cleanId = rawId.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
       const slugFromName = String(name || '').toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
@@ -141,11 +141,17 @@ module.exports.init = function init(paths) {
         packages: Array.isArray(meta.packages) ? meta.packages : undefined,
         version: detectedVersion,
         studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
-        // pluginDepends 兼容：优先 meta.pluginDepends；其次 meta.dependencies 为数组视为插件依赖
-        pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : (Array.isArray(meta.dependencies) ? meta.dependencies : undefined),
-        permissions: Array.isArray(meta.permissions) ? meta.permissions : undefined
+        // 统一插件依赖为 dependencies（数组），兼容旧字段 pluginDepends
+        dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined)
       });
-      nameToId.set(name, id);
+      // 建立多路映射：name、原始id（可能含点号）、清洗id、规范id本身
+      try {
+        if (name) nameToId.set(String(name), id);
+        if (rawId) nameToId.set(String(rawId), id);
+        if (cleanId) nameToId.set(String(cleanId), id);
+        if (slugFromName) nameToId.set(String(slugFromName), id);
+        nameToId.set(String(id), id);
+      } catch {}
     }
   } catch {}
   config = readJsonSafe(configPath, { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} });
@@ -165,6 +171,19 @@ module.exports.init = function init(paths) {
   writeJsonSafe(configPath, config);
 };
 
+// 统一插件ID规范化：支持中文名、带点号ID、清洗后ID与规范ID
+function canonicalizePluginId(key) {
+  const s = String(key || '').trim();
+  if (!s) return s;
+  // 直接映射命中
+  if (nameToId.has(s)) return nameToId.get(s);
+  // 尝试清洗点号与非法字符
+  const normalized = s.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (nameToId.has(normalized)) return nameToId.get(normalized);
+  // 回退：若传入本就是规范ID则原样返回
+  return normalized || s;
+}
+
 module.exports.getPlugins = function getPlugins() {
   return manifest.plugins.map((p) => ({
     id: p.id,
@@ -179,14 +198,15 @@ module.exports.getPlugins = function getPlugins() {
     actions: Array.isArray(p.actions) ? p.actions : [],
     version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
     studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : [],
-    // 输出时兼容插件依赖来源（pluginDepends 或 dependencies 为数组）
-    pluginDepends: Array.isArray(p.pluginDepends) ? p.pluginDepends : (Array.isArray(p.dependencies) ? p.dependencies : undefined),
-    permissions: Array.isArray(p.permissions) ? p.permissions : undefined
+    // 输出标准插件依赖字段 dependencies（数组），兼容旧存储
+    dependencies: Array.isArray(p.dependencies) ? p.dependencies : (Array.isArray(p.pluginDepends) ? p.pluginDepends : undefined)
   }));
 };
 
 function findPluginByIdOrName(key) {
-  return manifest.plugins.find((p) => p.id === key || p.name === key);
+  const canon = canonicalizePluginId(key);
+  // 直接按规范ID匹配；同时兼容名称精确匹配
+  return manifest.plugins.find((p) => p.id === canon || p.name === key || p.name === canon);
 }
 
 // 新增：读取插件 README 文本（优先本地插件目录）
@@ -210,14 +230,103 @@ module.exports.getPluginReadme = function getPluginReadme(idOrName) {
   } catch { return null; }
 };
 
-module.exports.toggle = function toggle(idOrName, enabled) {
+module.exports.toggle = async function toggle(idOrName, enabled) {
   const p = findPluginByIdOrName(idOrName);
   if (!p) return { ok: false, error: 'not_found' };
+  const logs = [];
+  const canonId = p.id || p.name;
+  // 更新配置
   config.enabled[p.id] = !!enabled;
   // 兼容旧键
   config.enabled[p.name] = !!enabled;
   writeJsonSafe(configPath, config);
-  return { id: p.id, name: p.name, enabled: !!enabled };
+
+  try {
+    if (!enabled) {
+      logs.push(`[disable] 开始禁用插件 ${p.name}`);
+      // 清理事件订阅
+      try {
+        const winById = pluginWindows.get(p.id);
+        const winByName = pluginWindows.get(p.name);
+        const pluginWebContentsIds = [];
+        if (winById?.webContents?.id) pluginWebContentsIds.push(winById.webContents.id);
+        if (winByName?.webContents?.id && winByName !== winById) pluginWebContentsIds.push(winByName.webContents.id);
+        for (const [eventName, subscriberSet] of eventSubscribers.entries()) {
+          try { pluginWebContentsIds.forEach(id => subscriberSet.delete(id)); } catch {}
+          if (subscriberSet.size === 0) { try { eventSubscribers.delete(eventName); } catch {} }
+        }
+      } catch {}
+      try { apiRegistry.delete(canonId); logs.push('[disable] 已清理已注册 API'); } catch {}
+      try { functionRegistry.delete(canonId); logs.push('[disable] 已清理已注册函数'); } catch {}
+      try { automationEventRegistry.delete(canonId); logs.push('[disable] 已清理自动化事件'); } catch {}
+      // 关闭窗口
+      try {
+        const winById = pluginWindows.get(p.id);
+        const winByName = pluginWindows.get(p.name);
+        if (winById) {
+          try { if (winById.webContents && !winById.webContents.isDestroyed()) winById.webContents.destroy(); } catch {}
+          try { if (winById.destroy && !winById.isDestroyed()) winById.destroy(); } catch {}
+        }
+        if (winByName && winByName !== winById) {
+          try { if (winByName.webContents && !winByName.webContents.isDestroyed()) winByName.webContents.destroy(); } catch {}
+          try { if (winByName.destroy && !winByName.isDestroyed()) winByName.destroy(); } catch {}
+        }
+        pluginWindows.delete(p.id);
+        pluginWindows.delete(p.name);
+        logs.push('[disable] 已关闭相关窗口');
+      } catch {}
+      // 清理自动化触发器
+      try {
+        if (automationManagerRef) {
+          try { automationManagerRef.clearPluginMinuteTriggers(canonId); logs.push('[disable] 已清理分钟触发器'); } catch {}
+          try { if (typeof automationManagerRef.clearPluginTimers === 'function') automationManagerRef.clearPluginTimers(canonId); } catch {}
+        }
+      } catch {}
+      logs.push(`[disable] 插件 ${p.name} 已禁用`);
+    } else {
+      logs.push(`[enable] 开始启用插件 ${p.name}`);
+      const baseDir = p.local ? path.join(path.dirname(manifestPath), p.local) : null;
+      const modPath = baseDir ? path.resolve(baseDir, 'index.js') : null;
+      try { if (modPath) { delete require.cache[require.resolve(modPath)]; } } catch {}
+      if (modPath && fs.existsSync(modPath)) {
+        try {
+          const mod = require(modPath);
+          // 注册函数
+          const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
+          if (fnObj) {
+            if (!functionRegistry.has(p.id)) functionRegistry.set(p.id, new Map());
+            const map = functionRegistry.get(p.id);
+            for (const [fn, impl] of Object.entries(fnObj)) {
+              if (fn === 'actions') continue;
+              if (typeof impl === 'function') map.set(fn, impl);
+            }
+            logs.push('[enable] 已注册后端函数');
+          }
+          // 注册自动化事件
+          if (mod && Array.isArray(mod.automationEvents)) {
+            module.exports.registerAutomationEvents(p.id, mod.automationEvents);
+            logs.push('[enable] 已注册自动化事件');
+          }
+          // 执行 init
+          if (mod && typeof mod.init === 'function') {
+            logs.push(`[enable] 正在初始化 ${p.name} ...`);
+            try {
+              await Promise.resolve(mod.init(createPluginApi(p.id)));
+              logs.push(`[enable] 插件 ${p.name} 初始化完成`);
+            } catch (e) {
+              logs.push(`[enable] 插件 ${p.name} 初始化失败：${e?.message || e}`);
+            }
+          }
+        } catch (e) {
+          logs.push(`[enable] 启用失败：${e?.message || String(e)}`);
+        }
+      } else {
+        logs.push('[enable] 未找到本地入口 index.js，跳过注册/初始化');
+      }
+    }
+  } catch {}
+
+  return { ok: true, id: p.id, name: p.name, enabled: !!enabled, logs };
 };
 
 module.exports.loadPlugins = async function loadPlugins(onProgress) {
@@ -237,6 +346,13 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
     }
 
     if (p.local) {
+      const isEnabled = !!(config.enabled[p.id] ?? config.enabled[p.name]);
+      if (!isEnabled) {
+        status.stage = 'disabled';
+        status.message = '插件已禁用，跳过初始化';
+        onProgress && onProgress({ ...status });
+        continue;
+      }
       const localPath = path.resolve(path.dirname(manifestPath), p.local);
       if (fs.existsSync(localPath)) {
         status.stage = 'local';
@@ -678,9 +794,8 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       packages: Array.isArray(meta.packages) ? meta.packages : undefined,
       version: detectedVersion,
       studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
-      // pluginDepends 兼容：优先 meta.pluginDepends；其次 meta.dependencies 为数组视为插件依赖
-      pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : (Array.isArray(meta.dependencies) ? meta.dependencies : undefined),
-      permissions: Array.isArray(meta.permissions) ? meta.permissions : undefined
+      // 统一插件依赖为 dependencies（数组），兼容旧字段 pluginDepends
+      dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined)
     };
     if (existingIdx >= 0) {
       manifest.plugins[existingIdx] = updated;
@@ -696,6 +811,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
     }
 
     // 重新注册并初始化插件核心资源（functions、automationEvents），并执行插件自身 init
+    const logs = [];
     try {
       const modPath = path.resolve(finalDir, 'index.js');
       try { delete require.cache[require.resolve(modPath)]; } catch {}
@@ -714,6 +830,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
         // 注册自动化事件（若插件导出）
         if (mod && Array.isArray(mod.automationEvents)) {
           module.exports.registerAutomationEvents(pluginId, mod.automationEvents);
+          logs.push('[install] 已注册自动化事件');
         }
         // 执行插件初始化
         if (mod && typeof mod.init === 'function') {
@@ -721,14 +838,16 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
             progressReporter && progressReporter({ stage: 'plugin:init', message: `初始化插件 ${pluginName}...` });
             await Promise.resolve(mod.init(createPluginApi(pluginId)));
             progressReporter && progressReporter({ stage: 'plugin:init', message: `插件 ${pluginName} 初始化完成` });
+            logs.push(`[install] 插件 ${pluginName} 初始化完成`);
           } catch (e) {
             progressReporter && progressReporter({ stage: 'plugin:error', message: `插件 ${pluginName} 初始化失败：${e?.message || e}` });
+            logs.push(`[install] 插件 ${pluginName} 初始化失败：${e?.message || e}`);
           }
         }
       }
     } catch {}
 
-    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined };
+    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined, logs };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -736,7 +855,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
 // -------- 插件 API / 事件总线 --------
 module.exports.registerFunctions = function registerFunctions(pluginId, functions, senderWC) {
-  const canonId = nameToId.get(pluginId) || pluginId;
+  const canonId = canonicalizePluginId(pluginId);
   if (!apiRegistry.has(canonId)) apiRegistry.set(canonId, new Set());
   const set = apiRegistry.get(canonId);
   for (const fn of functions) set.add(fn);
@@ -751,7 +870,7 @@ module.exports.registerFunctions = function registerFunctions(pluginId, function
 
 // 自动化事件注册/查询
 module.exports.registerAutomationEvents = function registerAutomationEvents(pluginId, events) {
-  const canonId = nameToId.get(pluginId) || pluginId;
+  const canonId = canonicalizePluginId(pluginId);
   if (!Array.isArray(events)) return { ok: false, error: 'events_invalid' };
   const filtered = events.filter((e) => e && e.expose !== false).map((e) => ({
     id: e.id || e.name,
@@ -763,13 +882,13 @@ module.exports.registerAutomationEvents = function registerAutomationEvents(plug
   return { ok: true, count: filtered.length };
 };
 module.exports.listAutomationEvents = function listAutomationEvents(pluginId) {
-  const canonId = nameToId.get(pluginId) || pluginId;
+  const canonId = canonicalizePluginId(pluginId);
   return { ok: true, events: automationEventRegistry.get(canonId) || [] };
 };
 
 module.exports.callFunction = function callFunction(targetPluginId, fnName, args) {
   return new Promise(async (resolve) => {
-    const canonId = nameToId.get(targetPluginId) || targetPluginId;
+    const canonId = canonicalizePluginId(targetPluginId);
     // 优先主进程注册的函数，无需窗口
     const fnMap = functionRegistry.get(canonId);
     if (fnMap && fnMap.has(fnName)) {
@@ -910,9 +1029,15 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
       packages: meta.packages,
       version: detectedVersion,
       studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
-      // pluginDepends 兼容：优先 meta.pluginDepends；其次 meta.dependencies 为数组视为插件依赖
-      pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : (Array.isArray(meta.dependencies) ? meta.dependencies : undefined),
-      permissions: Array.isArray(meta.permissions) ? meta.permissions : undefined
+      // 统一插件依赖为 dependencies（数组），兼容旧字段 pluginDepends；同时支持对象形式 { name: range }
+      dependencies: (() => {
+        if (Array.isArray(meta.dependencies)) return meta.dependencies;
+        if (typeof meta.dependencies === 'object' && meta.dependencies) {
+          try { return Object.keys(meta.dependencies).map(k => `${k}@${meta.dependencies[k]}`); } catch {}
+        }
+        if (Array.isArray(meta.pluginDepends)) return meta.pluginDepends;
+        return undefined;
+      })()
     };
     try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
     return info;
@@ -924,10 +1049,14 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
 module.exports.listDependents = function listDependents(idOrName) {
   try {
     const canonId = nameToId.get(idOrName) || idOrName;
-    // 依赖此插件的其他插件（按 pluginDepends 声明）
+    // 依赖此插件的其他插件（按 dependencies 声明，支持 name@version 形式）
     const pluginDeps = (manifest.plugins || []).filter((p) => {
-      const deps = Array.isArray(p.pluginDepends) ? p.pluginDepends : (Array.isArray(p.dependencies) ? p.dependencies : []);
-      return deps.some((d) => (d === canonId) || (d === p.name) || (nameToId.get(d) === canonId));
+      const deps = Array.isArray(p.dependencies) ? p.dependencies : (Array.isArray(p.pluginDepends) ? p.pluginDepends : []);
+      return deps.some((d) => {
+        const base = String(d).split('@')[0].trim();
+        const targetCanon = nameToId.get(base) || base;
+        return targetCanon === canonId;
+      });
     }).map((p) => ({ id: p.id, name: p.name }));
     // 引用此插件的自动化（actions 中包含 pluginAction 或 pluginEvent 的 pluginId）
     const autos = [];

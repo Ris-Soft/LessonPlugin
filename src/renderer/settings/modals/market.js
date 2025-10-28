@@ -1,4 +1,4 @@
-function showStorePluginModal(item) {
+async function showStorePluginModal(item) {
   const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
   const box = document.createElement('div'); box.className = 'modal-box market-plugin';
   const title = document.createElement('div'); title.className = 'modal-title';
@@ -23,9 +23,33 @@ function showStorePluginModal(item) {
 
   const depsObj = (item && typeof item.npmDependencies === 'object' && item.npmDependencies) ? item.npmDependencies : null;
   const depsKeys = depsObj ? Object.keys(depsObj) : [];
-  const depsHtml = depsKeys.length
+  const npmDepsHtml = depsKeys.length
     ? depsKeys.slice(0, 6).map(k => `<span class="pill small">${k}</span>`).join(' ') + (depsKeys.length > 6 ? ` <span class="pill small muted">+${depsKeys.length - 6}</span>` : '')
     : '<span class="muted">无依赖</span>';
+  // 依赖满足状态：获取已安装插件列表并进行版本对比
+  let installedList = [];
+  try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch {}
+  const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
+  const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
+  const satisfies = (ver, range) => {
+    if (!range) return !!ver; const v=parseVer(ver); const r=String(range).trim(); const plain=r.replace(/^[~^]/,''); const base=parseVer(plain);
+    if (r.startsWith('^')) return (v.m===base.m) && (cmp(v,base)>=0);
+    if (r.startsWith('~')) return (v.m===base.m) && (v.n===base.n) && (cmp(v,base)>=0);
+    if (r.startsWith('>=')) return cmp(v, parseVer(r.slice(2)))>=0;
+    if (r.startsWith('>')) return cmp(v, parseVer(r.slice(1)))>0;
+    if (r.startsWith('<=')) return cmp(v, parseVer(r.slice(2)))<=0;
+    if (r.startsWith('<')) return cmp(v, parseVer(r.slice(1)))<0;
+    const exact=parseVer(r); return cmp(v, exact)===0;
+  };
+  const pluginDepsArray = Array.isArray(item.dependencies) ? item.dependencies : [];
+  const pluginDepsHtml = pluginDepsArray.length ? pluginDepsArray.slice(0, 6).map(d => {
+    const [depName, depRange] = String(d).split('@');
+    const target = installedList.find(pp => (pp.id === depName) || (pp.name === depName));
+    const ok = !!target && satisfies(target?.version, depRange);
+    const icon = ok ? 'ri-check-line' : 'ri-close-line';
+    const cls = ok ? 'pill small ok' : 'pill small danger';
+    return `<span class="${cls}"><i class="${icon}"></i> ${depName}${depRange ? '@'+depRange : ''}</span>`;
+  }).join(' ') + (pluginDepsArray.length > 6 ? ` <span class="pill small muted">+${pluginDepsArray.length - 6}</span>` : '') : '<span class="muted">无依赖</span>';
 
   const readmeBox = document.createElement('div'); readmeBox.className = 'modal-readme';
   readmeBox.style.overflowX = 'hidden';
@@ -43,8 +67,10 @@ function showStorePluginModal(item) {
       <div class=\"setting-action\"></div>
     </div>
     <br>
-    <div class=\"section-title\"><i class=\"ri-git-repository-line\"></i> 依赖</div>
-    <div>${depsHtml}</div>
+    <div class=\"section-title\"><i class=\"ri-git-repository-line\"></i> 插件依赖</div>
+    <div>${pluginDepsHtml}</div>
+    <div class=\"section-title\" style=\"margin-top:8px;\"><i class=\"ri-box-3-line\"></i> NPM 依赖</div>
+    <div>${npmDepsHtml}</div>
     <div class=\"section-title\" style=\"margin-top:12px;\"><i class=\"ri-file-text-line\"></i> 插件说明</div>
   `;
   body.appendChild(readmeBox);
@@ -182,20 +208,262 @@ function showStorePluginModal(item) {
             try {
               const inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf));
               if (inspect?.ok) {
-                const author = (typeof inspect.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect.author || '未知作者');
-                const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : (Array.isArray(inspect.pluginDepends) ? inspect.pluginDepends : []);
-                const depsObj = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
-                const depNames = depsObj ? Object.keys(depsObj) : [];
-                const permissions = Array.isArray(inspect.permissions) ? inspect.permissions : [];
-                const msg = `将安装：${inspect.name || item.name}\n作者：${author}\n插件依赖：${pluginDepends.length ? pluginDepends.join('，') : '无'}\nNPM依赖：${depNames.length ? depNames.join('，') : '无'}\n权限：${permissions.length ? permissions.join('，') : '无'}\n是否继续？`;
-                const ok = await showConfirm(msg);
-                if (!ok) { actionBtn.disabled = false; actionBtn.innerHTML = '<i class=\"ri-download-2-line\"></i> 安装'; return; }
+                // 美化安装确认弹窗：展示作者、插件依赖状态与 NPM 依赖
+                const installedList = await window.settingsAPI?.getPlugins?.();
+                const installed = Array.isArray(installedList) ? installedList : [];
+                const normalizeAuthor = (a) => {
+                  if (a === null || a === undefined) return null;
+                  if (typeof a === 'object') return a?.name || null;
+                  return String(a);
+                };
+                const authorVal = normalizeAuthor(inspect?.author) || normalizeAuthor(item?.author) || '未知作者';
+                const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : (Array.isArray(item.dependencies) ? item.dependencies : []);
+                const depsObjZip = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
+                const depNames = depsObjZip ? Object.keys(depsObjZip) : [];
+
+                const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
+                const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
+                const satisfies = (ver, range) => {
+                  if (!range) return !!ver;
+                  const v = parseVer(ver);
+                  const r = String(range).trim();
+                  const plain = r.replace(/^[~^]/, '');
+                  const base = parseVer(plain);
+                  if (r.startsWith('^')) return (v.m === base.m) && (cmp(v, base) >= 0);
+                  if (r.startsWith('~')) return (v.m === base.m) && (v.n === base.n) && (cmp(v, base) >= 0);
+                  if (r.startsWith('>=')) return cmp(v, parseVer(r.slice(2))) >= 0;
+                  if (r.startsWith('>')) return cmp(v, parseVer(r.slice(1))) > 0;
+                  if (r.startsWith('<=')) return cmp(v, parseVer(r.slice(2))) <= 0;
+                  if (r.startsWith('<')) return cmp(v, parseVer(r.slice(1))) < 0;
+                  const exact = parseVer(r); return cmp(v, exact) === 0;
+                };
+                const depPills = pluginDepends.map(d => {
+                  const [depName, depRange] = String(d).split('@');
+                  const target = installed.find(pp => (pp.id === depName) || (pp.name === depName));
+                  const ok = !!target && satisfies(target?.version, depRange);
+                  const icon = ok ? 'ri-check-line' : 'ri-close-line';
+                  const cls = ok ? 'pill small ok' : 'pill small danger';
+                  return `<span class="${cls}"><i class="${icon}"></i> ${depName}${depRange ? '@'+depRange : ''}</span>`;
+                }).join(' ');
+                const hasUnsatisfied = pluginDepends.some(d => {
+                  const [depName, depRange] = String(d).split('@');
+                  const target = installed.find(pp => (pp.id === depName) || (pp.name === depName));
+                  return !(!!target && satisfies(target?.version, depRange));
+                });
+                const npmPills = depNames.map(k => `<span class="pill small">${k}</span>`).join(' ');
+
+                // 依赖安装引导弹窗（多选，可忽略不安装；展示含上级依赖）
+                const catalog = Array.isArray(window.__marketCatalog__) ? window.__marketCatalog__ : [];
+                const findMarketItem = (name) => catalog.find((x) => (x.id === name) || (x.name === name));
+                const resolveClosure = (deps) => {
+                  const seen = new Set();
+                  const out = [];
+                  const queue = deps.slice();
+                  while (queue.length) {
+                    const raw = queue.shift();
+                    const [depName, depRange] = String(raw).split('@');
+                    const key = depName.trim();
+                    if (!key || seen.has(key)) continue;
+                    seen.add(key);
+                    const mi = findMarketItem(key) || null;
+                    out.push({ name: key, range: depRange || '', market: mi });
+                    const next = Array.isArray(mi?.dependencies) ? mi.dependencies.slice() : [];
+                    queue.push(...next);
+                  }
+                  return out;
+                };
+                const closure = resolveClosure(pluginDepends);
+                const guideOverlay = document.createElement('div'); guideOverlay.className = 'modal-overlay';
+                const guideBox = document.createElement('div'); guideBox.className = 'modal-box';
+                const guideTitle = document.createElement('div'); guideTitle.className = 'modal-title';
+                guideTitle.innerHTML = `<i class="${item.icon || 'ri-puzzle-line'}"></i> 依赖安装引导 — ${inspect.name || item.name}`;
+                const guideBody = document.createElement('div'); guideBody.className = 'modal-body';
+                const tipEl = document.createElement('div'); tipEl.className = 'muted'; tipEl.textContent = '可忽略不安装：未选择的依赖将跳过安装';
+                guideBody.innerHTML = `
+                  <div class="setting-item">
+                    <div class="setting-icon"><i class="${item.icon || 'ri-puzzle-line'}"></i></div>
+                    <div class="setting-main">
+                      <div class="setting-title">${inspect.name || item.name}</div>
+                      <div class="setting-desc">作者：${authorVal}</div>
+                    </div>
+                  </div>
+                  <br>
+                  <div class="section-title"><i class="ri-git-repository-line"></i> 需要安装的依赖（含上级依赖）</div>
+                `;
+                guideBody.appendChild(tipEl);
+                const listEl = document.createElement('div'); listEl.style.display='grid'; listEl.style.gridTemplateColumns='1fr'; listEl.style.gap='8px';
+                const inputs = [];
+                closure.forEach((d) => {
+                  const target = installed.find(pp => (pp.id === d.name) || (pp.name === d.name));
+                  const ok2 = !!target && satisfies(target?.version, d.range);
+                  const row = document.createElement('label'); row.style.display='flex'; row.style.alignItems='center'; row.style.gap='8px';
+                  const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.depName=d.name; cb.dataset.depRange=d.range||'';
+                  const found = !!d.market;
+                  cb.disabled = ok2 || !found;
+                  cb.checked = found && !ok2;
+                  const status = ok2 ? '<span class="pill small ok">已安装</span>' : (found ? '<span class="pill small">可安装</span>' : '<span class="pill small danger">未在市场找到</span>');
+                  row.innerHTML = `
+                    <span>${d.name}${d.range ? '@'+d.range : ''}</span>
+                    ${status}
+                  `;
+                  row.insertBefore(cb, row.firstChild);
+                  listEl.appendChild(row);
+                  inputs.push(cb);
+                });
+                guideBody.appendChild(listEl);
+                const guideActions = document.createElement('div'); guideActions.style.display='flex'; guideActions.style.justifyContent='flex-end'; guideActions.style.gap='8px'; guideActions.style.marginTop='12px';
+                const btnCancel = document.createElement('button'); btnCancel.className='btn secondary'; btnCancel.innerHTML='<i class="ri-close-line"></i> 取消';
+                const btnSkip = document.createElement('button'); btnSkip.className='btn secondary'; btnSkip.innerHTML='<i class="ri-skip-forward-line"></i> 跳过';
+                const btnNext = document.createElement('button'); btnNext.className='btn primary'; btnNext.innerHTML='<i class="ri-arrow-right-line"></i> 下一步';
+                guideActions.appendChild(btnCancel); guideActions.appendChild(btnSkip); guideActions.appendChild(btnNext);
+                guideOverlay.appendChild(guideBox); guideBox.appendChild(guideTitle); guideBox.appendChild(guideBody); guideBody.appendChild(guideActions);
+                document.body.appendChild(guideOverlay);
+                const waitGuide = await new Promise((resolve)=>{
+                  btnCancel.addEventListener('click', ()=>{ try{guideOverlay.remove();}catch{} resolve({ proceed:false, selected:[] }); });
+                  btnSkip.addEventListener('click', ()=>{ try{guideOverlay.remove();}catch{} resolve({ proceed:true, selected:[] }); });
+                  btnNext.addEventListener('click', ()=>{
+                    const selected = inputs.filter(i=>i.checked && !i.disabled).map(i=>{
+                      const mi = findMarketItem(i.dataset.depName);
+                      return { name: i.dataset.depName, range: i.dataset.depRange, market: mi };
+                    });
+                    try{guideOverlay.remove();}catch{}
+                    resolve({ proceed:true, selected });
+                  });
+                });
+                if (!waitGuide.proceed) { actionBtn.disabled = false; actionBtn.innerHTML = '<i class="ri-download-2-line"></i> 安装'; return; }
+                if (waitGuide.selected.length) {
+                  const ok3 = await showConfirm(`将先安装以下依赖，再安装插件：\n- ${waitGuide.selected.map(s=>s.name+(s.range?('@'+s.range):'')).join('\n- ')}`);
+                  if (!ok3) { actionBtn.disabled = false; actionBtn.innerHTML = '<i class="ri-download-2-line"></i> 安装'; return; }
+                  const base2 = await (async () => {
+                    try { const svc = await window.settingsAPI?.configGet?.('system', 'serviceBase'); if (typeof svc === 'string' && svc) return svc; const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase'); return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/'; } catch { return 'http://localhost:3030/'; }
+                  })();
+                  for (const s of waitGuide.selected) {
+                    try {
+                      if (s.market?.zip) {
+                        const url2 = new URL(s.market.zip, base2).toString();
+                        const res2 = await fetch(url2); if (!res2.ok) throw new Error('ZIP 下载失败');
+                        const buf2 = await res2.arrayBuffer();
+                        const name2 = s.market.id ? `${s.market.id}.zip` : `${s.market.name || 'plugin'}.zip`;
+                        const out2 = await window.settingsAPI?.installPluginZipData?.(name2, new Uint8Array(buf2)); if (!out2?.ok) throw new Error(out2?.error || '安装失败');
+                      } else if (s.market?.npm) {
+                        const res3 = await window.settingsAPI?.installNpm?.(s.market.npm || s.market.id || s.market.name); if (!res3?.ok) throw new Error(res3?.error || '安装失败');
+                      } else {
+                        await showAlert(`依赖缺少安装源：${s.name}`);
+                      }
+                    } catch (e) {
+                      await showAlert(`依赖安装失败：${s.name} — ${e?.message || '未知错误'}`);
+                    }
+                  }
+                }
               }
             } catch {}
             const out = await window.settingsAPI?.installPluginZipData?.(name, new Uint8Array(buf));
             if (!out?.ok) throw new Error(out?.error || '安装失败');
-            await showAlert('安装完成');
+            const metaAuthor = (typeof out.author === 'object') ? (out.author?.name || JSON.stringify(out.author)) : (out.author || '未知作者');
+            const depsObj = (typeof out.npmDependencies === 'object' && out.npmDependencies) ? out.npmDependencies : null;
+            const depNames = depsObj ? Object.keys(depsObj) : [];
+            await showAlertWithLogs(
+              '安装完成',
+              `安装成功：${out.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`,
+              Array.isArray(out?.logs) ? out.logs : []
+            );
           } else {
+            // NPM 安装前引导依赖选择
+            const installedList2 = await window.settingsAPI?.getPlugins?.();
+            const installed2 = Array.isArray(installedList2) ? installedList2 : [];
+            const pluginDepends2 = Array.isArray(item.dependencies) ? item.dependencies : [];
+            const hasUnsatisfied2 = pluginDepends2.some(d => {
+              const [depName, depRange] = String(d).split('@');
+              const target = installed2.find(pp => (pp.id === depName) || (pp.name === depName));
+              return !(!!target && satisfies(target?.version, depRange));
+            });
+            if (hasUnsatisfied2) {
+              const catalog2 = Array.isArray(window.__marketCatalog__) ? window.__marketCatalog__ : [];
+              const findMarketItem2 = (name) => catalog2.find((x) => (x.id === name) || (x.name === name));
+              const resolveClosure2 = (deps) => {
+                const seen = new Set(); const out = []; const queue = deps.slice();
+                while (queue.length) {
+                  const raw = queue.shift(); const [depName, depRange] = String(raw).split('@');
+                  const key2 = depName.trim(); if (!key2 || seen.has(key2)) continue; seen.add(key2);
+                  const mi = findMarketItem2(key2) || null; out.push({ name: key2, range: depRange || '', market: mi });
+                  const next = Array.isArray(mi?.dependencies) ? mi.dependencies.slice() : []; queue.push(...next);
+                }
+                return out;
+              };
+              const closure2 = resolveClosure2(pluginDepends2);
+              const guideOverlay2 = document.createElement('div'); guideOverlay2.className = 'modal-overlay';
+              const guideBox2 = document.createElement('div'); guideBox2.className = 'modal-box';
+              const guideTitle2 = document.createElement('div'); guideTitle2.className = 'modal-title';
+              guideTitle2.innerHTML = `<i class="${item.icon || 'ri-puzzle-line'}"></i> 依赖安装引导 — ${item.name}`;
+              const guideBody2 = document.createElement('div'); guideBody2.className = 'modal-body';
+              const tipEl2 = document.createElement('div'); tipEl2.className = 'muted'; tipEl2.textContent = '可忽略不安装：未选择的依赖将跳过安装';
+              guideBody2.innerHTML = `
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="${item.icon || 'ri-puzzle-line'}"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">${item.name}</div>
+                    <div class="setting-desc">作者：${authorText}</div>
+                  </div>
+                </div>
+                <br>
+                <div class="section-title"><i class="ri-git-repository-line"></i> 需要安装的依赖（含上级依赖）</div>
+              `;
+              guideBody2.appendChild(tipEl2);
+              const listEl2 = document.createElement('div'); listEl2.style.display='grid'; listEl2.style.gridTemplateColumns='1fr'; listEl2.style.gap='8px';
+              const inputs2 = [];
+              closure2.forEach((d) => {
+                const target = installed2.find(pp => (pp.id === d.name) || (pp.name === d.name));
+                const ok2 = !!target && satisfies(target?.version, d.range);
+                const row = document.createElement('label'); row.style.display='flex'; row.style.alignItems='center'; row.style.gap='8px';
+                const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.depName=d.name; cb.dataset.depRange=d.range||'';
+                const found = !!d.market; cb.disabled = ok2 || !found; cb.checked = found && !ok2;
+                const status = ok2 ? '<span class="pill small ok">已安装</span>' : (found ? '<span class="pill small">可安装</span>' : '<span class="pill small danger">未在市场找到</span>');
+                row.innerHTML = `<span>${d.name}${d.range ? '@'+d.range : ''}</span>${status}`;
+                row.insertBefore(cb, row.firstChild);
+                listEl2.appendChild(row);
+                inputs2.push(cb);
+              });
+              guideBody2.appendChild(listEl2);
+              const guideActions2 = document.createElement('div'); guideActions2.style.display='flex'; guideActions2.style.justifyContent='flex-end'; guideActions2.style.gap='8px'; guideActions2.style.marginTop='12px';
+              const btnCancel2 = document.createElement('button'); btnCancel2.className='btn secondary'; btnCancel2.innerHTML='<i class="ri-close-line"></i> 取消';
+              const btnSkip2 = document.createElement('button'); btnSkip2.className='btn secondary'; btnSkip2.innerHTML='<i class="ri-skip-forward-line"></i> 跳过';
+              const btnNext2 = document.createElement('button'); btnNext2.className='btn primary'; btnNext2.innerHTML='<i class="ri-arrow-right-line"></i> 下一步';
+              guideActions2.appendChild(btnCancel2); guideActions2.appendChild(btnSkip2); guideActions2.appendChild(btnNext2);
+              guideOverlay2.appendChild(guideBox2); guideBox2.appendChild(guideTitle2); guideBox2.appendChild(guideBody2); guideBody2.appendChild(guideActions2);
+              document.body.appendChild(guideOverlay2);
+              const waitGuide2 = await new Promise((resolve)=>{
+                btnCancel2.addEventListener('click', ()=>{ try{guideOverlay2.remove();}catch{} resolve({ proceed:false, selected:[] }); });
+                btnSkip2.addEventListener('click', ()=>{ try{guideOverlay2.remove();}catch{} resolve({ proceed:true, selected:[] }); });
+                btnNext2.addEventListener('click', ()=>{
+                  const selected = inputs2.filter(i=>i.checked && !i.disabled).map(i=>{ const mi = findMarketItem2(i.dataset.depName); return { name: i.dataset.depName, range: i.dataset.depRange, market: mi }; });
+                  try{guideOverlay2.remove();}catch{} resolve({ proceed:true, selected });
+                });
+              });
+              if (!waitGuide2.proceed) { actionBtn.disabled = false; actionBtn.innerHTML = '<i class="ri-download-2-line"></i> 安装'; return; }
+              if (waitGuide2.selected.length) {
+                const ok4 = await showConfirm(`将先安装以下依赖，再安装插件：\n- ${waitGuide2.selected.map(s=>s.name+(s.range?('@'+s.range):'')).join('\n- ')}`);
+                if (!ok4) { actionBtn.disabled = false; actionBtn.innerHTML = '<i class="ri-download-2-line"></i> 安装'; return; }
+                const base3 = await (async () => {
+                  try { const svc = await window.settingsAPI?.configGet?.('system', 'serviceBase'); if (typeof svc === 'string' && svc) return svc; const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase'); return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/'; } catch { return 'http://localhost:3030/'; }
+                })();
+                for (const s of waitGuide2.selected) {
+                  try {
+                    if (s.market?.zip) {
+                      const url3 = new URL(s.market.zip, base3).toString();
+                      const r3 = await fetch(url3); if (!r3.ok) throw new Error('ZIP 下载失败');
+                      const b3 = await r3.arrayBuffer(); const n3 = s.market.id ? `${s.market.id}.zip` : `${s.market.name || 'plugin'}.zip`;
+                      const o3 = await window.settingsAPI?.installPluginZipData?.(n3, new Uint8Array(b3)); if (!o3?.ok) throw new Error(o3?.error || '安装失败');
+                    } else if (s.market?.npm) {
+                      const r4 = await window.settingsAPI?.installNpm?.(s.market.npm || s.market.id || s.market.name); if (!r4?.ok) throw new Error(r4?.error || '安装失败');
+                    } else {
+                      await showAlert(`依赖缺少安装源：${s.name}`);
+                    }
+                  } catch (e) {
+                    await showAlert(`依赖安装失败：${s.name} — ${e?.message || '未知错误'}`);
+                  }
+                }
+              }
+            }
             const key = item.id || item.name;
             const res = await window.settingsAPI?.installNpm?.(key);
             if (!res?.ok) throw new Error(res?.error || '安装失败');

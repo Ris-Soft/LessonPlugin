@@ -82,7 +82,7 @@ function createTray() {
   tray = new Tray(nativeImage.createFromPath(iconPath));
 
   const openSettingsTo = (page) => {
-    if (!settingsWindow) createSettingsWindow();
+    if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
     if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
     settingsWindow.show();
     settingsWindow.focus();
@@ -414,7 +414,7 @@ app.whenReady().then(async () => {
     }
     // 重复启动时打开设置页面（创建并置顶显示）
     try {
-      if (!settingsWindow) createSettingsWindow();
+      if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
       if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
       settingsWindow.show();
       settingsWindow.focus();

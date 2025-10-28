@@ -2,6 +2,7 @@
   "id": "morning.reading",
   "name": "早读助手",
   "icon": "ri-sun-foggy-line",
+  "author": "LessonPlugin",
   "description": "站立早读提醒、早读看板等功能",
   "actions": [
     {
@@ -10,6 +11,9 @@
       "text": "打开设置",
       "target": "openSettings"
     }
+  ],
+  "dependencies": [
+    "notify-plugin@^1.0.0"
   ],
   "version": "1.0.0"
 }

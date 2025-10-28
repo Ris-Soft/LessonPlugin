@@ -53,6 +53,10 @@ async function initMarketPage() {
       market.catalog.plugins = Array.isArray(market?.catalog?.plugins) ? market.catalog.plugins : [];
       market.catalog.automation = Array.isArray(market?.catalog?.automation) ? market.catalog.automation : [];
       market.catalog.components = Array.isArray(market?.catalog?.components) ? market.catalog.components : [];
+      try {
+        window.__marketCatalog__ = market.catalog.plugins.slice();
+        window.__marketCatalogUpdatedAt__ = Date.now();
+      } catch {}
     };
     // 首次加载数据
     await reloadMarket();
