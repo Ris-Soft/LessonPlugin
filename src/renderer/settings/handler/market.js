@@ -166,7 +166,7 @@ function renderStoreCard(item, installedList) {
                   const guideOverlay = document.createElement('div'); guideOverlay.className = 'modal-overlay';
                   const guideBox = document.createElement('div'); guideBox.className = 'modal-box';
                   const guideTitle = document.createElement('div'); guideTitle.className = 'modal-title';
-                  guideTitle.innerHTML = `<i class=\"${item.icon || 'ri-puzzle-line'}\"></i> 依赖安装引导 — ${inspect.name || item.name}`;
+                  guideTitle.innerHTML = `<i class=\"${item.icon || 'ri-puzzle-line'}\"></i> 插件安装向导 — ${inspect.name || item.name}`;
                   const guideBody = document.createElement('div'); guideBody.className = 'modal-body';
                   guideBody.innerHTML = `
                     <div class=\"setting-item\">
@@ -239,7 +239,14 @@ function renderStoreCard(item, installedList) {
               } catch {}
               const out = await window.settingsAPI?.installPluginZipData?.(name, new Uint8Array(buf));
               if (!out?.ok) throw new Error(out?.error || '安装失败');
-              await showAlertWithLogs('安装完成', '插件安装成功并已执行初始化', Array.isArray(out?.logs) ? out.logs : []);
+              const metaAuthor = (typeof out.author === 'object') ? (out.author?.name || JSON.stringify(out.author)) : (out.author || '未知作者');
+              const depsObj = (typeof out.npmDependencies === 'object' && out.npmDependencies) ? out.npmDependencies : null;
+              const depNames = depsObj ? Object.keys(depsObj) : [];
+              await showAlertWithLogs(
+                '插件安装完成',
+                `安装成功：${out.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`,
+                Array.isArray(out?.logs) ? out.logs : []
+              );
             } catch (e) {
               throw e;
             }
@@ -269,7 +276,7 @@ function renderStoreCard(item, installedList) {
                 const closure2 = resolveClosure2(pluginDepends2);
                 const overlay2 = document.createElement('div'); overlay2.className='modal-overlay';
                 const box2 = document.createElement('div'); box2.className='modal-box';
-                const title2 = document.createElement('div'); title2.className='modal-title'; title2.innerHTML = `<i class=\"${item.icon || 'ri-puzzle-line'}\"></i> 依赖安装引导 — ${item.name}`;
+                const title2 = document.createElement('div'); title2.className='modal-title'; title2.innerHTML = `<i class=\"${item.icon || 'ri-puzzle-line'}\"></i> 插件安装向导 — ${item.name}`;
                 const body2 = document.createElement('div'); body2.className='modal-body';
                 const tip2 = document.createElement('div'); tip2.className='muted'; tip2.textContent='未选择的依赖将跳过安装';
                 const list2 = document.createElement('div'); list2.style.display='grid'; list2.style.gridTemplateColumns='1fr'; list2.style.gap='8px';
@@ -321,7 +328,7 @@ function renderStoreCard(item, installedList) {
             const depsObj = (typeof res.npmDependencies === 'object' && res.npmDependencies) ? res.npmDependencies : null;
             const depNames = depsObj ? Object.keys(depsObj) : [];
             await showAlertWithLogs(
-              '安装完成',
+              '插件安装完成',
               `安装成功：${res.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`,
               Array.isArray(res?.logs) ? res.logs : []
             );

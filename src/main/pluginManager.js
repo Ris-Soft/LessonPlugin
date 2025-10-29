@@ -244,6 +244,8 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
   try {
     if (!enabled) {
       logs.push(`[disable] 开始禁用插件 ${p.name}`);
+      // 触发插件禁用事件，便于插件自行清理资源
+      try { module.exports.emitEvent('__plugin_disabled__', { pluginId: canonId, name: p.name, version: p.version }); } catch {}
       // 清理事件订阅
       try {
         const winById = pluginWindows.get(p.id);
@@ -545,6 +547,8 @@ module.exports.uninstall = function uninstall(idOrName) {
     
     // 获取插件的规范化ID用于清理各种注册项
     const canonId = p.id || p.name;
+    // 触发插件卸载事件，通知前端与其他插件及时清理
+    try { module.exports.emitEvent('__plugin_uninstall__', { pluginId: canonId, name: p.name, version: p.version }); } catch {}
     
     // 1. 先收集插件窗口信息（用于后续清理）
     const winById = pluginWindows.get(p.id);
@@ -856,9 +860,8 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 // -------- 插件 API / 事件总线 --------
 module.exports.registerFunctions = function registerFunctions(pluginId, functions, senderWC) {
   const canonId = canonicalizePluginId(pluginId);
-  if (!apiRegistry.has(canonId)) apiRegistry.set(canonId, new Set());
-  const set = apiRegistry.get(canonId);
-  for (const fn of functions) set.add(fn);
+  // 覆盖式API注册，避免重复与陈旧条目导致冲突
+  apiRegistry.set(canonId, new Set(Array.isArray(functions) ? functions : []));
   // 将 webContents 记录，供路由调用
   const win = pluginWindows.get(canonId);
   if (!win || win.webContents.id !== senderWC.id) {

@@ -99,13 +99,121 @@ function createRuntimeWindow() {
 module.exports = {
   name: '通知插件',
   version: '1.0.0',
-  // 插件初始化：创建运行窗口
-  init: () => {
+  description: '前置类通知插件：队列化通知、TTS播报、类型音频与两种窗口样式',
+  init: (api) => {
+    // 插件初始化逻辑
+    log('notify:init');
+    
+    // 监听插件卸载事件，进行资源清理
+    if (api && typeof api.emit === 'function') {
+      // 订阅卸载事件
+      try {
+        const { ipcMain } = require('electron');
+        const cleanupHandler = (event, payload) => {
+          if (payload && payload.pluginId === 'notify.plugin') {
+            log('notify:cleanup:start');
+            try {
+              // 清理窗口
+              if (runtimeWin && !runtimeWin.isDestroyed()) {
+                runtimeWin.destroy();
+                runtimeWin = null;
+              }
+              if (settingsWin && !settingsWin.isDestroyed()) {
+                settingsWin.destroy();
+                settingsWin = null;
+              }
+              // 清理队列
+              pendingQueue = [];
+              // 恢复音量
+              if (previousVolume != null && volumeLib) {
+                try {
+                  volumeLib.setVolume(previousVolume);
+                  previousVolume = null;
+                } catch {}
+              }
+              log('notify:cleanup:done');
+            } catch (e) {
+              log('notify:cleanup:error', e?.message || String(e));
+            }
+          }
+        };
+        
+        // 监听禁用和卸载事件
+        ipcMain.on('__plugin_disabled__', cleanupHandler);
+        ipcMain.on('__plugin_uninstall__', cleanupHandler);
+      } catch (e) {
+        log('notify:cleanup:register:error', e?.message || String(e));
+      }
+    }
+    
+    // 注册 IPC 处理器（避免重复注册：先移除再注册）
+    const { ipcMain } = require('electron');
+    function registerIpcHandlers() {
+      try {
+        try { ipcMain.removeHandler('notify:setClickThrough'); } catch {}
+        ipcMain.handle('notify:setClickThrough', (_evt, enable) => {
+          if (!runtimeWin || runtimeWin.isDestroyed()) return false;
+          runtimeWin.setIgnoreMouseEvents(Boolean(enable), { forward: true });
+          return true;
+        });
+
+        try { ipcMain.removeHandler('notify:setVisible'); } catch {}
+        ipcMain.handle('notify:setVisible', (_evt, visible) => {
+          if (!runtimeWin || runtimeWin.isDestroyed()) return false;
+          try { if (visible) runtimeWin.show(); else runtimeWin.hide(); return true; } catch { return false; }
+        });
+
+        try { ipcMain.removeHandler('notify:setSystemVolume'); } catch {}
+        ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
+          try {
+            if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
+              log('volume:lib_missing');
+              return false;
+            }
+            const target = Math.max(0, Math.min(100, Number(level || 0)));
+            if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
+              try { previousVolume = await volumeLib.getVolume(); } catch {}
+            }
+            await volumeLib.setVolume(target);
+            log('volume:set', target);
+            return true;
+          } catch (e) {
+            log('volume:set:error', e?.message || String(e));
+            return false;
+          }
+        });
+
+        try { ipcMain.removeHandler('notify:restoreSystemVolume'); } catch {}
+        ipcMain.handle('notify:restoreSystemVolume', async () => {
+          try {
+            if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
+              log('volume:lib_missing');
+              return false;
+            }
+            const pv = previousVolume;
+            previousVolume = null;
+            if (pv == null) return true;
+            await volumeLib.setVolume(Math.max(0, Math.min(100, Number(pv))));
+            log('volume:restore', pv);
+            return true;
+          } catch (e) {
+            log('volume:restore:error', e?.message || String(e));
+            return false;
+          }
+        });
+      } catch (e) {
+        log('notify:ipc_register:error', e?.message || String(e));
+      }
+    }
+
     if (app.isReady()) {
       createRuntimeWindow();
+      registerIpcHandlers();
     } else {
-      app.once('ready', () => createRuntimeWindow());
+      app.once('ready', () => { createRuntimeWindow(); registerIpcHandlers(); });
     }
+    
+    return Promise.resolve();
   },
   // 可供 actions 调用的函数
   functions: {
@@ -272,59 +380,7 @@ function openSettingsWindow() {
   return settingsWin;
 }
 
-// IPC: 由渲染进程控制穿透开关
-ipcMain.handle('notify:setClickThrough', (_evt, enable) => {
-  if (!runtimeWin || runtimeWin.isDestroyed()) return false;
-  runtimeWin.setIgnoreMouseEvents(Boolean(enable), { forward: true });
-  return true;
-});
-
-// 渲染进程请求显示/隐藏运行窗口：空闲时隐藏，有通知时显示
-ipcMain.handle('notify:setVisible', (_evt, visible) => {
-  if (!runtimeWin || runtimeWin.isDestroyed()) return false;
-  try {
-    if (visible) runtimeWin.show(); else runtimeWin.hide();
-    return true;
-  } catch { return false; }
-});
-
-// 系统音量暂调：播放前设置指定百分比，播放后恢复
-ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
-  try {
-    if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
-      log('volume:lib_missing');
-      return false;
-    }
-    const target = Math.max(0, Math.min(100, Number(level || 0)));
-    if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
-      try { previousVolume = await volumeLib.getVolume(); } catch {}
-    }
-    await volumeLib.setVolume(target);
-    log('volume:set', target);
-    return true;
-  } catch (e) {
-    log('volume:set:error', e?.message || String(e));
-    return false;
-  }
-});
-
-ipcMain.handle('notify:restoreSystemVolume', async () => {
-  try {
-    if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
-      log('volume:lib_missing');
-      return false;
-    }
-    const pv = previousVolume;
-    previousVolume = null;
-    if (pv == null) return true;
-    await volumeLib.setVolume(Math.max(0, Math.min(100, Number(pv))));
-    log('volume:restore', pv);
-    return true;
-  } catch (e) {
-    log('volume:restore:error', e?.message || String(e));
-    return false;
-  }
-});
+// 移除覆盖式导出，避免清空前面已定义的 functions；IPC 已在 init 中注册
 
 // 辅助：使用本地 EdgeTTS 合成并返回音频文件路径（file:///）
 async function synthEdgeTtsToFile(text, voiceName) {

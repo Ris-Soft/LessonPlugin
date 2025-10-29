@@ -5,5 +5,9 @@
   "id": "notify.plugin",
   "actions": [
     { "id": "openSettings", "text": "通知设置", "target": "openSettings", "icon": "ri-settings-3-line" }
-  ]
+  ],
+  "npmDependencies": {
+    "edge-tts": "^1.5.0",
+    "loudness": "^0.4.2"
+  }
 }

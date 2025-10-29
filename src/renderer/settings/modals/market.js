@@ -252,7 +252,7 @@ async function showStorePluginModal(item) {
                 });
                 const npmPills = depNames.map(k => `<span class="pill small">${k}</span>`).join(' ');
 
-                // 依赖安装引导弹窗（多选，可忽略不安装；展示含上级依赖）
+                // 插件安装向导弹窗（多选，可忽略不安装；展示含上级依赖）
                 const catalog = Array.isArray(window.__marketCatalog__) ? window.__marketCatalog__ : [];
                 const findMarketItem = (name) => catalog.find((x) => (x.id === name) || (x.name === name));
                 const resolveClosure = (deps) => {
@@ -276,7 +276,7 @@ async function showStorePluginModal(item) {
                 const guideOverlay = document.createElement('div'); guideOverlay.className = 'modal-overlay';
                 const guideBox = document.createElement('div'); guideBox.className = 'modal-box';
                 const guideTitle = document.createElement('div'); guideTitle.className = 'modal-title';
-                guideTitle.innerHTML = `<i class="${item.icon || 'ri-puzzle-line'}"></i> 依赖安装引导 — ${inspect.name || item.name}`;
+                guideTitle.innerHTML = `<i class="${item.icon || 'ri-puzzle-line'}"></i> 插件安装向导 — ${inspect.name || item.name}`;
                 const guideBody = document.createElement('div'); guideBody.className = 'modal-body';
                 const tipEl = document.createElement('div'); tipEl.className = 'muted'; tipEl.textContent = '可忽略不安装：未选择的依赖将跳过安装';
                 guideBody.innerHTML = `
@@ -363,7 +363,7 @@ async function showStorePluginModal(item) {
             const depsObj = (typeof out.npmDependencies === 'object' && out.npmDependencies) ? out.npmDependencies : null;
             const depNames = depsObj ? Object.keys(depsObj) : [];
             await showAlertWithLogs(
-              '安装完成',
+              '插件安装完成',
               `安装成功：${out.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`,
               Array.isArray(out?.logs) ? out.logs : []
             );
@@ -394,7 +394,7 @@ async function showStorePluginModal(item) {
               const guideOverlay2 = document.createElement('div'); guideOverlay2.className = 'modal-overlay';
               const guideBox2 = document.createElement('div'); guideBox2.className = 'modal-box';
               const guideTitle2 = document.createElement('div'); guideTitle2.className = 'modal-title';
-              guideTitle2.innerHTML = `<i class="${item.icon || 'ri-puzzle-line'}"></i> 依赖安装引导 — ${item.name}`;
+              guideTitle2.innerHTML = `<i class="${item.icon || 'ri-puzzle-line'}"></i> 插件安装向导 — ${item.name}`;
               const guideBody2 = document.createElement('div'); guideBody2.className = 'modal-body';
               const tipEl2 = document.createElement('div'); tipEl2.className = 'muted'; tipEl2.textContent = '可忽略不安装：未选择的依赖将跳过安装';
               guideBody2.innerHTML = `
@@ -467,7 +467,16 @@ async function showStorePluginModal(item) {
             const key = item.id || item.name;
             const res = await window.settingsAPI?.installNpm?.(key);
             if (!res?.ok) throw new Error(res?.error || '安装失败');
-            await showAlert('安装完成');
+            {
+              const metaAuthor2 = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
+              const depsObj2 = (typeof res.npmDependencies === 'object' && res.npmDependencies) ? res.npmDependencies : null;
+              const depNames2 = depsObj2 ? Object.keys(depsObj2) : [];
+              await showAlertWithLogs(
+                '插件安装完成',
+                `安装成功：${res.name}\n作者：${metaAuthor2}\n依赖：${depNames2.length ? depNames2.join(', ') : '无'}`,
+                Array.isArray(res?.logs) ? res.logs : []
+              );
+            }
           }
         } else if (action === 'update') {
           const latest = actionBtn.dataset.latest;
@@ -488,9 +497,7 @@ async function showStorePluginModal(item) {
 
     uninstallBtn.addEventListener('click', async () => {
       try {
-        const res = await showModal({ title: '卸载插件', message: `确认卸载插件：${item.name}？\n这将删除其目录与相关文件。`, confirmText: '卸载', cancelText: '取消' });
-        if (!res) return;
-        uninstallBtn.disabled = true; uninstallBtn.innerHTML = '<i class="ri-loader-4-line"></i> 卸载中...';
+        // 先确定插件键并查询被依赖情况
         const list = await window.settingsAPI?.getPlugins?.();
         const installed = Array.isArray(list) ? list.find((p) => (
           (item.id && (p.id === item.id)) ||
@@ -498,6 +505,28 @@ async function showStorePluginModal(item) {
           (item.npm && (p.npm === item.npm))
         )) : null;
         const key = installed ? (installed.id || installed.name) : (item.id || item.name);
+        let dep = null;
+        try { dep = await window.settingsAPI?.pluginDependents?.(key); } catch {}
+        const pluginNames = Array.isArray(dep?.plugins) ? dep.plugins.map(p => p.name).join('，') : '';
+        const autoNames = Array.isArray(dep?.automations) ? dep.automations.map(a => `${a.name}${a.enabled ? '(已启用)' : ''}`).join('，') : '';
+        const extra = [
+          pluginNames ? `被以下插件依赖：${pluginNames}` : '',
+          autoNames ? `被以下自动化引用：${autoNames}` : ''
+        ].filter(Boolean).join('\n');
+        const msg = extra ? `确认卸载插件：${item.name}？\n${extra}\n您可以选择继续卸载，已启用的自动化将被禁用。` : `确认卸载插件：${item.name}？\n这将删除其目录与相关文件。`;
+        const res = await showModal({ title: '卸载插件', message: msg, confirmText: '卸载', cancelText: '取消' });
+        if (!res) return;
+        uninstallBtn.disabled = true; uninstallBtn.innerHTML = '<i class="ri-loader-4-line"></i> 卸载中...';
+        // 自动禁用引用该插件的已启用自动化
+        try {
+          if (Array.isArray(dep?.automations)) {
+            for (const a of dep.automations) {
+              if (a.enabled) {
+                try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch {}
+              }
+            }
+          }
+        } catch {}
         const out = await window.settingsAPI?.uninstallPlugin?.(key);
         if (!out?.ok) throw new Error(out?.error || '卸载失败');
         await showAlert('已卸载');
