@@ -6,7 +6,12 @@ function showModal({ title = '提示', message = '', confirmText = '确定', can
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
     const box = document.createElement('div'); box.className = 'modal-box';
     const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
-    const msg = document.createElement('div'); msg.className = 'modal-message'; msg.textContent = message;
+    const msg = document.createElement('div'); msg.className = 'modal-message';
+    if (message instanceof Node) {
+      msg.appendChild(message);
+    } else {
+      msg.textContent = String(message || '');
+    }
     const actions = document.createElement('div'); actions.className = 'modal-actions';
     const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = confirmText || '确定';
     ok.addEventListener('click', () => { overlay.remove(); resolve(true); });
@@ -47,23 +52,56 @@ async function showLogModal(title = '日志', lines = []) {
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     // 自动关闭
-    setTimeout(() => { try { overlay.remove(); } catch {} resolve(true); }, 1500);
+    setTimeout(() => { try { overlay.remove(); } catch { } resolve(true); }, 1500);
   });
 }
 
 // 安装完成提示框（带日志容器）：在成功提示中嵌入独立日志区域
-async function showAlertWithLogs(title = '安装完成', message = '安装成功', lines = []) {
+async function showAlertWithLogs(title = '安装完成', pluginInfo = {}, lines = []) {
   return new Promise((resolve) => {
     const old = document.querySelector('.modal-overlay');
     if (old) old.remove();
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
     const box = document.createElement('div'); box.className = 'modal-box';
     const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
-    const msg = document.createElement('div'); msg.className = 'modal-message'; msg.textContent = message || '';
-    const logsSection = document.createElement('div'); logsSection.className = 'panel';
-    logsSection.style.marginTop = '8px';
-    const logsHeader = document.createElement('div'); logsHeader.className = 'section-title';
-    logsHeader.innerHTML = '<i class="ri-file-list-2-line"></i> 初始化日志';
+    const msg = document.createElement('div'); msg.className = 'modal-message';
+
+    // 如果传入的是字符串（向后兼容），转换为对象
+    if (typeof pluginInfo === 'string') {
+      const infoSection = document.createElement('div'); infoSection.className = 'section';
+      const infoTitle = document.createElement('div'); infoTitle.className = 'section-title'; infoTitle.innerHTML = '<i class="ri-checkbox-circle-line"></i> 安装结果';
+      const infoBody = document.createElement('div'); infoBody.style.fontSize = '13px'; infoBody.style.color = 'var(--muted)'; infoBody.style.marginTop = '6px'; infoBody.textContent = pluginInfo || '';
+      infoSection.appendChild(infoTitle); infoSection.appendChild(infoBody);
+      msg.appendChild(infoSection);
+    } else {
+      // 新的基本信息卡片显示
+      const pluginCard = document.createElement('div');
+      pluginCard.className = 'setting-item';
+      pluginCard.style.marginBottom = '12px';
+      const versionText = pluginInfo.version ? `v${pluginInfo.version}` : '未知版本';
+      const authorText = pluginInfo.author || '未知作者';
+      const iconCls = pluginInfo.icon || 'ri-puzzle-line';
+      pluginCard.innerHTML = `
+        <div class="setting-icon"><i class="${iconCls}"></i></div>
+        <div class="setting-main">
+          <div class="setting-title">${pluginInfo.name || '未知插件'} <span class="pill small plugin-version">${versionText}</span></div>
+          <div class="setting-desc">作者：${authorText}</div>
+        </div>
+      `;
+      msg.appendChild(pluginCard);
+
+      // 安装结果信息
+      const infoSection = document.createElement('div'); infoSection.className = 'section';
+      const infoTitle = document.createElement('div'); infoTitle.className = 'section-title'; infoTitle.innerHTML = '<i class="ri-checkbox-circle-line"></i> 安装结果';
+      const infoBody = document.createElement('div'); infoBody.style.fontSize = '13px'; infoBody.style.color = 'var(--muted)'; infoBody.style.marginTop = '6px';
+      const pluginDepends = Array.isArray(pluginInfo.pluginDepends) ? pluginInfo.pluginDepends : [];
+      const npmDepends = Array.isArray(pluginInfo.npmDepends) ? pluginInfo.npmDepends : [];
+      infoBody.innerHTML = `插件依赖：${pluginDepends.length ? pluginDepends.join('，') : '无'}<br>NPM依赖：${npmDepends.length ? npmDepends.join('，') : '无'}`;
+      infoSection.appendChild(infoTitle); infoSection.appendChild(infoBody);
+      msg.appendChild(infoSection);
+    }
+    const logsSection = document.createElement('div'); logsSection.className = 'section'; logsSection.style.marginTop = '8px';
+    const logsHeader = document.createElement('div'); logsHeader.className = 'section-title'; logsHeader.innerHTML = '<i class="ri-file-list-2-line"></i> 初始化日志';
     const logsBox = document.createElement('div'); logsBox.className = 'modal-logs';
     logsBox.style.whiteSpace = 'pre-wrap';
     logsBox.style.fontFamily = 'monospace';
@@ -74,15 +112,108 @@ async function showAlertWithLogs(title = '安装完成', message = '安装成功
     const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = '好的';
     ok.addEventListener('click', () => { overlay.remove(); resolve(true); });
     actions.appendChild(ok);
-    box.appendChild(t); box.appendChild(msg);
+    box.appendChild(t);
     if ((Array.isArray(lines) && lines.length) || (typeof lines === 'string' && lines)) {
       logsSection.appendChild(logsHeader);
       logsSection.appendChild(logsBox);
-      box.appendChild(logsSection);
+      msg.appendChild(logsSection);
     }
+    box.appendChild(msg);
     box.appendChild(actions);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
   });
+}
+
+// Toast 通知：非模态、自动消失
+function showToast(message = '', { type = 'info', duration = 2000 } = {}) {
+  try {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = String(message || '');
+    container.appendChild(toast);
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+    setTimeout(() => {
+      try { toast.classList.remove('show'); } catch { }
+      setTimeout(() => { try { toast.remove(); } catch { } }, 300);
+    }, Math.max(1000, duration));
+  } catch { }
+}
+
+// 统一卸载确认弹窗：返回 { confirmed, dep }
+async function showUninstallConfirm(item) {
+  try {
+    const key = item.id || item.name || item.npm;
+    let dep = null;
+    try { dep = await window.settingsAPI?.pluginDependents?.(key); } catch { }
+    const pluginNames = Array.isArray(dep?.plugins) ? dep.plugins.map(p => p.name).join('，') : '';
+    const autoNames = Array.isArray(dep?.automations) ? dep.automations.map(a => `${a.name}${a.enabled ? '(已启用)' : ''}`).join('，') : '';
+    const extra = [
+      pluginNames ? `被以下插件依赖：${pluginNames}` : '',
+      autoNames ? `被以下自动化引用：${autoNames}` : ''
+    ].filter(Boolean).join('\n');
+
+    const content = document.createElement('div');
+
+    // 基本信息卡片
+    const pluginCard = document.createElement('div');
+    pluginCard.className = 'setting-item';
+    pluginCard.style.marginBottom = '12px';
+    const v = item?.version || item?.detectedVersion;
+    const versionText = v ? `v${v}` : '未知版本';
+    const authorText = (() => {
+      const a = item?.author;
+      if (!a) return '未知作者';
+      if (typeof a === 'string') return a;
+      if (typeof a === 'object') return a.name || JSON.stringify(a);
+      return String(a);
+    })();
+    const iconCls = item?.icon || 'ri-puzzle-line';
+    const titleName = item?.name || item?.id || item?.npm || '';
+    pluginCard.innerHTML = `
+      <div class="setting-icon"><i class="${iconCls}"></i></div>
+      <div class="setting-main">
+        <div class="setting-title">${titleName} <span class="pill small plugin-version">${versionText}</span></div>
+        <div class="setting-desc">作者：${authorText}</div>
+      </div>
+    `;
+    content.appendChild(pluginCard);
+
+    // 依赖警告
+    if (extra) {
+      const warningBox = document.createElement('div');
+      warningBox.className = 'section';
+      warningBox.style.cssText = `
+        background: rgba(255, 193, 7, 0.1);
+        border-color: rgba(255, 193, 7, 0.3);
+        margin-bottom: 16px;
+      `;
+      const warningTitle = document.createElement('div');
+      warningTitle.className = 'section-title';
+      warningTitle.innerHTML = '<i class="ri-alert-line"></i> 依赖警告';
+      const warningBody = document.createElement('div');
+      warningBody.style.cssText = 'color: var(--muted); font-size: 13px; line-height: 1.4; margin-top: 8px; white-space: pre-wrap;';
+      warningBody.textContent = `${extra}\n您可以选择继续卸载，已启用的自动化将被禁用。`;
+      warningBox.appendChild(warningTitle);
+      warningBox.appendChild(warningBody);
+      content.appendChild(warningBox);
+    }
+
+    const confirmText = document.createElement('div');
+    confirmText.style.cssText = 'color: var(--muted); font-size: 14px; margin-top: 8px;';
+    confirmText.textContent = '这将删除插件目录与相关文件。';
+    content.appendChild(confirmText);
+
+    const confirmed = await showModal({ title: '卸载插件', message: content, confirmText: '卸载', cancelText: '取消' });
+    return { confirmed, dep: dep || {} };
+  } catch { return { confirmed: false, dep: {} }; }
 }
 

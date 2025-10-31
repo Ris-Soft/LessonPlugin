@@ -1,6 +1,79 @@
 
 async function initDebugSettings() {
   try {
+    // 子页切换逻辑
+    const subItems = document.querySelectorAll('#page-debug .subnav .sub-item');
+    const runPanel = document.getElementById('debug-run');
+    const iconsPanel = document.getElementById('debug-icons');
+    const logsPanel = document.getElementById('debug-logs');
+    const logList = document.getElementById('backend-log-list');
+    subItems.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        subItems.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const sub = btn.dataset.sub;
+        runPanel.hidden = sub !== 'run';
+        iconsPanel.hidden = sub !== 'icons';
+        logsPanel.hidden = sub !== 'logs';
+        if (sub === 'logs') {
+          // 初次进入日志页，拉取最近记录并订阅实时日志
+          if (logList && logList.dataset.bound !== '1') {
+            logList.dataset.bound = '1';
+            (async () => {
+              try {
+                const last = await window.settingsAPI?.backendLogsGet?.();
+                if (Array.isArray(last)) {
+                  logList.innerHTML = '';
+                  last.forEach((line) => {
+                    const row = document.createElement('div');
+                    row.textContent = String(line || '');
+                    logList.appendChild(row);
+                  });
+                  logList.scrollTop = logList.scrollHeight;
+                }
+              } catch {}
+            })();
+            try {
+              window.settingsAPI?.onBackendLog?.((line) => {
+                try {
+                  const row = document.createElement('div');
+                  row.textContent = String(line || '');
+                  logList.appendChild(row);
+                  // 自动滚动到底部
+                  logList.scrollTop = logList.scrollHeight;
+                } catch {}
+              });
+            } catch {}
+          }
+        }
+      });
+    });
+
+    // 运行管理：填充基本信息与重启按钮
+    (async () => {
+      try {
+        const info = await window.settingsAPI?.getAppInfo?.();
+        document.getElementById('debug-app-version').textContent = info?.appVersion || '—';
+        document.getElementById('debug-electron').textContent = info?.electronVersion || (navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—');
+        document.getElementById('debug-node').textContent = info?.nodeVersion || (process?.versions?.node || '—');
+        document.getElementById('debug-chrome').textContent = info?.chromeVersion || (process?.versions?.chrome || '—');
+        document.getElementById('debug-platform').textContent = info?.platform || (process?.platform || navigator?.platform || '—');
+      } catch {}
+    })();
+    const restartBtn = document.getElementById('debug-restart');
+    restartBtn?.addEventListener('click', async () => {
+      try {
+        restartBtn.disabled = true; restartBtn.innerHTML = '<i class="ri-loader-4-line"></i> 重启中...';
+        const res = await window.settingsAPI?.restartApp?.();
+        if (!res?.ok) { await showAlert(res?.error || '无法重启'); }
+      } catch (e) {
+        await showAlert(e?.message || '无法重启');
+      } finally {
+        restartBtn.disabled = false; restartBtn.innerHTML = '<i class="ri-refresh-line"></i> 快速重启程序';
+      }
+    });
+
+    // 图标工具：原有逻辑
     const iconClassInput = document.getElementById('debug-icon-class');
     const fileNameInput = document.getElementById('debug-filename');
     const bgInput = document.getElementById('debug-bg');
@@ -11,7 +84,6 @@ async function initDebugSettings() {
     const releaseBtn = document.getElementById('debug-release');
     const openDirBtn = document.getElementById('debug-open-dir');
     const pathEl = document.getElementById('debug-icons-path');
-
     let iconsDir = '';
     try {
       iconsDir = await window.settingsAPI?.getIconsDir?.();

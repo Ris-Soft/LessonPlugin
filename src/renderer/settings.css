@@ -8,6 +8,8 @@
   /* 绿色强调 */
   --panel: rgba(255, 255, 255, 0.06);
   --border: rgba(255, 255, 255, 0.12);
+  /* 预览缩放 */
+  --preview-scale: 0.75;
 }
 
 html,
@@ -217,6 +219,21 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-top: 1px dashed var(--border);
 }
 
+/* 调试：后端日志列表 */
+.log-list {
+  margin: 12px 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  max-height: 50vh;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -248,6 +265,114 @@ textarea::-webkit-scrollbar-thumb:hover {
 #content section {
   padding: 0 20px
 }
+
+/* 启动页内嵌预览样式 */
+.splash-preview-container {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 280px;
+}
+.splash-preview-frame {
+  display: block;
+  width: calc(100% / var(--preview-scale));
+  height: calc(280px / var(--preview-scale));
+  border: none;
+  transform: scale(var(--preview-scale));
+  transform-origin: top left;
+}
+
+/* 紧凑选项组（用于背景样式选择） */
+.options.compact label {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* 合并卡片布局：左预览 / 右设置 */
+.setting-card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.splash-card {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.splash-card-left { display: flex; flex-direction: column; }
+.splash-card-right { display: flex; flex-direction: column; }
+
+/* 右侧分组卡片（美化名言相关设置） */
+.field-group {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+}
+.field-header { display: grid; gap: 4px; margin-bottom: 8px; }
+.field-title { font-weight: 600; }
+.field-desc { color: var(--muted); font-size: 13px; }
+
+/* 名言来源按钮组优化 */
+.field-group .options {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.field-group .options label {
+  padding: 8px 12px;
+}
+.field-group .options input[type=radio]:checked+label {
+  background: rgba(34, 197, 94, 0.16);
+}
+.field-group .inline { margin-top: 6px; }
+
+/* API示例文本样式 */
+#api-sample {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+}
+
+/* Toast 通知（全局） */
+.toast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+  transform: translateY(10px);
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  max-width: 360px;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast-info { border-left: 4px solid #22c55e; }
+.toast-success { border-left: 4px solid #16a34a; }
+.toast-warning { border-left: 4px solid #f59e0b; }
+.toast-error { border-left: 4px solid #ef4444; }
 
 header {
   margin: 20px;
@@ -445,7 +570,7 @@ main {
   border-radius: 10px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .card-header {
@@ -547,6 +672,48 @@ main {
 
 .auto-item:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+
+/* 全局进度显示区域 */
+.global-progress {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 380px;
+  max-height: 40vh;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  z-index: 9;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  font-size: 13px;
+}
+.progress-list {
+  padding: 8px 10px;
+  max-height: calc(40vh - 36px);
+  overflow-y: auto;
+}
+.progress-list::-webkit-scrollbar {
+  width: 8px;
+}
+.progress-item {
+  font-size: 12px;
+  color: var(--fg);
+  padding: 4px 6px;
+  border-left: 2px solid rgba(34, 197, 94, 0.45);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 6px;
 }
 
 .auto-item .title {
@@ -1802,3 +1969,80 @@ select:focus {
 #page-market .store-card .btn i {
   color: white !important
 }
+
+/* ---- 追加规则：满宽设置项与插件操作区溢出菜单 ---- */
+
+/* 满宽设置项：无图标/动作列，主体占满整行 */
+.setting-item.full {
+  grid-template-columns: 1fr;
+}
+.setting-item.full .setting-icon,
+.setting-item.full .setting-action {
+  display: none;
+}
+
+/* 插件卡片操作区左右两侧容器与溢出处理 */
+.card-actions .actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.card-actions .actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 溢出菜单（更多操作） */
+.overflow-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 160px;
+  border: 1px solid var(--border);
+  background: #1b1f2a; /* 使用不透明背景，避免透出卡片内容 */
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  right: 0;
+  top: calc(100% + 6px);
+  display: none;
+}
+.overflow-menu.overflow-open { display: flex; }
+
+/* 溢出菜单中的按钮使用同样的按钮样式，并占满宽度 */
+.overflow-menu .action-btn { width: 100%; background: #1f2937; }
+
+/* 插件动作按钮统一高度与不换行，避免缩窄时增高 */
+.plugin-card .card-actions .action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  height: 28px;
+  line-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+}
+.plugin-card .card-actions .action-btn i { font-size: 16px; }
+
+/* 展开按钮使用文字提示“展开操作”，在窄宽度更友好 */
+.plugin-card .card-actions .icon-btn.more-btn.text {
+  width: auto;
+  padding: 0 10px;
+  gap: 6px;
+  color: var(--fg);
+  background: #1f2937;
+  border: 1px solid var(--border);
+}
+.plugin-card .card-actions .icon-btn.more-btn.text i { font-size: 16px; }

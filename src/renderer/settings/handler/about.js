@@ -7,6 +7,7 @@ function initAboutPage() {
   const pEl = document.getElementById('about-platform');
   const copyBtn = document.getElementById('about-copy');
   const openDataBtn = document.getElementById('about-open-data');
+  const versionEl = document.getElementById('about-version');
 
   // 优先通过主进程API获取版本与环境信息；否则从 UA 与 process 解析
   (async () => {
@@ -50,5 +51,36 @@ function initAboutPage() {
     } else {
       openDataBtn.hidden = true;
     }
+  }
+
+  // 开发者模式：点击版本号5次切换（避免重复绑定导致多次弹窗）
+  const debugNavBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.dataset.page === 'debug');
+  if (versionEl && versionEl.dataset.devToggleBound !== '1') {
+    versionEl.dataset.devToggleBound = '1';
+    let tapCount = 0; let tapTimer = null;
+    versionEl.addEventListener('click', async () => {
+      try {
+        tapCount += 1;
+        if (tapTimer) clearTimeout(tapTimer);
+        tapTimer = setTimeout(() => { tapCount = 0; }, 1200);
+        if (tapCount < 5) return;
+        tapCount = 0; clearTimeout(tapTimer); tapTimer = null;
+        const current = await window.settingsAPI?.configGet?.('system', 'developerMode');
+        const enable = !current;
+        if (enable) {
+          const ok = await showConfirm('开发者模式将显示调试功能，操作有风险，请谨慎使用。', '开启开发者模式');
+          if (!ok) return;
+          await window.settingsAPI?.configSet?.('system', 'developerMode', true);
+          // 显示调试页导航并跳转到运行管理
+          if (debugNavBtn) { debugNavBtn.style.display = ''; debugNavBtn.click(); }
+          showToast('开发者模式已开启', { type: 'success', duration: 2000 });
+        } else {
+          await window.settingsAPI?.configSet?.('system', 'developerMode', false);
+          // 隐藏调试页导航
+          if (debugNavBtn) { debugNavBtn.style.display = 'none'; }
+          showToast('开发者模式已关闭', { type: 'info', duration: 2000 });
+        }
+      } catch {}
+    });
   }
 }

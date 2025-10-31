@@ -7,6 +7,7 @@ const https = require('https');
 
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
+const backendLog = require('./backendLog');
 const AutomationManager = require('./automationManager');
 const store = require('./store');
 // 让插件管理器可以访问 ipcMain（用于事件回调注册）
@@ -201,11 +202,19 @@ function createTray() {
 }
 
 function sendSplashProgress(payload) {
-  if (splashWindow && splashReady) {
-    splashWindow.webContents.send('plugin-progress', payload);
-  } else {
-    splashQueue.push(payload);
-  }
+  try {
+    if (splashWindow && splashReady) {
+      splashWindow.webContents.send('plugin-progress', payload);
+    } else {
+      splashQueue.push(payload);
+    }
+  } catch {}
+  // 同步推送到设置窗口（用于前端可视化进度显示）
+  try {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.webContents.send('plugin-progress', payload);
+    }
+  } catch {}
 }
 
 app.whenReady().then(async () => {
@@ -223,8 +232,11 @@ app.whenReady().then(async () => {
     preciseTimeEnabled: false,
     timeOffset: 0,
     autoOffsetDaily: 0,
-    offsetBaseDate: new Date().toISOString().slice(0, 10)
+    offsetBaseDate: new Date().toISOString().slice(0, 10),
+    developerMode: false
   });
+  // 后端日志：仅在开发者模式启用时捕获与保存
+  try { backendLog.init({ enabled: !!store.get('system', 'developerMode') }); } catch {}
   const splashEnabled = store.get('system', 'splashEnabled') !== false;
   if (splashEnabled) {
     createSplashWindow();
@@ -428,6 +440,17 @@ app.whenReady().then(async () => {
   createTray();
   createSettingsWindow();
 
+  // 若为快速重启触发，则启动后自动打开设置页（仅一次）
+  try {
+    const openOnce = store.get('system', 'openSettingsOnBootOnce');
+    if (openOnce) {
+      store.set('system', 'openSettingsOnBootOnce', false);
+      if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+      settingsWindow.show();
+      settingsWindow.focus();
+    }
+  } catch {}
+
   // 关闭启动页
   // 由渲染进程的逻辑决定关闭时机，这里不强制关闭
 });
@@ -615,6 +638,13 @@ ipcMain.handle('npm:switch', async (_e, pluginName, name, version) => {
 ipcMain.handle('npm:installed', async () => {
   return pluginManager.listInstalledPackages();
 });
+// 插件依赖状态查询（用于设置页/市场页显示）
+ipcMain.handle('plugin:deps:status', async (_e, idOrName) => {
+  return pluginManager.getPluginDependencyStatus(idOrName);
+});
+ipcMain.handle('plugin:deps:ensure', async (_e, idOrName) => {
+  return pluginManager.ensureDeps(idOrName);
+});
 
 // 档案管理：学生列定义（从插件清单聚合）
 ipcMain.handle('profiles:columnDefs', async () => {
@@ -659,7 +689,13 @@ ipcMain.handle('config:get', async (_e, scope, key) => {
   return store.get(scope, key);
 });
 ipcMain.handle('config:set', async (_e, scope, key, value) => {
-  return store.set(scope, key, value);
+  const r = store.set(scope, key, value);
+  try {
+    if (scope === 'system' && key === 'developerMode') {
+      backendLog.enableLogging(!!value);
+    }
+  } catch {}
+  return r;
 });
 ipcMain.handle('config:ensureDefaults', async (_e, scope, defaults) => {
   return store.ensureDefaults(scope, defaults);
@@ -745,6 +781,31 @@ ipcMain.handle('system:getTime', async () => {
 // 数据目录相关操作
 ipcMain.handle('system:getUserDataPath', async () => {
   try { return app.getPath('userData'); } catch (e) { return ''; }
+});
+// 获取数据目录大小（递归计算 %USER_DATA%/LessonPlugin）
+ipcMain.handle('system:getUserDataSize', async () => {
+  try {
+    const root = path.join(app.getPath('userData'), 'LessonPlugin');
+    const dirSize = (p) => {
+      try {
+        if (!fs.existsSync(p)) return 0;
+        const entries = fs.readdirSync(p);
+        let total = 0;
+        for (const name of entries) {
+          const sub = path.join(p, name);
+          let st;
+          try { st = fs.statSync(sub); } catch { continue; }
+          if (st.isDirectory()) total += dirSize(sub);
+          else total += Number(st.size || 0);
+        }
+        return total;
+      } catch { return 0; }
+    };
+    const bytes = dirSize(root);
+    return { ok: true, bytes };
+  } catch (e) {
+    return { ok: false, bytes: 0, error: e?.message || String(e) };
+  }
 });
 ipcMain.handle('system:openUserData', async () => {
   try {
@@ -937,4 +998,23 @@ ipcMain.handle('asset:url', async (_e, relPath) => {
 });
 ipcMain.handle('plugin:dependents', async (_e, idOrName) => {
   return pluginManager.listDependents(idOrName);
+});
+// 重启应用（开发者模式工具）
+ipcMain.handle('system:restart', async () => {
+  try {
+    // 下次启动仅一次地自动打开设置页
+    try { store.set('system', 'openSettingsOnBootOnce', true); } catch {}
+    app.relaunch();
+    app.exit(0);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+// 调试日志：最近记录查询与订阅实时流
+ipcMain.handle('debug:logs:get', async () => {
+  try { return backendLog.getLast(20); } catch { return []; }
+});
+ipcMain.on('debug:logs:subscribe', (event) => {
+  try { backendLog.subscribe(event.sender); } catch {}
 });

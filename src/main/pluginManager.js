@@ -244,7 +244,18 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
   try {
     if (!enabled) {
       logs.push(`[disable] 开始禁用插件 ${p.name}`);
-      // 触发插件禁用事件，便于插件自行清理资源
+      // 调用插件导出的生命周期函数进行清理
+      try {
+        const fnMap = functionRegistry.get(canonId);
+        const disabledFn = fnMap && (fnMap.get('disabled') || fnMap.get('__plugin_disabled__'));
+        if (typeof disabledFn === 'function') {
+          disabledFn({ pluginId: canonId, name: p.name, version: p.version });
+          logs.push('[disable] 已调用插件的禁用生命周期（disabled / __plugin_disabled__）');
+        }
+      } catch (e) {
+        logs.push(`[disable] 调用禁用生命周期失败: ${e?.message || e}`);
+      }
+      // 触发插件禁用事件，便于插件自行清理资源（保持兼容事件名）
       try { module.exports.emitEvent('__plugin_disabled__', { pluginId: canonId, name: p.name, version: p.version }); } catch {}
       // 清理事件订阅
       try {
@@ -292,6 +303,8 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
       try { if (modPath) { delete require.cache[require.resolve(modPath)]; } } catch {}
       if (modPath && fs.existsSync(modPath)) {
         try {
+          // 启用前确保依赖注入到插件目录
+          try { await module.exports.ensureDeps(p.id); } catch {}
           const mod = require(modPath);
           // 注册函数
           const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -331,6 +344,150 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
   return { ok: true, id: p.id, name: p.name, enabled: !!enabled, logs };
 };
 
+// 选择已安装的最新版本（简单策略）
+function pickInstalledLatest(name) {
+  try {
+    const nameDir = path.join(storeRoot, name);
+    if (!fs.existsSync(nameDir) || !fs.statSync(nameDir).isDirectory()) return null;
+    const versions = fs.readdirSync(nameDir).filter((v) => {
+      const vDir = path.join(nameDir, v, 'node_modules', name);
+      return fs.existsSync(vDir);
+    }).sort((a, b) => {
+      const pa = String(a).split('.').map((x) => parseInt(x, 10) || 0);
+      const pb = String(b).split('.').map((x) => parseInt(x, 10) || 0);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const da = pa[i] || 0; const db = pb[i] || 0;
+        if (da !== db) return da - db;
+      }
+      return 0;
+    });
+    return versions[versions.length - 1] || null;
+  } catch { return null; }
+}
+
+function linkDepToPlugin(pluginDir, pkgName, version) {
+  try {
+    const pluginNm = path.join(pluginDir, 'node_modules');
+    const target = path.join(pluginNm, pkgName);
+    const storePkg = path.join(storeRoot, pkgName, version, 'node_modules', pkgName);
+    if (!fs.existsSync(storePkg)) return { ok: false, error: 'store_package_missing' };
+    try { if (!fs.existsSync(pluginNm)) fs.mkdirSync(pluginNm, { recursive: true }); } catch {}
+    try {
+      if (fs.existsSync(target)) {
+        const stat = fs.lstatSync(target);
+        if (stat.isSymbolicLink() || stat.isDirectory()) {
+          fs.rmSync(target, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(target);
+        }
+      }
+    } catch {}
+    const type = process.platform === 'win32' ? 'junction' : 'dir';
+    fs.symlinkSync(storePkg, target, type);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+function collectPluginDeps(p) {
+  const deps = [];
+  try {
+    const obj = (typeof p.npmDependencies === 'object' && p.npmDependencies) ? p.npmDependencies : {};
+    for (const name of Object.keys(obj)) deps.push({ name, range: String(obj[name] || '').trim() });
+    if (Array.isArray(p.packages)) {
+      for (const pkg of p.packages) {
+        const name = pkg?.name; if (!name) continue;
+        const versions = Array.isArray(pkg.versions) ? pkg.versions : (pkg.version ? [pkg.version] : []);
+        if (versions.length) {
+          for (const v of versions) deps.push({ name, explicit: String(v) });
+        } else {
+          deps.push({ name });
+        }
+      }
+    }
+  } catch {}
+  return deps;
+}
+
+module.exports.ensureDeps = async function ensureDeps(idOrName) {
+  try {
+    const p = findPluginByIdOrName(idOrName);
+    if (!p) return { ok: false, error: 'plugin_not_found' };
+    if (!p.local) return { ok: true };
+    const baseDir = path.join(path.dirname(manifestPath), p.local);
+    const deps = collectPluginDeps(p);
+    const selMap = (config.npmSelection[p.id] || config.npmSelection[p.name] || {});
+    const logs = [];
+    for (const d of deps) {
+      const name = d.name;
+      let version = selMap[name] || d.explicit || null;
+      if (!version) version = pickInstalledLatest(name);
+      const storePath = version ? path.join(storeRoot, name, version, 'node_modules', name) : null;
+      if (!version || !storePath || !fs.existsSync(storePath)) {
+        let pick = d.explicit || null;
+        if (!pick) {
+          const list = await module.exports.getPackageVersions(name);
+          if (list.ok && Array.isArray(list.versions) && list.versions.length) {
+            pick = list.versions[list.versions.length - 1];
+          }
+        }
+        if (pick) {
+          const dl = await module.exports.downloadPackageVersion(name, pick);
+          if (dl.ok) {
+            version = pick;
+            logs.push(`[deps] 下载 ${name}@${pick} 完成`);
+          } else {
+            logs.push(`[deps] 下载 ${name}@${pick} 失败：${dl.error}`);
+            continue;
+          }
+        } else {
+          logs.push(`[deps] 未能确定 ${name} 可用版本`);
+          continue;
+        }
+      }
+      const link = linkDepToPlugin(baseDir, name, version);
+      if (!link.ok) {
+        logs.push(`[deps] 链接 ${name}@${version} 到插件失败：${link.error}`);
+      } else {
+        logs.push(`[deps] 已链接 ${name}@${version} 到插件`);
+      }
+    }
+    return { ok: true, logs };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.getPluginDependencyStatus = function getPluginDependencyStatus(idOrName) {
+  try {
+    const p = findPluginByIdOrName(idOrName);
+    if (!p) return { ok: false, error: 'plugin_not_found' };
+    const baseDir = p.local ? path.join(path.dirname(manifestPath), p.local) : null;
+    const deps = collectPluginDeps(p);
+    const status = [];
+    for (const d of deps) {
+      const name = d.name;
+      const installed = [];
+      try {
+        const nameDir = path.join(storeRoot, name);
+        if (fs.existsSync(nameDir)) {
+          const versions = fs.readdirSync(nameDir).filter((v) => {
+            const vDir = path.join(nameDir, v, 'node_modules', name);
+            return fs.existsSync(vDir);
+          });
+          installed.push(...versions);
+        }
+      } catch {}
+      const linked = baseDir ? fs.existsSync(path.join(baseDir, 'node_modules', name)) : false;
+      status.push({ name, installed, linked });
+    }
+    return { ok: true, status };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
 module.exports.loadPlugins = async function loadPlugins(onProgress) {
   // 保存进度报告函数，供插件入口通过 API 更新启动页状态
   progressReporter = typeof onProgress === 'function' ? onProgress : null;
@@ -363,6 +520,8 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
         try {
           const modPath = path.resolve(localPath, 'index.js');
           if (fs.existsSync(modPath)) {
+            // 启动阶段，加载前确保依赖已链接到插件目录
+            try { await module.exports.ensureDeps(p.id); } catch {}
             const mod = require(modPath);
             // 仅从 functions 中注册函数，排除 actions
             const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -547,7 +706,18 @@ module.exports.uninstall = function uninstall(idOrName) {
     
     // 获取插件的规范化ID用于清理各种注册项
     const canonId = p.id || p.name;
-    // 触发插件卸载事件，通知前端与其他插件及时清理
+    // 调用插件导出的生命周期函数进行清理
+    try {
+      const fnMap = functionRegistry.get(canonId);
+      const uninstallFn = fnMap && (fnMap.get('uninstall') || fnMap.get('__plugin_uninstall__'));
+      if (typeof uninstallFn === 'function') {
+        uninstallFn({ pluginId: canonId, name: p.name, version: p.version });
+        console.log(`[uninstall] 已调用插件 ${p.name} 的卸载生命周期（uninstall / __plugin_uninstall__）`);
+      }
+    } catch (e) {
+      console.log(`[uninstall] 调用插件 ${p.name} 的卸载生命周期失败: ${e?.message || e}`);
+    }
+    // 触发插件卸载事件，通知前端与其他插件及时清理（保持兼容事件名）
     try { module.exports.emitEvent('__plugin_uninstall__', { pluginId: canonId, name: p.name, version: p.version }); } catch {}
     
     // 1. 先收集插件窗口信息（用于后续清理）

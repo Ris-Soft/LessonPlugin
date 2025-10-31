@@ -19,6 +19,18 @@ async function main() {
     debug: document.getElementById('page-debug'),
     about: document.getElementById('page-about')
   };
+  // 根据配置显示/隐藏调试页，并可默认进入运行管理
+  try {
+    const devMode = await window.settingsAPI?.configGet?.('system', 'developerMode');
+    const debugBtn = Array.from(navItems).find(b => b.dataset.page === 'debug');
+    if (debugBtn) {
+      debugBtn.style.display = devMode ? '' : 'none';
+      if (devMode) {
+        // 默认进入调试页
+        debugBtn.click();
+      }
+    }
+  } catch {}
   navItems.forEach((btn) => {
     btn.addEventListener('click', () => {
       navItems.forEach((b) => b.classList.remove('active'));
@@ -53,6 +65,32 @@ async function main() {
         initAboutPage();
       }
     });
+  });
+
+  // 全局进度显示区域（用于 Node 模块安装/下载等主进程推送的进度事件）
+  const progressUI = (() => {
+    const box = document.createElement('div'); box.id = 'global-progress'; box.className = 'global-progress'; box.hidden = true;
+    const header = document.createElement('div'); header.className = 'progress-header'; header.innerHTML = '<i class="ri-time-line"></i> 安装进度';
+    const list = document.createElement('div'); list.className = 'progress-list';
+    box.appendChild(header); box.appendChild(list);
+    document.body.appendChild(box);
+    return { box, list };
+  })();
+  window.settingsAPI?.onProgress?.((payload) => {
+    try {
+      const stage = payload?.stage || payload?.type || 'progress';
+      // 仅显示 NPM 下载阶段，避免非下载提示出现在此区域
+      if (stage !== 'npm') return;
+      const line = document.createElement('div'); line.className = 'progress-item';
+      const ts = new Date(); const hh = String(ts.getHours()).padStart(2, '0'); const mm = String(ts.getMinutes()).padStart(2, '0'); const ss = String(ts.getSeconds()).padStart(2, '0');
+      const time = `${hh}:${mm}:${ss}`;
+      const msg = payload?.message || payload?.msg || '';
+      const detail = payload?.detail || '';
+      line.textContent = `[${time}] ${msg}${detail ? ' ' + detail : ''}`;
+      progressUI.list.appendChild(line);
+      progressUI.box.hidden = false;
+      progressUI.list.scrollTop = progressUI.list.scrollHeight;
+    } catch {}
   });
 
   const navigateToPage = (page) => {
@@ -158,11 +196,10 @@ async function main() {
 
   // 拖拽安装ZIP
   const drop = document.getElementById('drop-install');
-  const modal = document.getElementById('install-modal');
-  const btnCancel = document.getElementById('install-cancel');
-  const btnConfirm = document.getElementById('install-confirm');
+  // 安装确认由统一入口处理，不再直接使用本地模态框
   let pendingZipPath = null;
   let pendingZipData = null; // { name, data: Uint8Array }
+  let pendingItemMeta = null; // 用于统一入口的依赖引导与展示
   ['dragenter','dragover'].forEach(evt => drop.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); }));
   ['dragleave','drop'].forEach(evt => drop.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover'); }));
   drop.addEventListener('drop', async (e) => {
@@ -182,7 +219,7 @@ async function main() {
         return;
       }
     }
-    // 安装前检查ZIP以展示依赖与安全提示
+    // 安装前检查ZIP以展示依赖与安全提示，并记录元信息供统一入口使用
     try {
       let inspect = null;
       if (pendingZipPath) inspect = await window.settingsAPI?.inspectPluginZip?.(pendingZipPath);
@@ -193,6 +230,14 @@ async function main() {
         const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : [];
         const depsObj = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
         const depNames = depsObj ? Object.keys(depsObj) : [];
+        // 记录供统一入口使用的元信息
+        pendingItemMeta = {
+          id: inspect.id || name,
+          name,
+          icon: 'ri-puzzle-line',
+          dependencies: pluginDepends,
+          npmDependencies: depsObj || null,
+        };
         // 计算插件依赖的安装状态（支持 name@version 范式）
         const list = await window.settingsAPI?.getPlugins?.();
         const installed = Array.isArray(list) ? list : [];
@@ -235,42 +280,19 @@ async function main() {
 插件依赖：${pluginDepends.length ? pluginDepends.join('，') : '无'}
 NPM依赖：${depNames.length ? depNames.join('，') : '无'}
 `;
-        const ok = await showConfirm(msg);
-        if (!ok) return;
+        // 风险确认与依赖选择将由统一安装入口统一处理
       }
     } catch {}
-    modal.hidden = false;
-  });
-  btnCancel?.addEventListener('click', () => { pendingZipPath = null; pendingZipData = null; modal.hidden = true; });
-  btnConfirm?.addEventListener('click', async () => {
-    if (!pendingZipPath && !pendingZipData) return;
-    btnConfirm.disabled = true; btnConfirm.innerHTML = '<i class="ri-loader-4-line"></i> 安装中...';
-    let res;
-    if (pendingZipPath) {
-      res = await window.settingsAPI?.installPluginZip(pendingZipPath);
-    } else {
-      res = await window.settingsAPI?.installPluginZipData(pendingZipData.name, pendingZipData.data);
+    // 直接调用统一安装入口，交由其处理确认与依赖引导
+    try {
+      if (pendingZipPath) {
+        await window.unifiedPluginInstall({ kind: 'zipPath', item: pendingItemMeta || {}, zipPath: pendingZipPath });
+      } else if (pendingZipData) {
+        await window.unifiedPluginInstall({ kind: 'zipData', item: pendingItemMeta || {}, zipName: pendingZipData.name, zipData: pendingZipData.data });
+      }
+    } finally {
+      pendingZipPath = null; pendingZipData = null; pendingItemMeta = null;
     }
-    btnConfirm.disabled = false; btnConfirm.innerHTML = '<i class="ri-checkbox-circle-line"></i> 确认安装';
-    if (!res?.ok) {
-      showAlert(`安装失败：${res?.error || '未知错误'}\n如需手动导入Node模块，请将对应包拷贝至 src/npm_store/<name>/<version>/node_modules/<name>`);
-      return;
-    }
-    modal.hidden = true; pendingZipPath = null; pendingZipData = null;
-    const metaAuthor = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
-    const depsObj = (typeof res.npmDependencies === 'object' && res.npmDependencies) ? res.npmDependencies : null;
-    const depNames = depsObj ? Object.keys(depsObj) : [];
-    await showAlertWithLogs(
-      '安装完成',
-      `安装成功：${res.name}\n作者：${metaAuthor}\n依赖：${depNames.length ? depNames.join(', ') : '无'}`,
-      Array.isArray(res?.logs) ? res.logs : []
-    );
-    // 重新刷新插件列表（仅显示包含动作的插件）
-    const container = document.getElementById('plugins');
-    const list = await fetchPlugins();
-    const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
-    container.innerHTML = '';
-    filtered.forEach((p) => container.appendChild(renderPlugin(p)));
   });
 }
 

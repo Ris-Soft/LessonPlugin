@@ -73,8 +73,34 @@ async function loadQuote() {
     quoteSource: 'hitokoto',
     quoteApiUrl: 'https://v1.hitokoto.cn/',
     localQuotes: [],
-    splashQuoteEnabled: true
+    splashQuoteEnabled: true,
+    splashBgStyle: 'default',
+    splashProgramName: 'LessonPlugin',
+    splashProgramDesc: '插件化大屏课堂辅助工具'
   });
+  // 应用程序名称与描述、背景样式
+  try {
+    const name = (await window.splashAPI.configGet('system', 'splashProgramName')) || 'LessonPlugin';
+    const desc = (await window.splashAPI.configGet('system', 'splashProgramDesc')) || '插件化大屏课堂辅助工具';
+    const style = (await window.splashAPI.configGet('system', 'splashBgStyle')) || 'default';
+    const brandTitle = document.querySelector('.brand h1');
+    const brandSub = document.querySelector('.brand .subtitle');
+    if (brandTitle) brandTitle.textContent = String(name || 'LessonPlugin');
+    if (brandSub) brandSub.textContent = String(desc || '插件化大屏课堂辅助工具');
+    const root = document.documentElement;
+    const body = document.body;
+    const setVars = (vars) => { Object.entries(vars || {}).forEach(([k, v]) => root.style.setProperty(k, v)); };
+    if (style === 'blue') {
+      setVars({ '--bg': '#0b1733', '--fg': '#e6f0ff', '--muted': '#a8c0ff', '--accent': '#3b82f6', '--btn-primary': '#1d4ed8', '--btn-secondary': '#1e3a8a' });
+      if (body) body.style.background = 'radial-gradient(900px 520px at 50% -200px, #0a1342, var(--bg))';
+    } else if (style === 'black') {
+      setVars({ '--bg': '#000000', '--fg': '#f0f0f0', '--muted': '#bdbdbd', '--accent': '#22c55e', '--btn-primary': '#374151', '--btn-secondary': '#1f2937' });
+      if (body) body.style.background = 'var(--bg)';
+    } else {
+      setVars({ '--bg': '#071a12', '--fg': '#d7f3e5', '--muted': '#9bd6b8', '--accent': '#22c55e', '--btn-primary': '#15803d', '--btn-secondary': '#14532d' });
+      if (body) body.style.background = 'radial-gradient(900px 520px at 50% -200px, #0b2a1d, var(--bg))';
+    }
+  } catch {}
   const showQuote = (await window.splashAPI.configGet('system', 'splashQuoteEnabled')) !== false;
   if (!showQuote && quoteEl) {
     quoteEl.style.display = 'none';

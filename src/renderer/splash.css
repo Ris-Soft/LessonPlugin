@@ -92,8 +92,8 @@ h1 {
 .brand img { width: 72px; height: 72px; }
 /* 按钮样式 */
 .btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
-.btn.primary { background: #15803d; color: #fff; }
-.btn.secondary { background: #14532d; color: #fff; }
+.btn.primary { background: var(--btn-primary, #15803d); color: #fff; }
+.btn.secondary { background: var(--btn-secondary, #14532d); color: #fff; }
 /* 图标按钮（仅显示最小化图标） */
 .btn.icon-only { padding: 6px; border-radius: 999px; }
 .btn.icon-only i { font-size: 16px; }
@@ -103,4 +103,4 @@ h1 {
 .quote .quote-en { font-size: 26px; line-height: 1.8; }
 .quote .quote-cn { margin-top: 2px; font-size: 20px; color: var(--muted); }
 .quote .quote-note { margin-top: 1px; font-size: 10px; color: var(--muted); }
-.quote .quote-origin { margin-top: 4px; font-size: 10px; opacity: 0.9; }
+.quote .quote-origin { margin-top: 4px; font-size: 10px; opacity: 0.9; display: none; }

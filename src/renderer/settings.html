@@ -105,6 +105,78 @@
           <!-- 启动页与名言设置（合并） -->
           <div id="general-splash" class="panel" hidden>
             <div class="form">
+              <!-- 启动页外观与文案（合并卡片：左预览/右设置） -->
+              <div class="setting-card splash-card">
+                <div class="splash-card-left">
+                  <div id="splash-preview-container" class="splash-preview-container">
+                    <iframe id="splash-preview-frame" class="splash-preview-frame" src="./splash.html"
+                      title="启动页预览"></iframe>
+                  </div>
+                  <div class="inline" style="margin-top:8px;">
+                    <button id="splash-refresh-quote" class="btn secondary"><i class="ri-refresh-line"></i>
+                      刷新语句</button>
+                  </div>
+                </div>
+                <div class="splash-card-right">
+                  <!-- 外观与文案分组 -->
+                  <div class="field-group">
+                    <div class="field-header">
+                      <div class="field-title">外观与文案</div>
+                      <div class="field-desc">选择背景主题、设置标题与副标题，左侧实时预览效果。</div>
+                    </div>
+                    <div class="inline" style="gap:8px;">
+                      <span class="muted">背景样式</span>
+                      <div class="options compact" role="group" aria-label="背景样式">
+                        <input type="radio" id="bg-default" name="splashBgStyle" value="default" />
+                        <label for="bg-default">默认</label>
+                        <input type="radio" id="bg-blue" name="splashBgStyle" value="blue" />
+                        <label for="bg-blue">深蓝</label>
+                        <input type="radio" id="bg-black" name="splashBgStyle" value="black" />
+                        <label for="bg-black">纯黑</label>
+                      </div>
+                    </div>
+                    <div class="inline" style="gap:8px; margin-top:8px;">
+                      <input id="splash-program-name" type="text" placeholder="程序名称（如：LessonPlugin）" />
+                      <input id="splash-program-desc" type="text" placeholder="副标题/描述（如：插件化大屏课堂辅助工具）" />
+                    </div>
+                    <div class="muted" style="margin-top:8px;">提示：左侧为启动页缩略预览，主题与文案修改将即时反映。</div>
+                  </div>
+
+                  <!-- 名言设置分组卡片（关闭显示时隐藏来源） -->
+                  <div class="field-group">
+                    <div class="field-header">
+                      <div class="field-title">名言设置</div>
+                      <div class="field-desc">选择来源和开关，左侧预览实时更新当前语句。</div>
+                    </div>
+
+                    <!-- 显示名言开关（移动到右侧卡片） -->
+                    <div class="inline" style="align-items:center; gap:10px;">
+                      <span class="muted">显示名言</span>
+                      <label class="switch">
+                        <input id="splash-quote-enabled" type="checkbox" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+
+                    <!-- 名言来源（移动到右侧卡片） -->
+                    <div id="quote-source-group" style="margin-top:8px;">
+                      <div class="setting-title" style="font-size:14px;">名言来源</div>
+                      <div class="setting-desc" style="margin-bottom: 4px;">支持 Hitokoto、EngQuote、本地列表或自定义地址。</div>
+                      <div class="options compact" role="group" aria-label="名言来源">
+                        <input type="radio" id="quote-hitokoto" name="quoteSource" value="hitokoto" />
+                        <label for="quote-hitokoto"><i class="ri-link-m"></i> Hitokoto</label>
+                        <input type="radio" id="quote-engquote" name="quoteSource" value="engquote" />
+                        <label for="quote-engquote"><i class="ri-translate-2"></i> EngQuote</label>
+                        <input type="radio" id="quote-local" name="quoteSource" value="local" />
+                        <label for="quote-local"><i class="ri-file-text-line"></i> 本地列表</label>
+                        <input type="radio" id="quote-custom" name="quoteSource" value="custom" />
+                        <label for="quote-custom"><i class="ri-tools-line"></i> 自定义地址</label>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
               <!-- 启动页开关 -->
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-window-line"></i></div>
@@ -119,48 +191,12 @@
                   </label>
                 </div>
               </div>
-
-              <!-- 显示名言开关 -->
-              <div class="setting-item">
-                <div class="setting-icon"><i class="ri-quill-pen-line"></i></div>
-                <div class="setting-main">
-                  <div class="setting-title">显示名言</div>
-                  <div class="setting-desc">关闭后不显示名言，启动页高度减小。</div>
-                </div>
-                <div class="setting-action">
-                  <label class="switch">
-                    <input id="splash-quote-enabled" type="checkbox" />
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- 名言来源选择（按钮组样式） -->
-              <div class="setting-item">
-                <div class="setting-icon"><i class="ri-chat-quote-line"></i></div>
-                <div class="setting-main">
-                  <div class="setting-title">名言来源</div>
-                  <div class="setting-desc">支持 Hitokoto、EngQuote、本地列表或自定义地址。</div>
-                  <div class="options" role="group" aria-label="名言来源">
-                    <input type="radio" id="quote-hitokoto" name="quoteSource" value="hitokoto" />
-                    <label for="quote-hitokoto"><i class="ri-link-m"></i> Hitokoto</label>
-                    <input type="radio" id="quote-engquote" name="quoteSource" value="engquote" />
-                    <label for="quote-engquote"><i class="ri-translate-2"></i> EngQuote</label>
-                    <input type="radio" id="quote-local" name="quoteSource" value="local" />
-                    <label for="quote-local"><i class="ri-file-text-line"></i> 本地列表</label>
-                    <input type="radio" id="quote-custom" name="quoteSource" value="custom" />
-                    <label for="quote-custom"><i class="ri-tools-line"></i> 自定义地址</label>
-                  </div>
-                </div>
-                <div class="setting-action"></div>
-              </div>
-
-              <!-- API 设置 -->
+              <!-- API 设置（仅在“自定义地址”来源下显示） -->
               <div class="setting-item" id="field-api">
                 <div class="setting-icon"><i class="ri-link-m"></i></div>
                 <div class="setting-main">
                   <div class="setting-title">API 地址</div>
-                  <div class="setting-desc">自定义Api地址</div>
+                  <div class="setting-desc">在“自定义地址”来源下，用于获取名言文本。</div>
                   <div class="inline">
                     <input id="api-url" type="text" placeholder="https://example.com/api" />
                     <button id="api-test" class="btn primary"><i class="ri-refresh-line"></i> 测试获取</button>
@@ -170,16 +206,19 @@
                 <div class="setting-action"></div>
               </div>
 
-              <!-- 本地列表编辑 -->
+              <!-- 本地列表编辑（仅在“本地列表”来源下显示） -->
               <div class="setting-item" id="field-local">
                 <div class="setting-icon"><i class="ri-file-text-line"></i></div>
                 <div class="setting-main">
                   <div class="setting-title">本地名言列表</div>
-                  <div class="setting-desc">以“文本 | 来源”两列编辑，支持从TXT导入。</div>
+                  <div class="setting-desc">以“文本 | 来源”两列编辑，支持从 TXT 导入。</div>
                   <button id="open-array-editor" class="btn secondary"><i class="ri-edit-2-line"></i> 编辑列表</button>
                 </div>
                 <div class="setting-action"></div>
               </div>
+
+
+
             </div>
           </div>
 
@@ -237,6 +276,22 @@
           <!-- 时间与数据 子页 -->
           <div id="general-time" class="panel" hidden>
             <div class="form">
+              <!-- 当前设定时间与日期（实时展示，左大时间 / 右学期信息） -->
+              <div class="setting-item full">
+                <div class="setting-main">
+                  <div style="display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:center;">
+                    <div>
+                      <div id="current-time-summary" style="font-size:22px; font-weight:600;">—</div>
+                      <div id="current-offset-summary" class="muted" style="margin-top:4px;">偏移 —</div>
+                    </div>
+                    <div>
+                      <div id="current-semester-summary" class="pill small" style="display:inline-block;">—</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+
               <!-- 精确时间开关 -->
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-time-line"></i></div>
@@ -318,6 +373,19 @@
           <!-- 数据目录 子页（从插件页面移回通用设置） -->
           <div id="general-data" class="panel" hidden>
             <div class="form">
+              <!-- 数据目录占用大小展示 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-database-2-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">数据目录占用</div>
+                  <div class="setting-desc">显示用户数据目录当前磁盘占用大小。</div>
+                  <div class="inline" style="margin-top:8px;">
+                    <span class="pill small">大小 <span id="user-data-size">—</span></span>
+                  </div>
+                </div>
+                <div class="setting-action"></div>
+              </div>
+
               <!-- 数据目录操作 -->
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-folder-line"></i></div>
@@ -445,9 +513,38 @@
         <section id="page-debug" hidden>
           <header>
             <h1>调试</h1>
-            <p>通过 Canvas 生成并释放 RemixIcon 到 icons 目录，用作托盘菜单一级图标。</p>
+            <p>开发者模式下提供运行管理与图标工具。</p>
           </header>
-          <div class="panel">
+          <!-- 子页导航 -->
+          <div class="subnav">
+            <button class="sub-item active" data-sub="run"><i class="ri-roadster-line"></i> 运行管理</button>
+            <button class="sub-item" data-sub="icons"><i class="ri-tools-line"></i> 图标工具</button>
+            <button class="sub-item" data-sub="logs"><i class="ri-terminal-box-line"></i> 后端日志</button>
+          </div>
+          <!-- 运行管理子页（默认） -->
+          <div id="debug-run" class="panel">
+            <div class="form">
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-information-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">程序基本信息</div>
+                  <div class="setting-desc">查看当前版本与运行环境信息。</div>
+                  <div class="inline">
+                    <span class="pill small">版本 <span id="debug-app-version">—</span></span>
+                    <span class="pill small" style="margin-left:8px;">Electron <span id="debug-electron">—</span></span>
+                    <span class="pill small" style="margin-left:8px;">Node <span id="debug-node">—</span></span>
+                    <span class="pill small" style="margin-left:8px;">Chrome <span id="debug-chrome">—</span></span>
+                    <span class="pill small" style="margin-left:8px;">平台 <span id="debug-platform">—</span></span>
+                  </div>
+                </div>
+                <div class="setting-action">
+                  <button id="debug-restart" class="btn"><i class="ri-refresh-line"></i> 快速重启程序</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 图标工具子页 -->
+          <div id="debug-icons" class="panel" hidden>
             <div class="form">
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-tools-line"></i></div>
@@ -477,8 +574,6 @@
                 </div>
               </div>
             </div>
-          </div>
-          <div class="panel">
             <div class="shortcut-preview-grid">
               <canvas id="debug-canvas" class="preview-canvas" width="256" height="256"></canvas>
               <div class="preview-meta">
@@ -486,6 +581,19 @@
                 <div class="muted" style="margin-top:6px;">提示：托盘图标来源优先用户数据 icons，其次应用内置。</div>
               </div>
             </div>
+          </div>
+          <!-- 后端日志子页 -->
+          <div id="debug-logs" class="panel" hidden>
+            <div class="form">
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-terminal-box-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">Node 后端日志</div>
+                  <div class="setting-desc">仅在开发者模式开启时自动保存与记录。进入页面显示最近 20 条，并实时更新。</div>
+                </div>
+              </div>
+            </div>
+            <div id="backend-log-list" class="log-list" aria-label="后端日志"></div>
           </div>
         </section>
 
@@ -580,6 +688,76 @@
   <!-- <script src="./settings.js"></script> -->
   <script src="./settings/processor/icon.js"></script>
   <script src="./settings/processor/text.js"></script>
+  <script src="./settings/processor/install.js"></script>
+  <script src="./settings/modals/message.js"></script>
+  <script src="./settings/modals/editor.js"></script>
+  <script src="./settings/modals/market.js"></script>
+  <script src="./settings/modals/shortcut.js"></script>
+  <script src="./settings/modals/plugin.js"></script>
+  <script src="./settings/handler/about.js"></script>
+  <script src="./settings/handler/automation.js"></script>
+  <script src="./settings/handler/debug.js"></script>
+  <script src="./settings/handler/general.js"></script>
+  <script src="./settings/handler/market.js"></script>
+  <script src="./settings/handler/market.init.js"></script>
+  <script src="./settings/handler/plugin.js"></script>
+  <script src="./settings/handler/profile.js"></script>
+  <script src="./settings/main.js"></script>
+
+
+  </div>
+  </div>
+
+  </section>
+
+  <!-- 关于页面 -->
+  <section id="page-about" hidden>
+    <header>
+      <h1>关于</h1>
+      <p>LessonPlugin — 插件化大屏课堂辅助工具</p>
+    </header>
+    <div class="panel">
+      <div class="about-hero">
+        <img class="about-logo" src="../../icon.ico" alt="LessonPlugin" />
+        <div class="about-title">
+          <div class="name">LessonPlugin</div>
+          <div class="tagline">插件化大屏课堂辅助工具</div>
+        </div>
+        <div class="about-badges">
+          <span class="pill small">版本 <span id="about-version">—</span></span>
+          <span class="pill small">Electron <span id="about-electron">—</span></span>
+          <span class="pill small">Node <span id="about-node">—</span></span>
+          <span class="pill small">Chrome <span id="about-chrome">—</span></span>
+          <span class="pill small">平台 <span id="about-platform">—</span></span>
+        </div>
+      </div>
+      <div class="about-links">
+        <a href="https://github.com/Ris-Soft/LessonPlugin" target="_blank" class="btn"><i
+            class="ri-git-repository-line"></i> 仓库</a>
+        <div class="spacer"></div>
+        <button id="about-copy" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制版本信息</button>
+        <button id="about-open-data" class="btn"><i class="ri-folder-2-line"></i> 打开数据目录</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="contributors">
+        <div class="section-title"><i class="ri-team-line"></i> 贡献者</div>
+        <ul class="contributors-list horizontal">
+          <li>
+            <div class="avatar"><i style="color: white;" class="ri-code-line"></i></div>
+            <div class="name">PYLXU</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  </main>
+  </div>
+  </div>
+  <script src="./settings/processor/icon.js"></script>
+  <script src="./settings/processor/text.js"></script>
+  <script src="./settings/processor/install.js"></script>
   <script src="./settings/modals/message.js"></script>
   <script src="./settings/modals/editor.js"></script>
   <script src="./settings/modals/market.js"></script>

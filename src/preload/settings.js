@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   npmDownload: (name, version) => ipcRenderer.invoke('npm:download', name, version),
   npmSwitch: (pluginName, name, version) => ipcRenderer.invoke('npm:switch', pluginName, name, version)
   ,npmListInstalled: () => ipcRenderer.invoke('npm:installed'),
+  // 插件依赖状态与确保（下载+链接）
+  pluginDepsStatus: (idOrName) => ipcRenderer.invoke('plugin:deps:status', idOrName),
+  pluginEnsureDeps: (idOrName) => ipcRenderer.invoke('plugin:deps:ensure', idOrName),
   // 档案管理：列定义
   profilesGetColumnDefs: () => ipcRenderer.invoke('profiles:columnDefs'),
   // 统一配置存储 API
@@ -47,6 +50,10 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   onNavigate: (handler) => {
     ipcRenderer.on('settings:navigate', (_e, page) => handler && handler(page));
   },
+  // 进度事件订阅（主进程通过 'plugin-progress' 推送）
+  onProgress: (handler) => {
+    try { ipcRenderer.on('plugin-progress', (_e, payload) => handler && handler(payload)); } catch {}
+  },
   // 打开插件信息模态框事件订阅
   onOpenPluginInfo: (handler) => {
     ipcRenderer.on('settings:openPluginInfo', (_e, pluginKey) => handler && handler(pluginKey));
@@ -63,10 +70,13 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getAutostart: () => ipcRenderer.invoke('system:getAutostart'),
   setAutostart: (enabled, highPriority) => ipcRenderer.invoke('system:setAutostart', enabled, highPriority),
   getCurrentTime: () => ipcRenderer.invoke('system:getTime'),
+  getUserDataSize: () => ipcRenderer.invoke('system:getUserDataSize'),
   cleanupUserData: () => ipcRenderer.invoke('system:cleanupUserData'),
   getUserDataPath: () => ipcRenderer.invoke('system:getUserDataPath'),
   openUserData: () => ipcRenderer.invoke('system:openUserData'),
   changeUserData: () => ipcRenderer.invoke('system:changeUserData'),
+  // 快速重启应用
+  restartApp: () => ipcRenderer.invoke('system:restart'),
   // 图标释放（Canvas PNG -> 用户数据 renderer/icons）
   getIconsDir: () => ipcRenderer.invoke('icons:dir'),
   writeIconPng: (fileName, dataUrl) => ipcRenderer.invoke('icons:write', fileName, dataUrl),
@@ -76,4 +86,12 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   },
   // 查询依赖反向引用（依赖此插件的插件与自动化）
   pluginDependents: (idOrName) => ipcRenderer.invoke('plugin:dependents', idOrName)
+  ,
+  // 后端日志（调试）：获取最近记录与订阅实时日志
+  backendLogsGet: () => ipcRenderer.invoke('debug:logs:get'),
+  onBackendLog: (handler) => {
+    ipcRenderer.on('backend:log', (_e, line) => handler && handler(line));
+    // 主动声明订阅以便主进程推送
+    try { ipcRenderer.send('debug:logs:subscribe'); } catch {}
+  }
 });

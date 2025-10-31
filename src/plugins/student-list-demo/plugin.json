@@ -5,6 +5,8 @@
   "icon": "ri-user-3-line",
   "description": "示例：调用学生列表、编辑学生档案与精准时间（含偏移）",
   "actions": [
+    { "id": "openWindow", "icon": "ri-window-line", "text": "学生列表编辑", "target": "openWindow" },
+    { "id": "openWindow", "icon": "ri-window-line", "text": "学生列表编辑", "target": "openWindow" },
     { "id": "openWindow", "icon": "ri-window-line", "text": "学生列表编辑", "target": "openWindow" }
   ],
   "studentColumns": [

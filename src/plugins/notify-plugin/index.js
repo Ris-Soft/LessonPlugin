@@ -19,9 +19,8 @@ try {
 let volumeLib = null;
 let previousVolume = null;
 try {
-  const cr = Module.createRequire(path.join(app.getAppPath(), 'package.json'));
-  volumeLib = cr('loudness');
-  log('volume:require:ok', 'loudness', 'via createRequire(app)');
+  volumeLib = require('loudness');
+  log('volume:require:ok', 'loudness');
 } catch (e) {
   log('volume:require:fail', 'loudness', e?.message || String(e));
 }
@@ -96,6 +95,102 @@ function createRuntimeWindow() {
   return runtimeWin;
 }
 
+// 统一的 IPC 注册函数：在初始化或重新启用时调用
+function registerIpcHandlers() {
+  try {
+    try { ipcMain.removeHandler('notify:setClickThrough'); } catch {}
+    ipcMain.handle('notify:setClickThrough', (_evt, enable) => {
+      if (!runtimeWin || runtimeWin.isDestroyed()) return false;
+      runtimeWin.setIgnoreMouseEvents(Boolean(enable), { forward: true });
+      return true;
+    });
+
+    try { ipcMain.removeHandler('notify:setVisible'); } catch {}
+    ipcMain.handle('notify:setVisible', (_evt, visible) => {
+      if (!runtimeWin || runtimeWin.isDestroyed()) return false;
+      try { if (visible) runtimeWin.show(); else runtimeWin.hide(); return true; } catch { return false; }
+    });
+
+    try { ipcMain.removeHandler('notify:setSystemVolume'); } catch {}
+    ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
+      try {
+        if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
+          log('volume:lib_missing');
+          return false;
+        }
+        const target = Math.max(0, Math.min(100, Number(level || 0)));
+        if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
+          try { previousVolume = await volumeLib.getVolume(); } catch {}
+        }
+        await volumeLib.setVolume(target);
+        log('volume:set', target);
+        return true;
+      } catch (e) {
+        log('volume:set:error', e?.message || String(e));
+        return false;
+      }
+    });
+
+    try { ipcMain.removeHandler('notify:restoreSystemVolume'); } catch {}
+    ipcMain.handle('notify:restoreSystemVolume', async () => {
+      try {
+        if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
+          log('volume:lib_missing');
+          return false;
+        }
+        const pv = previousVolume;
+        previousVolume = null;
+        if (pv == null) return true;
+        await volumeLib.setVolume(Math.max(0, Math.min(100, Number(pv))));
+        log('volume:restore', pv);
+        return true;
+      } catch (e) {
+        log('volume:restore:error', e?.message || String(e));
+        return false;
+      }
+    });
+  } catch (e) {
+    log('notify:ipc_register:error', e?.message || String(e));
+  }
+}
+
+// 统一的清理函数：禁用或卸载时调用，确保资源一致释放
+function cleanup(payload) {
+  log('notify:cleanup:start', payload);
+  try {
+    // 清理窗口
+    if (runtimeWin && !runtimeWin.isDestroyed()) {
+      try { runtimeWin.webContents?.destroy(); } catch {}
+      try { runtimeWin.destroy(); } catch {}
+      runtimeWin = null;
+    }
+    if (settingsWin && !settingsWin.isDestroyed()) {
+      try { settingsWin.webContents?.destroy(); } catch {}
+      try { settingsWin.destroy(); } catch {}
+      settingsWin = null;
+    }
+    // 清理队列
+    pendingQueue = [];
+    // 恢复音量
+    if (previousVolume != null && volumeLib) {
+      try { volumeLib.setVolume(previousVolume); } catch {}
+      previousVolume = null;
+    }
+    // 移除 IPC 处理器
+    try {
+      ipcMain.removeHandler('notify:setClickThrough');
+      ipcMain.removeHandler('notify:setVisible');
+      ipcMain.removeHandler('notify:setSystemVolume');
+      ipcMain.removeHandler('notify:restoreSystemVolume');
+    } catch {}
+    log('notify:cleanup:done');
+    return true;
+  } catch (e) {
+    log('notify:cleanup:error', e?.message || String(e));
+    return false;
+  }
+}
+
 module.exports = {
   name: '通知插件',
   version: '1.0.0',
@@ -103,112 +198,11 @@ module.exports = {
   init: (api) => {
     // 插件初始化逻辑
     log('notify:init');
-    
-    // 监听插件卸载事件，进行资源清理
-    if (api && typeof api.emit === 'function') {
-      // 订阅卸载事件
-      try {
-        const { ipcMain } = require('electron');
-        const cleanupHandler = (event, payload) => {
-          if (payload && payload.pluginId === 'notify.plugin') {
-            log('notify:cleanup:start');
-            try {
-              // 清理窗口
-              if (runtimeWin && !runtimeWin.isDestroyed()) {
-                runtimeWin.destroy();
-                runtimeWin = null;
-              }
-              if (settingsWin && !settingsWin.isDestroyed()) {
-                settingsWin.destroy();
-                settingsWin = null;
-              }
-              // 清理队列
-              pendingQueue = [];
-              // 恢复音量
-              if (previousVolume != null && volumeLib) {
-                try {
-                  volumeLib.setVolume(previousVolume);
-                  previousVolume = null;
-                } catch {}
-              }
-              log('notify:cleanup:done');
-            } catch (e) {
-              log('notify:cleanup:error', e?.message || String(e));
-            }
-          }
-        };
-        
-        // 监听禁用和卸载事件
-        ipcMain.on('__plugin_disabled__', cleanupHandler);
-        ipcMain.on('__plugin_uninstall__', cleanupHandler);
-      } catch (e) {
-        log('notify:cleanup:register:error', e?.message || String(e));
-      }
-    }
-    
     // 注册 IPC 处理器（避免重复注册：先移除再注册）
-    const { ipcMain } = require('electron');
-    function registerIpcHandlers() {
-      try {
-        try { ipcMain.removeHandler('notify:setClickThrough'); } catch {}
-        ipcMain.handle('notify:setClickThrough', (_evt, enable) => {
-          if (!runtimeWin || runtimeWin.isDestroyed()) return false;
-          runtimeWin.setIgnoreMouseEvents(Boolean(enable), { forward: true });
-          return true;
-        });
-
-        try { ipcMain.removeHandler('notify:setVisible'); } catch {}
-        ipcMain.handle('notify:setVisible', (_evt, visible) => {
-          if (!runtimeWin || runtimeWin.isDestroyed()) return false;
-          try { if (visible) runtimeWin.show(); else runtimeWin.hide(); return true; } catch { return false; }
-        });
-
-        try { ipcMain.removeHandler('notify:setSystemVolume'); } catch {}
-        ipcMain.handle('notify:setSystemVolume', async (_evt, level) => {
-          try {
-            if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
-              log('volume:lib_missing');
-              return false;
-            }
-            const target = Math.max(0, Math.min(100, Number(level || 0)));
-            if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
-              try { previousVolume = await volumeLib.getVolume(); } catch {}
-            }
-            await volumeLib.setVolume(target);
-            log('volume:set', target);
-            return true;
-          } catch (e) {
-            log('volume:set:error', e?.message || String(e));
-            return false;
-          }
-        });
-
-        try { ipcMain.removeHandler('notify:restoreSystemVolume'); } catch {}
-        ipcMain.handle('notify:restoreSystemVolume', async () => {
-          try {
-            if (!volumeLib || typeof volumeLib.setVolume !== 'function') {
-              log('volume:lib_missing');
-              return false;
-            }
-            const pv = previousVolume;
-            previousVolume = null;
-            if (pv == null) return true;
-            await volumeLib.setVolume(Math.max(0, Math.min(100, Number(pv))));
-            log('volume:restore', pv);
-            return true;
-          } catch (e) {
-            log('volume:restore:error', e?.message || String(e));
-            return false;
-          }
-        });
-      } catch (e) {
-        log('notify:ipc_register:error', e?.message || String(e));
-      }
-    }
+    registerIpcHandlers();
 
     if (app.isReady()) {
       createRuntimeWindow();
-      registerIpcHandlers();
     } else {
       app.once('ready', () => { createRuntimeWindow(); registerIpcHandlers(); });
     }
@@ -219,6 +213,21 @@ module.exports = {
   functions: {
     openSettings: () => { openSettingsWindow(); return true; },
     reopenRuntime: () => { createRuntimeWindow(); return true; },
+    // 统一结构：提供 __plugin_init__，与顶层 init 行为一致（供需要时调用）
+    __plugin_init__: () => {
+      try {
+        if (app.isReady()) {
+          createRuntimeWindow();
+        } else {
+          app.once('ready', () => { createRuntimeWindow(); });
+        }
+        registerIpcHandlers();
+        return true;
+      } catch (e) {
+        log('notify:init:function:error', e?.message || String(e));
+        return false;
+      }
+    },
     // 主动广播当前配置到运行窗口（供设置页调用实现实时生效）
     broadcastConfig: () => {
       const win = createRuntimeWindow();
@@ -334,7 +343,13 @@ module.exports = {
         win.webContents.send('notify:enqueue', payload);
         return true;
       } catch { return false; }
-    }
+    },
+
+    // 插件生命周期函数：禁用时清理（统一结构）
+    disabled: (payload) => cleanup(payload),
+
+    // 插件生命周期函数：卸载时清理（统一结构）
+    uninstall: (payload) => cleanup(payload)
   },
   // 自动化事件声明：暴露可调用动作（更全面）
   automationEvents: [
