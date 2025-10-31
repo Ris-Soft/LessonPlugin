@@ -200,10 +200,12 @@ function renderStoreCard(item, installedList) {
               const res = await fetch(url);
               if (!res.ok) throw new Error('ZIP 下载失败');
               const buf = await res.arrayBuffer();
-              const name = item.id ? `${item.id}.zip` : `${item.name || 'plugin'}.zip`;
+              // 名称不带 .zip 后缀：优先使用插件名称，其次回退到 id，最后回退默认名
+              const name = item.name ? item.name : (item.id ? item.id : 'plugin');
               // 安装前检查ZIP并弹出美化确认窗口
+              let inspect = null;
               try {
-                const inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf));
+                inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf));
                 if (inspect?.ok) {
                   const installedList = await window.settingsAPI?.getPlugins?.();
                   const installed = Array.isArray(installedList) ? installedList : [];
@@ -258,7 +260,17 @@ function renderStoreCard(item, installedList) {
                   // 本地安装向导已移除，依赖引导与安装由统一入口处理
                 }
               } catch {}
-              await window.unifiedPluginInstall({ kind: 'zipData', item, zipName: name, zipData: new Uint8Array(buf) });
+              // 将 inspect 结果合并到 item，确保统一安装入口能识别 NPM 依赖
+              const depsObj = (inspect && typeof inspect.npmDependencies === 'object' && !Array.isArray(inspect.npmDependencies) && inspect.npmDependencies) ? inspect.npmDependencies : null;
+              const enrichedItem = {
+                ...item,
+                id: inspect?.id || item.id || name,
+                name: name,
+                author: (typeof inspect?.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect?.author || item.author),
+                dependencies: Array.isArray(inspect?.dependencies) ? inspect.dependencies : (Array.isArray(item?.dependencies) ? item.dependencies : []),
+                npmDependencies: depsObj || (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) ? item.npmDependencies : null)
+              };
+              await window.unifiedPluginInstall({ kind: 'zipData', item: enrichedItem, zipName: name, zipData: new Uint8Array(buf) });
             } catch (e) {
               throw e;
             }

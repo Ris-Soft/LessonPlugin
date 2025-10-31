@@ -1,6 +1,7 @@
 {
   "name": "通知插件",
   "version": "1.0.0",
+  "author": "LessonPlugin",
   "description": "前置类通知插件：队列化通知、TTS播报、类型音频与两种窗口样式",
   "id": "notify.plugin",
   "actions": [

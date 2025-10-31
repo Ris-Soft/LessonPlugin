@@ -23,7 +23,7 @@
         <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
         <button class="nav-item" data-page="profiles"><i class="ri-archive-line"></i> 档案管理</button>
         <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
-        <button class="nav-item" data-page="npm" style="display: none;"><i class="ri-box-3-line"></i> 依赖管理</button>
+        <button class="nav-item" data-page="npm"><i class="ri-box-3-line"></i> 依赖管理</button>
         <button class="nav-item" data-page="debug" style="display: none;"><i class="ri-tools-line"></i> 调试功能</button>
         <button class="nav-item" data-page="about"><i class="ri-information-line"></i> 关于软件</button>
       </nav>
@@ -661,9 +661,14 @@
         <section id="page-npm" hidden>
           <header>
             <h1>依赖管理</h1>
-            <p>仅展示插件依赖的 Node 模块列表（随插件安装或手动导入）</p>
+            <p>管理插件依赖的 Node 模块：搜索、下载与删除版本</p>
           </header>
           <div class="panel">
+            <div class="npm-search">
+              <input id="npm-search-input" type="text" placeholder="搜索 NPM 包名（支持 @scope/package）" />
+              <button id="npm-search-btn" class="btn"><i class="ri-search-line"></i> 搜索版本</button>
+            </div>
+            <div id="npm-versions" class="npm-versions"></div>
             <div id="npm-installed" class="npm-installed"></div>
           </div>
         </section>

@@ -67,31 +67,7 @@ async function main() {
     });
   });
 
-  // 全局进度显示区域（用于 Node 模块安装/下载等主进程推送的进度事件）
-  const progressUI = (() => {
-    const box = document.createElement('div'); box.id = 'global-progress'; box.className = 'global-progress'; box.hidden = true;
-    const header = document.createElement('div'); header.className = 'progress-header'; header.innerHTML = '<i class="ri-time-line"></i> 安装进度';
-    const list = document.createElement('div'); list.className = 'progress-list';
-    box.appendChild(header); box.appendChild(list);
-    document.body.appendChild(box);
-    return { box, list };
-  })();
-  window.settingsAPI?.onProgress?.((payload) => {
-    try {
-      const stage = payload?.stage || payload?.type || 'progress';
-      // 仅显示 NPM 下载阶段，避免非下载提示出现在此区域
-      if (stage !== 'npm') return;
-      const line = document.createElement('div'); line.className = 'progress-item';
-      const ts = new Date(); const hh = String(ts.getHours()).padStart(2, '0'); const mm = String(ts.getMinutes()).padStart(2, '0'); const ss = String(ts.getSeconds()).padStart(2, '0');
-      const time = `${hh}:${mm}:${ss}`;
-      const msg = payload?.message || payload?.msg || '';
-      const detail = payload?.detail || '';
-      line.textContent = `[${time}] ${msg}${detail ? ' ' + detail : ''}`;
-      progressUI.list.appendChild(line);
-      progressUI.box.hidden = false;
-      progressUI.list.scrollTop = progressUI.list.scrollHeight;
-    } catch {}
-  });
+  // 已移除全局安装进度展示（global-progress）
 
   const navigateToPage = (page) => {
     try {
@@ -151,6 +127,46 @@ async function main() {
   const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
   filtered.forEach((p) => container.appendChild(renderPlugin(p)));
 
+  // 打开设置页时检查缺失依赖并提示安装（避免占用启动时间）
+  let depsPrompted = false;
+  async function checkMissingDepsPrompt() {
+    if (depsPrompted) return;
+    depsPrompted = true;
+    try {
+      const all = await window.settingsAPI?.getPlugins?.();
+      const enabledList = (all || []).filter(p => p.enabled);
+      for (const p of enabledList) {
+        const res = await window.settingsAPI?.pluginDepsStatus?.(p.id || p.name);
+        const st = Array.isArray(res?.status) ? res.status : [];
+        const missing = st.filter(s => !Array.isArray(s.installed) || s.installed.length === 0).map(s => s.name);
+        if (missing.length) {
+          const ok = await showConfirm(`插件 ${p.name} 缺少依赖：${missing.join('，')}，是否现在安装？`);
+          if (!ok) continue;
+          // 显示安装进度并绑定事件
+          const progressModal = showProgressModal('安装依赖', `准备安装 ${p.name} 依赖...`);
+          const handler = (payload) => {
+            try {
+              if (payload && String(payload.stage).toLowerCase() === 'npm') {
+                progressModal.update(payload);
+              }
+            } catch {}
+          };
+          try { window.settingsAPI?.onProgress?.(handler); } catch {}
+          const ensure = await window.settingsAPI?.pluginEnsureDeps?.(p.id || p.name);
+          try { window.settingsAPI?.offProgress?.(handler); } catch {}
+          try { progressModal?.close?.(); } catch {}
+          if (ensure?.ok) {
+            await showToast(`已安装 ${p.name} 依赖`);
+          } else {
+            await showAlert(`安装失败：${ensure?.error || '未知错误'}`);
+          }
+        }
+      }
+    } catch {}
+  }
+  // 触发一次检查
+  checkMissingDepsPrompt();
+
   // 自定义标题栏按钮
   document.querySelectorAll('.win-btn').forEach((b) => {
     b.addEventListener('click', () => {
@@ -161,6 +177,10 @@ async function main() {
 
   // NPM 管理逻辑（仅展示已安装列表）
   const installedEl = document.getElementById('npm-installed');
+  const versionsEl = document.getElementById('npm-versions');
+  const searchInput = document.getElementById('npm-search-input');
+  const searchBtn = document.getElementById('npm-search-btn');
+
   async function renderInstalled() {
     installedEl.innerHTML = '加载已安装模块...';
     const res = await window.settingsAPI?.npmListInstalled();
@@ -177,9 +197,63 @@ async function main() {
         <div class="pkg-header">
           <div class="pkg-name"><i class="ri-box-3-line"></i> ${pkg.name}</div>
           <div class="count">${pkg.versions.length} 个版本</div>
+          <div class="spacer"></div>
+          <button class="btn danger small" data-act="delete">删除</button>
         </div>
         <div class="versions">${pkg.versions.map(v => `<span class="pill">v${v}</span>`).join(' ')}</div>
+        <div class="pkg-actions" hidden></div>
       `;
+      const delBtn = div.querySelector('button[data-act="delete"]');
+      const actions = div.querySelector('.pkg-actions');
+      delBtn.addEventListener('click', async () => {
+        // 展示版本选择并检查占用
+        const name = pkg.name;
+        actions.hidden = false;
+        actions.innerHTML = '正在加载占用信息...';
+        const usesRes = await window.settingsAPI?.npmModuleUsers?.(name);
+        const usedMap = new Map();
+        if (usesRes?.ok && Array.isArray(usesRes.users)) {
+          usesRes.users.forEach(u => {
+            if (u.version) usedMap.set(String(u.version), (usedMap.get(String(u.version)) || 0) + 1);
+          });
+        }
+        actions.innerHTML = `
+          <div class="inline" style="gap:8px;align-items:center;margin-top:8px;">
+            <span class="muted">选择要删除的版本：</span>
+            ${pkg.versions.map(v => {
+              const used = usedMap.has(String(v));
+              const hint = used ? `（被${usedMap.get(String(v))}个插件占用）` : '';
+              return `<label class="inline" style="gap:6px;">
+                <input type="checkbox" name="ver" value="${v}" ${used ? 'disabled' : ''} />
+                <span>v${v} ${hint}</span>
+              </label>`;
+            }).join(' ')}
+            <div class="spacer"></div>
+            <button class="btn secondary small" data-act="cancel">取消</button>
+            <button class="btn danger small" data-act="confirm">确认删除</button>
+          </div>
+        `;
+        const cancelBtn = actions.querySelector('button[data-act="cancel"]');
+        const confirmBtn = actions.querySelector('button[data-act="confirm"]');
+        cancelBtn.addEventListener('click', () => { actions.hidden = true; actions.innerHTML = ''; });
+        confirmBtn.addEventListener('click', async () => {
+          const selected = Array.from(actions.querySelectorAll('input[name="ver"]:checked')).map(i => i.value);
+          if (!selected.length) { await showAlert('请至少选择一个可删除的版本'); return; }
+          const rmRes = await window.settingsAPI?.npmRemove?.(name, selected);
+          if (!rmRes?.ok) {
+            await showAlert(`删除失败：${rmRes?.error || (rmRes?.errors?.[0]?.error) || '未知错误'}`);
+            return;
+          }
+          if (rmRes.blocked?.length) {
+            await showAlert(`以下版本当前被插件占用，未删除：${rmRes.blocked.join('，')}`);
+          }
+          if (rmRes.removed?.length) {
+            await showToast(`已删除版本：${rmRes.removed.join('，')}`);
+          }
+          actions.hidden = true; actions.innerHTML = '';
+          await renderInstalled();
+        });
+      });
       installedEl.appendChild(div);
     });
   }
@@ -187,6 +261,71 @@ async function main() {
   const activeNav = document.querySelector('.nav-item.active');
   if (activeNav?.dataset.page === 'npm') {
     renderInstalled();
+  }
+
+  // 版本搜索与下载
+  async function renderVersions(name) {
+    versionsEl.innerHTML = '';
+    const res = await window.settingsAPI?.npmGetVersions?.(name);
+    if (!res?.ok) {
+      versionsEl.innerHTML = `<div class="panel">获取版本失败：${res?.error || '未知错误'}</div>`;
+      return;
+    }
+    const { versions } = res;
+    if (!Array.isArray(versions) || versions.length === 0) {
+      versionsEl.innerHTML = `<div class="muted">未查询到版本</div>`;
+      return;
+    }
+    versionsEl.innerHTML = `<div class="muted">找到 ${versions.length} 个版本，点击下载所需版本</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'versions-grid';
+    grid.style.display = 'flex';
+    grid.style.flexWrap = 'wrap';
+    grid.style.gap = '8px';
+    versions.forEach(v => {
+      const pill = document.createElement('button');
+      pill.className = 'btn small';
+      pill.textContent = `v${v}`;
+      pill.addEventListener('click', async () => {
+        const ok = await showConfirm(`下载 ${name}@${v} 吗？`);
+        if (!ok) return;
+        try {
+          // 显示下载/安装进度模态框，并绑定进度事件
+          const progressModal = showProgressModal('下载/安装进度', `准备下载 ${name}@${v} ...`);
+          const handler = (payload) => {
+            try {
+              // 仅处理 npm 阶段，且信息包含当前包名与版本，避免串扰
+              if (payload && String(payload.stage).toLowerCase() === 'npm') {
+                const msg = String(payload.message || '');
+                if (msg.includes(`${name}@${v}`) || msg.includes(name)) {
+                  progressModal.update(payload);
+                }
+              }
+            } catch {}
+          };
+          window.settingsAPI?.onProgress?.(handler);
+          const dl = await window.settingsAPI?.npmDownload?.(name, v);
+          // 解绑进度并关闭模态框
+          try { window.settingsAPI?.offProgress?.(handler); } catch {}
+          try { progressModal?.close?.(); } catch {}
+          if (!dl?.ok) {
+            await showAlert(`下载失败：${dl?.error || '未知错误'}`);
+            return;
+          }
+          await showToast(`已下载 ${name}@${v}`);
+          await renderInstalled();
+        } catch (e) { await showAlert(`下载异常：${e?.message || String(e)}`); }
+      });
+      grid.appendChild(pill);
+    });
+    versionsEl.appendChild(grid);
+  }
+  if (searchBtn) {
+    searchBtn.addEventListener('click', async () => {
+      const name = searchInput?.value?.trim();
+      if (!name) { await showAlert('请输入 NPM 包名'); return; }
+      await renderVersions(name);
+    });
   }
 
   // 如果初次进入为档案管理，初始化
@@ -228,7 +367,7 @@ async function main() {
         const name = inspect.name || file.name.replace(/\.zip$/i, '');
         const author = (typeof inspect.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect.author || '未知作者');
         const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : [];
-        const depsObj = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
+        const depsObj = (typeof inspect.npmDependencies === 'object' && !Array.isArray(inspect.npmDependencies) && inspect.npmDependencies) ? inspect.npmDependencies : null;
         const depNames = depsObj ? Object.keys(depsObj) : [];
         // 记录供统一入口使用的元信息
         pendingItemMeta = {

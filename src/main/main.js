@@ -638,6 +638,12 @@ ipcMain.handle('npm:switch', async (_e, pluginName, name, version) => {
 ipcMain.handle('npm:installed', async () => {
   return pluginManager.listInstalledPackages();
 });
+ipcMain.handle('npm:moduleUsers', async (_e, name) => {
+  return pluginManager.listPackageUsers(name);
+});
+ipcMain.handle('npm:remove', async (_e, name, versions) => {
+  return pluginManager.removePackageVersions(name, versions);
+});
 // 插件依赖状态查询（用于设置页/市场页显示）
 ipcMain.handle('plugin:deps:status', async (_e, idOrName) => {
   return pluginManager.getPluginDependencyStatus(idOrName);

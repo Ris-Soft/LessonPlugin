@@ -674,47 +674,7 @@ main {
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* 全局进度显示区域 */
-.global-progress {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  width: 380px;
-  max-height: 40vh;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 10px;
-  z-index: 9;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-}
-.progress-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--fg);
-  font-size: 13px;
-}
-.progress-list {
-  padding: 8px 10px;
-  max-height: calc(40vh - 36px);
-  overflow-y: auto;
-}
-.progress-list::-webkit-scrollbar {
-  width: 8px;
-}
-.progress-item {
-  font-size: 12px;
-  color: var(--fg);
-  padding: 4px 6px;
-  border-left: 2px solid rgba(34, 197, 94, 0.45);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
+/* 已移除全局安装进度展示（global-progress）相关样式 */
 
 .auto-item .title {
   font-weight: 600;

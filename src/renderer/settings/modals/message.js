@@ -217,3 +217,77 @@ async function showUninstallConfirm(item) {
   } catch { return { confirmed: false, dep: {} }; }
 }
 
+// 进度模态框：用于展示下载/安装过程进度，返回控制器 { update, close }
+function showProgressModal(title = '下载/安装进度', initialMessage = '准备中...') {
+  const old = document.querySelector('.modal-overlay');
+  if (old) try { old.remove(); } catch {}
+  const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+  const box = document.createElement('div'); box.className = 'modal-box';
+  const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
+  const msg = document.createElement('div'); msg.className = 'modal-message';
+  msg.style.whiteSpace = 'normal';
+  const statusLine = document.createElement('div');
+  statusLine.style.cssText = 'font-size: 14px; color: var(--muted); margin-bottom: 8px;';
+  statusLine.textContent = initialMessage || '准备中...';
+  const progress = document.createElement('div');
+  progress.className = 'progress';
+  progress.style.cssText = 'height:8px;background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:999px;overflow:hidden;';
+  const bar = document.createElement('div');
+  bar.className = 'progress-inner';
+  bar.style.cssText = 'height:100%;width:0%;background:var(--accent);transition:width .25s;';
+  progress.appendChild(bar);
+  const actions = document.createElement('div'); actions.className = 'modal-actions';
+  // 执行中不提供取消，仅在外部调用 close() 时关闭
+  const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.textContent = '隐藏';
+  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+  actions.appendChild(closeBtn);
+  msg.appendChild(statusLine);
+  msg.appendChild(progress);
+  box.appendChild(t); box.appendChild(msg); box.appendChild(actions);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  const controller = {
+    update: (payload) => {
+      try {
+        const stage = payload?.stage || '';
+        const message = payload?.message || '';
+        const percent = Number(payload?.percent || payload?.progress || NaN);
+        // 仅当提供 message 时更新文字
+        if (message) statusLine.textContent = message;
+        // 百分比存在时更新进度条
+        if (!Number.isNaN(percent)) {
+          const clamped = Math.max(0, Math.min(100, percent));
+          bar.style.width = clamped + '%';
+        } else {
+          // 无百分比时显示不定进度动画（通过条纹过渡实现）
+          bar.style.width = '35%';
+          bar.style.transition = 'width .8s ease-in-out';
+          // 简易往返动画
+          let dir = 1;
+          if (!bar._animTimer) {
+            bar._animTimer = setInterval(() => {
+              const w = parseFloat(bar.style.width) || 0;
+              const next = dir > 0 ? Math.min(85, w + 15) : Math.max(15, w - 15);
+              if (next >= 85) dir = -1; else if (next <= 15) dir = 1;
+              bar.style.width = next + '%';
+            }, 800);
+          }
+        }
+        // 完成或错误阶段时自动关闭动画，并将进度置为 100%
+        if (String(stage).toLowerCase() === 'done' || String(stage).toLowerCase() === 'error' || /完成/.test(message)) {
+          if (bar._animTimer) { try { clearInterval(bar._animTimer); } catch {} bar._animTimer = null; }
+          bar.style.width = '100%';
+        }
+      } catch {}
+    },
+    close: () => {
+      try {
+        if (bar._animTimer) { clearInterval(bar._animTimer); bar._animTimer = null; }
+        overlay.remove();
+      } catch {}
+    }
+  };
+  return controller;
+}
+

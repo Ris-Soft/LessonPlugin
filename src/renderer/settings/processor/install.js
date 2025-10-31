@@ -221,7 +221,7 @@
       });
       // 附加 NPM 依赖状态展示
       try {
-        const depsObj = (item && typeof item.npmDependencies === 'object' && item.npmDependencies) ? item.npmDependencies : null;
+        const depsObj = (item && typeof item.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) && item.npmDependencies) ? item.npmDependencies : null;
         if (depsObj && Object.keys(depsObj).length) {
           const installedPkgsRes = await window.settingsAPI?.npmListInstalled?.();
           const installedPkgs = (installedPkgsRes?.ok && Array.isArray(installedPkgsRes.packages)) ? installedPkgsRes.packages : [];
@@ -299,12 +299,382 @@
     throw new Error('未知安装类型');
   }
 
+  // NPM 安装向导：检查本地模块存储并进行安装
+  async function showNpmInstallWizard(item) {
+    const npmDeps = (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) && item.npmDependencies) ? item.npmDependencies : null;
+    if (!npmDeps || !Object.keys(npmDeps).length) {
+      return { proceed: true, installed: [] };
+    }
+
+    // 检查本地Node模块存储目录
+    const installedPkgsRes = await window.settingsAPI?.npmListInstalled?.();
+    const installedPkgs = (installedPkgsRes?.ok && Array.isArray(installedPkgsRes.packages)) ? installedPkgsRes.packages : [];
+    const hasPkg = (name) => installedPkgs.some(p => p.name === name && Array.isArray(p.versions) && p.versions.length);
+    
+    const missing = Object.keys(npmDeps).filter(name => !hasPkg(name));
+    
+    // 如果所有NPM依赖都已存在，直接进入确认链接步骤
+    if (!missing.length) {
+      return await showNpmLinkConfirm(item, Object.keys(npmDeps));
+    }
+
+    // 显示要下载的模块清单
+    const downloadConfirm = await showNpmDownloadList(item, missing, npmDeps);
+    if (!downloadConfirm.proceed) return { proceed: false, installed: [] };
+
+    // 显示带进度的下载安装界面
+    const installResult = await showNpmInstallProgress(missing, npmDeps);
+    if (!installResult.success) return { proceed: false, installed: [] };
+
+    // 下载完成后，显示确认链接窗口
+    return await showNpmLinkConfirm(item, Object.keys(npmDeps));
+  }
+
+  // 显示NPM模块下载清单
+  async function showNpmDownloadList(item, missing, npmDeps) {
+    return await new Promise((resolve) => {
+      const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+      const box = document.createElement('div'); box.className = 'modal-box';
+      const title = document.createElement('div'); title.className = 'modal-title';
+      const iconCls = item?.icon || 'ri-puzzle-line';
+      const titleName = item?.name || item?.id || item?.npm || '';
+      
+      title.innerHTML = `<i class="${iconCls}"></i> NPM 依赖安装 — ${titleName}`;
+      
+      const body = document.createElement('div'); body.className = 'modal-body';
+      
+      // 提示信息
+      const tip = document.createElement('div'); 
+      tip.className = 'section';
+      tip.style.cssText = `
+        margin: 16px 0;
+        background: rgba(13, 110, 253, 0.1);
+        border-color: rgba(13, 110, 253, 0.3);
+      `;
+      tip.innerHTML = `
+        <div class="section-title" style="color: #0d6efd; font-size: 14px;">
+          <i class="ri-information-line"></i> 需要下载的 NPM 模块
+        </div>
+        <div style="color: var(--muted); font-size: 13px; margin-top: 4px;">
+          以下模块将从 NPM 仓库下载并安装到本地存储目录
+        </div>
+      `;
+
+      // 模块列表
+      const list = document.createElement('div'); 
+      list.style.display = 'grid'; 
+      list.style.gridTemplateColumns = '1fr'; 
+      list.style.gap = '8px';
+      list.style.marginTop = '12px';
+
+      missing.forEach((name) => {
+        const range = npmDeps[name] ? String(npmDeps[name]) : '';
+        const row = document.createElement('div'); 
+        row.style.display = 'flex'; 
+        row.style.alignItems = 'center'; 
+        row.style.gap = '12px';
+        row.style.padding = '8px 12px';
+        row.style.background = 'rgba(108, 117, 125, 0.1)';
+        row.style.borderRadius = '4px';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.style.fontWeight = '500';
+        nameSpan.textContent = `${name}${range ? '@' + range : ''}`;
+        
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'pill small';
+        statusSpan.innerHTML = '<i class="ri-download-2-line"></i> 待下载';
+        
+        row.appendChild(nameSpan);
+        row.appendChild(statusSpan);
+        list.appendChild(row);
+      });
+
+      // 按钮区域
+      const actions = document.createElement('div'); 
+      actions.className = 'modal-actions';
+      
+      const btnCancel = document.createElement('button'); 
+      btnCancel.className = 'btn secondary'; 
+      btnCancel.innerHTML = '<i class="ri-close-line"></i> 取消';
+      
+      const btnConfirm = document.createElement('button'); 
+      btnConfirm.className = 'btn primary'; 
+      btnConfirm.innerHTML = '<i class="ri-download-2-line"></i> 确认下载';
+
+      actions.appendChild(btnCancel);
+      actions.appendChild(btnConfirm);
+      
+      body.appendChild(tip);
+      body.appendChild(list);
+      box.appendChild(title);
+      box.appendChild(body);
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      btnCancel.addEventListener('click', () => {
+        try { overlay.remove(); } catch {}
+        resolve({ proceed: false });
+      });
+
+      btnConfirm.addEventListener('click', () => {
+        try { overlay.remove(); } catch {}
+        resolve({ proceed: true });
+      });
+    });
+  }
+
+  // 显示带进度的NPM模块安装界面
+  async function showNpmInstallProgress(missing, npmDeps) {
+    return await new Promise(async (resolve) => {
+      const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+      const box = document.createElement('div'); box.className = 'modal-box';
+      const title = document.createElement('div'); title.className = 'modal-title';
+      
+      title.innerHTML = `<i class="ri-download-2-line"></i> 正在下载 NPM 模块`;
+      
+      const body = document.createElement('div'); body.className = 'modal-body';
+      
+      // 整体进度
+      const progressSection = document.createElement('div');
+      progressSection.className = 'section';
+      progressSection.innerHTML = `
+        <div class="section-title">
+          <i class="ri-progress-3-line"></i> 下载进度
+        </div>
+      `;
+      
+      const overallProgress = document.createElement('div');
+      overallProgress.style.cssText = `
+        width: 100%;
+        height: 8px;
+        background: rgba(108, 117, 125, 0.2);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 8px 0;
+      `;
+      
+      const progressBar = document.createElement('div');
+      progressBar.style.cssText = `
+        height: 100%;
+        background: #0d6efd;
+        width: 0%;
+        transition: width 0.3s ease;
+      `;
+      overallProgress.appendChild(progressBar);
+      progressSection.appendChild(overallProgress);
+
+      // 模块列表
+      const list = document.createElement('div'); 
+      list.style.display = 'grid'; 
+      list.style.gridTemplateColumns = '1fr'; 
+      list.style.gap = '8px';
+      list.style.marginTop = '12px';
+
+      const moduleRows = {};
+      missing.forEach((name) => {
+        const range = npmDeps[name] ? String(npmDeps[name]) : '';
+        const row = document.createElement('div'); 
+        row.style.display = 'flex'; 
+        row.style.alignItems = 'center'; 
+        row.style.gap = '12px';
+        row.style.padding = '8px 12px';
+        row.style.background = 'rgba(108, 117, 125, 0.1)';
+        row.style.borderRadius = '4px';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.style.fontWeight = '500';
+        nameSpan.textContent = `${name}${range ? '@' + range : ''}`;
+        
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'pill small';
+        statusSpan.innerHTML = '<i class="ri-time-line"></i> 等待中';
+        
+        row.appendChild(nameSpan);
+        row.appendChild(statusSpan);
+        list.appendChild(row);
+        moduleRows[name] = statusSpan;
+      });
+
+      // 按钮区域（初始时下一步按钮不可用）
+      const actions = document.createElement('div'); 
+      actions.className = 'modal-actions';
+      
+      const btnNext = document.createElement('button'); 
+      btnNext.className = 'btn primary'; 
+      btnNext.disabled = true;
+      btnNext.innerHTML = '<i class="ri-arrow-right-line"></i> 下一步';
+
+      actions.appendChild(btnNext);
+      
+      body.appendChild(progressSection);
+      body.appendChild(list);
+      box.appendChild(title);
+      box.appendChild(body);
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      // 开始下载安装
+      let completed = 0;
+      let hasError = false;
+
+      for (const name of missing) {
+        try {
+          // 更新状态为下载中
+          moduleRows[name].className = 'pill small';
+          moduleRows[name].innerHTML = '<i class="ri-download-2-line"></i> 下载中';
+
+          // 获取版本信息
+          const verRes = await window.settingsAPI?.npmGetVersions?.(name);
+          const versions = (verRes?.ok && Array.isArray(verRes.versions)) ? verRes.versions : [];
+          
+          if (!versions.length) {
+            throw new Error('无可用版本');
+          }
+
+          const latestVersion = versions[versions.length - 1];
+          
+          // 下载模块
+          const dl = await window.settingsAPI?.npmDownload?.(name, latestVersion);
+          
+          if (!dl?.ok) {
+            throw new Error(dl?.error || '下载失败');
+          }
+
+          // 更新状态为完成
+          moduleRows[name].className = 'pill small ok';
+          moduleRows[name].innerHTML = '<i class="ri-check-line"></i> 已完成';
+          
+        } catch (e) {
+          // 更新状态为失败
+          moduleRows[name].className = 'pill small danger';
+          moduleRows[name].innerHTML = `<i class="ri-close-line"></i> 失败: ${e.message}`;
+          hasError = true;
+        }
+
+        completed++;
+        const progress = (completed / missing.length) * 100;
+        progressBar.style.width = `${progress}%`;
+      }
+
+      // 所有下载完成，启用下一步按钮
+      btnNext.disabled = false;
+      if (hasError) {
+        btnNext.innerHTML = '<i class="ri-arrow-right-line"></i> 继续（部分失败）';
+      } else {
+        btnNext.innerHTML = '<i class="ri-arrow-right-line"></i> 下一步';
+      }
+
+      btnNext.addEventListener('click', () => {
+        try { overlay.remove(); } catch {}
+        resolve({ success: !hasError });
+      });
+    });
+  }
+
+  // 显示NPM模块链接确认窗口
+  async function showNpmLinkConfirm(item, allNpmDeps) {
+    return await new Promise((resolve) => {
+      const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+      const box = document.createElement('div'); box.className = 'modal-box';
+      const title = document.createElement('div'); title.className = 'modal-title';
+      const iconCls = item?.icon || 'ri-puzzle-line';
+      const titleName = item?.name || item?.id || item?.npm || '';
+      
+      title.innerHTML = `<i class="${iconCls}"></i> 确认链接模块 — ${titleName}`;
+      
+      const body = document.createElement('div'); body.className = 'modal-body';
+      
+      // 提示信息
+      const tip = document.createElement('div'); 
+      tip.className = 'section';
+      tip.style.cssText = `
+        margin: 16px 0;
+        background: rgba(25, 135, 84, 0.1);
+        border-color: rgba(25, 135, 84, 0.3);
+      `;
+      tip.innerHTML = `
+        <div class="section-title" style="color: #198754; font-size: 14px;">
+          <i class="ri-check-line"></i> 准备链接模块
+        </div>
+        <div style="color: var(--muted); font-size: 13px; margin-top: 4px;">
+          即将为插件链接以下 NPM 模块，确保插件可以正常使用这些依赖
+        </div>
+      `;
+
+      // 模块列表
+      const list = document.createElement('div'); 
+      list.style.display = 'grid'; 
+      list.style.gridTemplateColumns = '1fr'; 
+      list.style.gap = '8px';
+      list.style.marginTop = '12px';
+
+      allNpmDeps.forEach((name) => {
+        const row = document.createElement('div'); 
+        row.style.display = 'flex'; 
+        row.style.alignItems = 'center'; 
+        row.style.gap = '12px';
+        row.style.padding = '8px 12px';
+        row.style.background = 'rgba(25, 135, 84, 0.1)';
+        row.style.borderRadius = '4px';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.style.fontWeight = '500';
+        nameSpan.textContent = name;
+        
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'pill small ok';
+        statusSpan.innerHTML = '<i class="ri-link"></i> 准备链接';
+        
+        row.appendChild(nameSpan);
+        row.appendChild(statusSpan);
+        list.appendChild(row);
+      });
+
+      // 按钮区域
+      const actions = document.createElement('div'); 
+      actions.className = 'modal-actions';
+      
+      const btnCancel = document.createElement('button'); 
+      btnCancel.className = 'btn secondary'; 
+      btnCancel.innerHTML = '<i class="ri-close-line"></i> 取消';
+      
+      const btnConfirm = document.createElement('button'); 
+      btnConfirm.className = 'btn primary'; 
+      btnConfirm.innerHTML = '<i class="ri-link"></i> 确认链接';
+
+      actions.appendChild(btnCancel);
+      actions.appendChild(btnConfirm);
+      
+      body.appendChild(tip);
+      body.appendChild(list);
+      box.appendChild(title);
+      box.appendChild(body);
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      btnCancel.addEventListener('click', () => {
+        try { overlay.remove(); } catch {}
+        resolve({ proceed: false, installed: [] });
+      });
+
+      btnConfirm.addEventListener('click', () => {
+        try { overlay.remove(); } catch {}
+        resolve({ proceed: true, installed: allNpmDeps });
+      });
+    });
+  }
+
   async function unifiedPluginInstall(options) {
     const { kind, item, zipPath, zipName, zipData, pkg, preselectedDeps } = options || {};
     // 第一步：安装确认（风险告知）
     const okConfirm = await showInstallConfirm(item || {});
     if (!okConfirm) return;
-    // 依赖引导（如无传入预选依赖，则进行引导）
+    
+    // 第二步：插件依赖引导（如无传入预选依赖，则进行引导）
     let selected = Array.isArray(preselectedDeps) ? preselectedDeps : [];
     try {
       if (!selected.length) {
@@ -321,20 +691,31 @@
       }
     } catch {}
 
-    // 执行安装
-    const res = await performInstall(kind, { item, zipPath, zipName, zipData, pkg });
-    if (!res?.ok) {
-      await showAlert(`安装失败：${res?.error || '未知错误'}`);
+    // 第三步：NPM 依赖安装向导
+    let npmInstallResult = { proceed: true, installed: [] };
+    try {
+      npmInstallResult = await showNpmInstallWizard(item);
+      if (!npmInstallResult.proceed) return;
+    } catch (e) {
+      console.error('NPM安装向导失败:', e);
+      await showAlert(`NPM依赖处理失败：${e?.message || '未知错误'}`);
       return;
     }
 
-    // 安装完成后确保依赖链接
-    let ensure = null;
-    try { ensure = await window.settingsAPI?.pluginEnsureDeps?.(res.id || res.name || item?.id || item?.name); } catch {}
+    // 第四步：执行插件安装
+    const res = await performInstall(kind, { item, zipPath, zipName, zipData, pkg });
+    if (!res?.ok) {
+      await showAlert(`插件安装失败：${res?.error || '未知错误'}`);
+      return;
+    }
 
-    // 统一成功提示
+    // 第五步：安装完成后确保依赖链接
+    const pluginIdentifier = res.id || res.name || item?.id || item?.name;
+    const ensure = await window.settingsAPI?.pluginEnsureDeps?.(pluginIdentifier);
+
+    // 第六步：显示安装完成信息
     const metaAuthor = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
-    const npmObj = (typeof res.npmDependencies === 'object' && res.npmDependencies) ? res.npmDependencies : (typeof item?.npmDependencies === 'object' ? item.npmDependencies : null);
+    const npmObj = (typeof res.npmDependencies === 'object' && !Array.isArray(res.npmDependencies) && res.npmDependencies) ? res.npmDependencies : (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) ? item.npmDependencies : null);
     const npmNames = npmObj ? Object.keys(npmObj) : [];
     const pluginDepends = Array.isArray(res.pluginDepends) ? res.pluginDepends : (Array.isArray(res.dependencies) ? res.dependencies : (Array.isArray(item?.dependencies) ? item.dependencies : []));
     const mergedLogs = [];

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   npmDownload: (name, version) => ipcRenderer.invoke('npm:download', name, version),
   npmSwitch: (pluginName, name, version) => ipcRenderer.invoke('npm:switch', pluginName, name, version)
   ,npmListInstalled: () => ipcRenderer.invoke('npm:installed'),
+  npmModuleUsers: (name) => ipcRenderer.invoke('npm:moduleUsers', name),
+  npmRemove: (name, versions) => ipcRenderer.invoke('npm:remove', name, versions),
   // 插件依赖状态与确保（下载+链接）
   pluginDepsStatus: (idOrName) => ipcRenderer.invoke('plugin:deps:status', idOrName),
   pluginEnsureDeps: (idOrName) => ipcRenderer.invoke('plugin:deps:ensure', idOrName),
@@ -53,6 +55,10 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   // 进度事件订阅（主进程通过 'plugin-progress' 推送）
   onProgress: (handler) => {
     try { ipcRenderer.on('plugin-progress', (_e, payload) => handler && handler(payload)); } catch {}
+  },
+  // 取消进度事件订阅（用于安装完成后解绑）
+  offProgress: (handler) => {
+    try { ipcRenderer.removeListener('plugin-progress', handler); } catch {}
   },
   // 打开插件信息模态框事件订阅
   onOpenPluginInfo: (handler) => {

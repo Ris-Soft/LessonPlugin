@@ -43,14 +43,21 @@ function addNodeModulesToGlobalPaths(baseDir) {
     for (const name of names) {
       const nameDir = path.join(baseDir, name);
       try { if (!fs.statSync(nameDir).isDirectory()) continue; } catch { continue; }
-      const versions = fs.readdirSync(nameDir);
-      for (const v of versions) {
-        const nm = path.join(nameDir, v, 'node_modules');
-        try {
-          if (fs.existsSync(nm) && fs.statSync(nm).isDirectory()) {
-            if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm);
-          }
-        } catch {}
+      // 支持 scope 目录：@scope 下的多个包
+      const packageDirs = name.startsWith('@')
+        ? fs.readdirSync(nameDir).map((pkg) => path.join(nameDir, pkg)).filter((p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } })
+        : [nameDir];
+      for (const pkgDir of packageDirs) {
+        let versions = [];
+        try { versions = fs.readdirSync(pkgDir); } catch { versions = []; }
+        for (const v of versions) {
+          const nm = path.join(pkgDir, v, 'node_modules');
+          try {
+            if (fs.existsSync(nm) && fs.statSync(nm).isDirectory()) {
+              if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm);
+            }
+          } catch {}
+        }
       }
     }
   } catch {}
@@ -132,8 +139,13 @@ module.exports.init = function init(paths) {
         icon: meta.icon || null,
         description: meta.description || '',
         author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
-        // 统一 npmDependencies：对象表示 NPM 依赖；dependencies 为数组表示插件依赖
-        npmDependencies: (typeof meta.npmDependencies === 'object' ? meta.npmDependencies : (Array.isArray(meta.dependencies) ? undefined : (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)))),
+        // 统一 npmDependencies：仅接收对象（非数组）；dependencies 为数组表示插件依赖
+        npmDependencies: (() => {
+          if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
+          if (meta && typeof meta.dependencies === 'object' && !Array.isArray(meta.dependencies)) return meta.dependencies;
+          if (pkg && typeof pkg.dependencies === 'object' && !Array.isArray(pkg.dependencies)) return pkg.dependencies;
+          return undefined;
+        })(),
         // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
         actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
         // 保留 functions 以备后续扩展（如声明 backend 名称等）
@@ -155,6 +167,10 @@ module.exports.init = function init(paths) {
     }
   } catch {}
   config = readJsonSafe(configPath, { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} });
+  // 确保 config 对象包含所有必要的属性
+  if (!config.enabled) config.enabled = {};
+  if (!config.registry) config.registry = 'https://registry.npmmirror.com';
+  if (!config.npmSelection) config.npmSelection = {};
   storeRoot = path.resolve(path.dirname(manifestPath), '..', 'npm_store');
   if (!fs.existsSync(storeRoot)) fs.mkdirSync(storeRoot, { recursive: true });
   refreshGlobalModulePaths();
@@ -194,7 +210,7 @@ module.exports.getPlugins = function getPlugins() {
     icon: p.icon || null,
     description: p.description || '',
     author: (p.author !== undefined ? p.author : null),
-    npmDependencies: (typeof p.npmDependencies === 'object' ? p.npmDependencies : undefined),
+    npmDependencies: (typeof p.npmDependencies === 'object' && !Array.isArray(p.npmDependencies) ? p.npmDependencies : undefined),
     actions: Array.isArray(p.actions) ? p.actions : [],
     version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
     studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : [],
@@ -347,10 +363,11 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
 // 选择已安装的最新版本（简单策略）
 function pickInstalledLatest(name) {
   try {
-    const nameDir = path.join(storeRoot, name);
+    const segs = String(name).split('/').filter(Boolean);
+    const nameDir = path.join(storeRoot, ...segs);
     if (!fs.existsSync(nameDir) || !fs.statSync(nameDir).isDirectory()) return null;
     const versions = fs.readdirSync(nameDir).filter((v) => {
-      const vDir = path.join(nameDir, v, 'node_modules', name);
+      const vDir = path.join(nameDir, v, 'node_modules', ...segs);
       return fs.existsSync(vDir);
     }).sort((a, b) => {
       const pa = String(a).split('.').map((x) => parseInt(x, 10) || 0);
@@ -368,8 +385,9 @@ function pickInstalledLatest(name) {
 function linkDepToPlugin(pluginDir, pkgName, version) {
   try {
     const pluginNm = path.join(pluginDir, 'node_modules');
-    const target = path.join(pluginNm, pkgName);
-    const storePkg = path.join(storeRoot, pkgName, version, 'node_modules', pkgName);
+    const segs = String(pkgName).split('/').filter(Boolean);
+    const target = path.join(pluginNm, ...segs);
+    const storePkg = path.join(storeRoot, ...segs, version, 'node_modules', ...segs);
     if (!fs.existsSync(storePkg)) return { ok: false, error: 'store_package_missing' };
     try { if (!fs.existsSync(pluginNm)) fs.mkdirSync(pluginNm, { recursive: true }); } catch {}
     try {
@@ -382,9 +400,36 @@ function linkDepToPlugin(pluginDir, pkgName, version) {
         }
       }
     } catch {}
+    // 确保父目录存在（处理 scope 嵌套）
+    try { fs.mkdirSync(path.dirname(target), { recursive: true }); } catch {}
     const type = process.platform === 'win32' ? 'junction' : 'dir';
-    fs.symlinkSync(storePkg, target, type);
-    return { ok: true };
+    try {
+      fs.symlinkSync(storePkg, target, type);
+      return { ok: true, method: 'link' };
+    } catch (e) {
+      // 在部分 Windows 环境下可能没有创建符号链接的权限；回退为复制目录
+      try {
+        const copyDir = (src, dst) => {
+          const items = fs.readdirSync(src);
+          for (const it of items) {
+            const sp = path.join(src, it);
+            const dp = path.join(dst, it);
+            const st = fs.statSync(sp);
+            if (st.isDirectory()) {
+              if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
+              copyDir(sp, dp);
+            } else {
+              fs.copyFileSync(sp, dp);
+            }
+          }
+        };
+        if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
+        copyDir(storePkg, target);
+        return { ok: true, method: 'copy' };
+      } catch (copyErr) {
+        return { ok: false, error: (copyErr?.message || String(copyErr)) };
+      }
+    }
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
@@ -393,7 +438,7 @@ function linkDepToPlugin(pluginDir, pkgName, version) {
 function collectPluginDeps(p) {
   const deps = [];
   try {
-    const obj = (typeof p.npmDependencies === 'object' && p.npmDependencies) ? p.npmDependencies : {};
+    const obj = (typeof p.npmDependencies === 'object' && !Array.isArray(p.npmDependencies) && p.npmDependencies) ? p.npmDependencies : {};
     for (const name of Object.keys(obj)) deps.push({ name, range: String(obj[name] || '').trim() });
     if (Array.isArray(p.packages)) {
       for (const pkg of p.packages) {
@@ -410,21 +455,32 @@ function collectPluginDeps(p) {
   return deps;
 }
 
-module.exports.ensureDeps = async function ensureDeps(idOrName) {
+module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
   try {
+    const opts = options || {};
+    const downloadIfMissing = (opts.downloadIfMissing !== undefined) ? !!opts.downloadIfMissing : true;
     const p = findPluginByIdOrName(idOrName);
     if (!p) return { ok: false, error: 'plugin_not_found' };
-    if (!p.local) return { ok: true };
+    if (!p.local) return { ok: true, logs: ['[deps] 插件未安装到本地目录，跳过依赖链接'] };
     const baseDir = path.join(path.dirname(manifestPath), p.local);
     const deps = collectPluginDeps(p);
+    // 确保 config.npmSelection 存在，防止 undefined 错误
+    if (!config.npmSelection) config.npmSelection = {};
     const selMap = (config.npmSelection[p.id] || config.npmSelection[p.name] || {});
     const logs = [];
+    logs.push(`[deps] 开始处理插件依赖：${p.name}（${deps.length} 项）`);
+    console.log('deps:ensure', p.name, deps);
     for (const d of deps) {
       const name = d.name;
       let version = selMap[name] || d.explicit || null;
       if (!version) version = pickInstalledLatest(name);
-      const storePath = version ? path.join(storeRoot, name, version, 'node_modules', name) : null;
+      const segs = String(name).split('/').filter(Boolean);
+      const storePath = version ? path.join(storeRoot, ...segs, version, 'node_modules', ...segs) : null;
       if (!version || !storePath || !fs.existsSync(storePath)) {
+        if (!downloadIfMissing) {
+          logs.push(`[deps] ${name} 缺少已安装版本，暂不下载（启动加速）`);
+          continue;
+        }
         let pick = d.explicit || null;
         if (!pick) {
           const list = await module.exports.getPackageVersions(name);
@@ -449,8 +505,11 @@ module.exports.ensureDeps = async function ensureDeps(idOrName) {
       const link = linkDepToPlugin(baseDir, name, version);
       if (!link.ok) {
         logs.push(`[deps] 链接 ${name}@${version} 到插件失败：${link.error}`);
+        try { console.error('deps:link:failed', name, version, link.error); } catch {}
       } else {
-        logs.push(`[deps] 已链接 ${name}@${version} 到插件`);
+        const method = link.method === 'copy' ? '复制' : '链接';
+        logs.push(`[deps] 已${method} ${name}@${version} 到插件`);
+        try { console.log('deps:link:success', name, version, method); } catch {}
       }
     }
     return { ok: true, logs };
@@ -468,18 +527,19 @@ module.exports.getPluginDependencyStatus = function getPluginDependencyStatus(id
     const status = [];
     for (const d of deps) {
       const name = d.name;
+      const segs = String(name).split('/').filter(Boolean);
       const installed = [];
       try {
-        const nameDir = path.join(storeRoot, name);
+        const nameDir = path.join(storeRoot, ...segs);
         if (fs.existsSync(nameDir)) {
           const versions = fs.readdirSync(nameDir).filter((v) => {
-            const vDir = path.join(nameDir, v, 'node_modules', name);
+            const vDir = path.join(nameDir, v, 'node_modules', ...segs);
             return fs.existsSync(vDir);
           });
           installed.push(...versions);
         }
       } catch {}
-      const linked = baseDir ? fs.existsSync(path.join(baseDir, 'node_modules', name)) : false;
+      const linked = baseDir ? fs.existsSync(path.join(baseDir, 'node_modules', ...segs)) : false;
       status.push({ name, installed, linked });
     }
     return { ok: true, status };
@@ -520,8 +580,8 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
         try {
           const modPath = path.resolve(localPath, 'index.js');
           if (fs.existsSync(modPath)) {
-            // 启动阶段，加载前确保依赖已链接到插件目录
-            try { await module.exports.ensureDeps(p.id); } catch {}
+            // 启动阶段仅链接已有依赖，不触发下载以加速启动
+            try { await module.exports.ensureDeps(p.id, { downloadIfMissing: false }); } catch {}
             const mod = require(modPath);
             // 仅从 functions 中注册函数，排除 actions
             const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -634,7 +694,8 @@ module.exports.getPackageVersions = async function getPackageVersions(name) {
 };
 
 module.exports.downloadPackageVersion = async function downloadPackageVersion(name, version, onProgress) {
-  const dest = path.join(storeRoot, name, version);
+  const segs = String(name).split('/').filter(Boolean);
+  const dest = path.join(storeRoot, ...segs, version);
   if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
   const args = ['install', `${name}@${version}`, '--prefix', dest, '--registry', config.registry];
   onProgress && onProgress({ stage: 'npm', message: `下载 ${name}@${version} ...` });
@@ -643,7 +704,7 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   onProgress && onProgress({ stage: 'npm', message: `完成 ${name}@${version}` });
   const nm = path.join(dest, 'node_modules');
   try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch {}
-  return { ok: true, path: path.join(dest, 'node_modules', name) };
+  return { ok: true, path: path.join(dest, 'node_modules', ...segs) };
 };
 
 module.exports.switchPluginVersion = async function switchPluginVersion(pluginName, sel) {
@@ -660,15 +721,155 @@ module.exports.listInstalledPackages = async function listInstalledPackages() {
     for (const name of names) {
       const nameDir = path.join(storeRoot, name);
       if (!fs.statSync(nameDir).isDirectory()) continue;
-      const versions = fs.readdirSync(nameDir).filter((v) => {
-        const vDir = path.join(nameDir, v, 'node_modules', name);
-        return fs.existsSync(vDir);
-      });
-      result.push({ name, versions });
+      if (name.startsWith('@')) {
+        // 处理 scope 下的包
+        const pkgs = fs.readdirSync(nameDir).filter((p) => {
+          const pDir = path.join(nameDir, p);
+          try { return fs.statSync(pDir).isDirectory(); } catch { return false; }
+        });
+        for (const p of pkgs) {
+          const pkgDir = path.join(nameDir, p);
+          const versions = fs.readdirSync(pkgDir).filter((v) => {
+            const vDir = path.join(pkgDir, v, 'node_modules', name, p);
+            return fs.existsSync(vDir);
+          });
+          // 仅在存在有效版本时纳入列表；无版本则尝试清理空目录
+          if (versions.length > 0) {
+            result.push({ name: `${name}/${p}`, versions });
+          } else {
+            try {
+              // 尝试移除空包目录（不影响其他包）
+              const entries = fs.readdirSync(pkgDir);
+              if (!entries.length) fs.rmSync(pkgDir, { recursive: true, force: true });
+              // 若 scope 目录已空，也尝试清理
+              const remain = fs.readdirSync(nameDir).filter((n) => {
+                try { return fs.statSync(path.join(nameDir, n)).isDirectory(); } catch { return false; }
+              });
+              if (!remain.length) fs.rmSync(nameDir, { recursive: true, force: true });
+            } catch {}
+          }
+        }
+      } else {
+        // 普通包
+        const versions = fs.readdirSync(nameDir).filter((v) => {
+          const vDir = path.join(nameDir, v, 'node_modules', name);
+          return fs.existsSync(vDir);
+        });
+        if (versions.length > 0) {
+          result.push({ name, versions });
+        } else {
+          // 清理空包目录
+          try {
+            const entries = fs.readdirSync(nameDir);
+            if (!entries.length) fs.rmSync(nameDir, { recursive: true, force: true });
+          } catch {}
+        }
+      }
     }
     return { ok: true, packages: result };
   } catch (e) {
     return { ok: false, error: e.message };
+  }
+};
+
+// 查询某个 NPM 包的占用情况（哪些插件当前已链接到该包及其版本）
+module.exports.listPackageUsers = function listPackageUsers(pkgName) {
+  try {
+    const users = [];
+    const segs = String(pkgName).split('/').filter(Boolean);
+    for (const p of (manifest.plugins || [])) {
+      const baseDir = p.local ? path.join(path.dirname(manifestPath), p.local) : null;
+      if (!baseDir) continue;
+      const linkedPath = path.join(baseDir, 'node_modules', ...segs);
+      if (fs.existsSync(linkedPath)) {
+        let realLinked = null;
+        let version = null;
+        try {
+          realLinked = fs.realpathSync(linkedPath);
+          // 解析版本：storeRoot/[...segs]/<version>/node_modules/[...segs]
+          const rel = path.relative(storeRoot, realLinked).replace(/\\/g, '/');
+          const parts = rel.split('/').filter(Boolean);
+          // 普通包：name/version/...
+          // scope 包：@scope/pkg/version/...
+          if (parts.length >= 2 && parts[0].startsWith('@')) {
+            version = parts[2] || null;
+          } else {
+            version = parts[1] || null;
+          }
+        } catch {}
+        users.push({ pluginId: p.id, pluginName: p.name, version: version || null });
+      }
+    }
+    return { ok: true, users };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+// 删除指定 NPM 包的某些版本（删除前检查当前链接占用）
+module.exports.removePackageVersions = function removePackageVersions(pkgName, versions) {
+  try {
+    const segs = String(pkgName).split('/').filter(Boolean);
+    const blocked = [];
+    const removed = [];
+    const errors = [];
+    // 检查占用
+    const usesRes = module.exports.listPackageUsers(pkgName);
+    const uses = (usesRes?.ok && Array.isArray(usesRes.users)) ? usesRes.users : [];
+    const inUseVersions = new Set(uses.filter(u => u.version).map(u => String(u.version)));
+    for (const v of (Array.isArray(versions) ? versions : [])) {
+      const ver = String(v);
+      if (inUseVersions.has(ver)) {
+        blocked.push(ver);
+        continue;
+      }
+      try {
+        const verDir = path.join(storeRoot, ...segs, ver);
+        if (fs.existsSync(verDir)) {
+          // 递归删除版本目录
+          fs.rmSync(verDir, { recursive: true, force: true });
+          removed.push(ver);
+        } else {
+          errors.push({ version: ver, error: 'version_not_found' });
+        }
+      } catch (e) {
+        errors.push({ version: ver, error: e?.message || String(e) });
+      }
+    }
+    // 若该包已无有效版本，清理包目录及空的 scope 目录
+    try {
+      const pkgBase = path.join(storeRoot, ...segs);
+      const isScoped = segs[0]?.startsWith('@');
+      const pkgDir = isScoped && segs.length >= 2 ? path.join(storeRoot, segs[0], segs[1]) : (segs.length ? path.join(storeRoot, segs[0]) : pkgBase);
+      const existsPkgDir = fs.existsSync(pkgDir) && fs.statSync(pkgDir).isDirectory();
+      if (existsPkgDir) {
+        // 检查是否还存在有效版本（node_modules/...segs 路径存在）
+        const verNames = fs.readdirSync(pkgDir).filter((vn) => {
+          const vPath = path.join(pkgDir, vn, 'node_modules', ...segs);
+          return fs.existsSync(vPath);
+        });
+        if (verNames.length === 0) {
+          // 没有有效版本，删除包目录
+          try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch {}
+          // 若为 scoped 包，scope 目录为空则删除
+          if (isScoped) {
+            const scopeDir = path.join(storeRoot, segs[0]);
+            try {
+              const remain = fs.readdirSync(scopeDir).filter((n) => {
+                try { return fs.statSync(path.join(scopeDir, n)).isDirectory(); } catch { return false; }
+              });
+              if (remain.length === 0) fs.rmSync(scopeDir, { recursive: true, force: true });
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+    // 删除后刷新全局模块路径（避免残留）
+    try { refreshGlobalModulePaths(); } catch {}
+    const ok = errors.length === 0;
+    return { ok, removed, blocked, errors, uses };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
   }
 };
 
@@ -898,12 +1099,13 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       for (const pkgDef of meta.packages) {
         const versions = Array.isArray(pkgDef.versions) ? pkgDef.versions : (pkgDef.version ? [pkgDef.version] : []);
         for (const v of versions) {
-          const destPath = path.join(storeRoot, pkgDef.name, v, 'node_modules', pkgDef.name);
+          const segs = String(pkgDef.name).split('/').filter(Boolean);
+          const destPath = path.join(storeRoot, ...segs, v, 'node_modules', ...segs);
           if (fs.existsSync(destPath)) continue; // 已有版本
           const dl = await module.exports.downloadPackageVersion(pkgDef.name, v);
           if (!dl.ok) {
             // 无法下载且本地不存在
-            return { ok: false, error: `无法下载依赖 ${pkgDef.name}@${v}，请手动导入到 src/npm_store/${pkgDef.name}/${v}/node_modules/${pkgDef.name}` };
+            return { ok: false, error: `无法下载依赖 ${pkgDef.name}@${v}，请手动导入到 src/npm_store/${segs.join('/')}/${v}/node_modules/${segs.join('/')}` };
           }
         }
       }
@@ -959,8 +1161,13 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       icon: meta.icon || null,
       description: meta.description || '',
       author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
-      // 统一 npmDependencies：对象表示 NPM 依赖；dependencies 为数组表示插件依赖
-      npmDependencies: (typeof meta.npmDependencies === 'object' ? meta.npmDependencies : (Array.isArray(meta.dependencies) ? undefined : (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)))),
+      // 统一 npmDependencies：仅接收对象（非数组）；dependencies 为数组表示插件依赖
+      npmDependencies: (() => {
+        if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
+        if (meta && typeof meta.dependencies === 'object' && !Array.isArray(meta.dependencies)) return meta.dependencies;
+        if (pkg && typeof pkg.dependencies === 'object' && !Array.isArray(pkg.dependencies)) return pkg.dependencies;
+        return undefined;
+      })(),
       // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
       actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
       // 保留 functions 以备后续扩展（如声明 backend 名称等）
@@ -1021,7 +1228,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       }
     } catch {}
 
-    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined, logs };
+    return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), npmDependencies: updated.npmDependencies, dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined, logs };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -1195,8 +1402,13 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
       name: pluginName,
       author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
       version: detectedVersion,
-      // 统一 npmDependencies：对象表示 NPM 依赖；dependencies 为数组表示插件依赖
-      npmDependencies: (typeof meta.npmDependencies === 'object' ? meta.npmDependencies : (Array.isArray(meta.dependencies) ? undefined : (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)))),
+      // 统一 npmDependencies：仅接收对象（非数组）；dependencies 为数组表示插件依赖
+      npmDependencies: (() => {
+        if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
+        if (meta && typeof meta.dependencies === 'object' && !Array.isArray(meta.dependencies)) return meta.dependencies;
+        if (pkg && typeof pkg.dependencies === 'object' && !Array.isArray(pkg.dependencies)) return pkg.dependencies;
+        return undefined;
+      })(),
       actions: (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : (Array.isArray(meta.actions) ? meta.actions : [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }])),
       functions: typeof meta.functions === 'object' ? meta.functions : undefined,
       packages: meta.packages,
