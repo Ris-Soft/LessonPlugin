@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>秒表背景</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; color: #e6e6e6; font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; }
+    .wrap { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .time { font-size: 96px; font-weight: 600; letter-spacing: 4px; }
+    /* 移除内置按钮，改由工具栏控制 */
+  </style>
+  <script>
+    let running = false; let elapsed = 0; let last = 0; let timer = null;
+    function pad(n){ return String(n).padStart(2,'0'); }
+    function fmt(ms){ const s = Math.floor(ms/1000); const m = Math.floor(s/60); const rem = s%60; return `${pad(m)}:${pad(rem)}`; }
+    function render(){ document.getElementById('time').textContent = fmt(elapsed); localStorage.setItem('stopwatch:elapsed', String(elapsed)); localStorage.setItem('stopwatch:running', running ? '1' : '0'); }
+    function start(){ if (running) return; running = true; last=Date.now(); timer=setInterval(()=>{ elapsed += Date.now()-last; last=Date.now(); render(); }, 250); }
+    function stop(){ running=false; clearInterval(timer); timer=null; render(); }
+    function reset(){ elapsed=0; running=false; clearInterval(timer); timer=null; render(); }
+    function qs(name){ const m = location.search.match(new RegExp('[?&]'+name+'=([^&]+)')); return m? decodeURIComponent(m[1]) : null; }
+    window.addEventListener('DOMContentLoaded', () => { 
+      // 载入持久化状态
+      const savedElapsed = parseInt(localStorage.getItem('stopwatch:elapsed')||'0',10);
+      const savedRunning = localStorage.getItem('stopwatch:running')==='1';
+      if (Number.isFinite(savedElapsed)) elapsed = savedElapsed;
+      running = false; // 页面初载状态不自动运行，除非 action=start
+      render();
+      const action = qs('action');
+      if (action === 'start') start(); else if (action === 'stop') stop(); else if (action === 'reset') reset();
+    });
+  </script>
+</head>
+<body>
+  <div class="wrap"><div id="time" class="time">00:00</div></div>
+</body>
+</html>

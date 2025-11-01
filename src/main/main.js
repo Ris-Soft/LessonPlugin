@@ -613,6 +613,9 @@ ipcMain.handle('window:control', async (event, action) => {
     case 'maximize':
       win.isMaximized() ? win.unmaximize() : win.maximize();
       break;
+    case 'fullscreen':
+      try { win.setFullScreen(!win.isFullScreen()); } catch {}
+      break;
     case 'hide':
       win.hide();
       break;

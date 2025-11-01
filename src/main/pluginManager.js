@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const extract = require('extract-zip');
 const { v4: uuidv4 } = require('uuid');
 const Module = require('module');
-const { app } = require('electron');
+const { app, webContents } = require('electron');
 
 let manifestPath = '';
 let pluginsRoot = '';
@@ -667,6 +667,16 @@ module.exports.closeAllWindows = function closeAllWindows() {
     } catch {}
   }
   windows = [];
+  // 同步清理插件窗口与事件订阅
+  try {
+    for (const [key, w] of pluginWindows.entries()) {
+      const wc = (w && w.webContents) ? w.webContents : null;
+      try { if (wc && !wc.isDestroyed()) wc.destroy(); } catch {}
+      try { if (w && typeof w.destroy === 'function' && !w.isDestroyed()) w.destroy(); } catch {}
+    }
+    pluginWindows.clear();
+  } catch {}
+  try { eventSubscribers.clear(); } catch {}
 };
 
 // --------- NPM 管理 ---------
@@ -1360,12 +1370,15 @@ module.exports.emitEvent = function emitEvent(eventName, payload) {
   const subs = eventSubscribers.get(eventName);
   if (!subs || !subs.size) return { ok: true, delivered: 0 };
   let delivered = 0;
+  // 精确根据订阅的 webContents.id 投递事件，支持多个窗口
   for (const pid of subs) {
-    for (const w of windows) {
-      if (w.webContents.id === pid) {
-        try { w.webContents.send('plugin:event', { name: eventName, payload }); delivered++; } catch {}
+    try {
+      const wc = webContents.fromId(pid);
+      if (wc && !wc.isDestroyed()) {
+        wc.send('plugin:event', { name: eventName, payload });
+        delivered++;
       }
-    }
+    } catch {}
   }
   return { ok: true, delivered };
 };

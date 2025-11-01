@@ -5,6 +5,9 @@
     "AutomationDemo": true,
     "student-columns-demo": true,
     "student-list-demo": true,
-    "插件开发示例": true
+    "插件开发示例": true,
+    "UI模板-低栏应用": true,
+    "UI预览器": true,
+    "低栏模板调用示例": true
   }
 }

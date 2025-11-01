@@ -1,0 +1,95 @@
+html, body { height: 100%; margin: 0; background: #000; }
+body { font-family: system-ui, -apple-system, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; color: #e6e6e6; background: #000; }
+
+/* 文本选择：除 webview 外全部禁用选择，避免误选 */
+*:not(webview) { user-select: none; -webkit-user-select: none; }
+
+/* 顶栏（仅窗口化显示） */
+.titlebar { position: fixed; top: 0; left: 0; right: 0; height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; background: linear-gradient(180deg, rgba(28,28,28,0.9), rgba(22,22,22,0.85)); -webkit-app-region: drag; color: #ddd; }
+.titlebar .left { display: flex; align-items: center; gap: 8px; }
+.titlebar .right { display: flex; align-items: center; }
+.titlebar .icon-btn { -webkit-app-region: no-drag; border: none; background: transparent; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #ddd; }
+.titlebar .icon-btn:hover { background: rgba(255,255,255,0.08); }
+
+/* 背景 webview */
+.bg-view { position: absolute; top: 36px; left: 0; right: 0; bottom: 68px; }
+
+/* 悬浮窗口（内嵌 webview） */
+.float-win { position: absolute; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; overflow: hidden; backdrop-filter: blur(3px); box-shadow: 0 10px 26px rgba(0,0,0,0.35); opacity: 0; transform: translateY(8px); transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
+.float-win { z-index: 10; }
+.float-titlebar { height: 32px; display: flex; align-items: center; background: rgba(28,28,28,0.95); color: #ddd; -webkit-app-region: no-drag; }
+.float-titlebar .drag-area { flex: 1; }
+.float-titlebar .icon-btn { -webkit-app-region: no-drag; border: none; background: transparent; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #ddd; margin: 0 4px; transition: background 160ms ease, color 160ms ease; }
+.float-titlebar .icon-btn:hover { background: rgba(255,255,255,0.08); }
+.float-titlebar .icon-btn.active { background: rgba(255,255,255,0.18); color: #fff; }
+.float-win webview { width: 100%; height: calc(100% - 32px); }
+.float-win { max-width: 1200px; }
+
+/* 悬浮窗口外部遮罩：用于点击关闭 */
+#floatMask { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 9; background: rgba(0,0,0,0.08); transition: background 160ms ease; }
+
+/* 底部工具栏（暗色） */
+.bottombar { position: fixed; left: 0; right: 0; bottom: 0; height: 68px; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; background: linear-gradient(180deg, rgba(24,24,24,0.96), rgba(16,16,16,0.92)); border-top: 1px solid rgba(255,255,255,0.08); column-gap: 12px; backdrop-filter: saturate(120%); }
+body.mode-fullscreen  .bottombar { height: 80px; }
+.bottombar .area { display: flex; align-items: center; padding: 0 12px; }
+.bottombar .area .wrap { display: inline-flex; align-items: center; gap: 12px; }
+.bottombar .left { justify-content: flex-start; }
+.bottombar .center { justify-content: center; }
+.bottombar .right { justify-content: flex-end; }
+.bottombar .window-meta { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-right: 8px; }
+.bottombar .window-meta i { font-size: 18px; }
+.bottombar .window-meta span { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: #ccc; }
+
+.rect-btn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 56px; height: 56px; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: #ddd; transition: background 140ms ease, transform 140ms ease; }
+.rect-btn:hover { background: rgba(255,255,255,0.06); }
+.rect-btn.active { background: rgba(255,255,255,0.12); color: #fff; }
+.rect-btn i { font-size: 20px; }
+.rect-btn span { font-size: 11px; }
+
+/* 模式差异：全屏时底栏整体透明，仅对有内容的分区单独背景；非全屏恢复联合背景 */
+body { overflow: hidden; }
+body.mode-fullscreen .bottombar { background: transparent; border-top-color: transparent; column-gap: 12px; }
+body.mode-fullscreen .bottombar .area.has-content .wrap { background: rgba(24,24,24,0.85); padding: 8px 12px; border-radius: 5px; }
+body.mode-windowed .bottombar,
+body.mode-maximized .bottombar { background: rgba(20,20,20,0.92); border-top-color: rgba(255,255,255,0.08); }
+
+/* 非全屏：底栏空白区域与左侧图标/标题可拖动窗口 */
+body.mode-windowed .bottombar,
+body.mode-maximized .bottombar { -webkit-app-region: drag; }
+/* 交互控件禁用拖动，确保点击操作正常 */
+.rect-btn, .titlebar .icon-btn, .float-titlebar .icon-btn { -webkit-app-region: no-drag; }
+/* 左侧窗口信息区为非交互元素，允许拖动 */
+.bottombar .window-meta { -webkit-app-region: drag; }
+
+/* 全屏模式下的工具栏收起/展开 */
+/* 默认全屏：显示“收起”按钮，隐藏“展开”按钮 */
+body.mode-fullscreen #bottom-collapse { display: inline-flex; }
+body.mode-fullscreen #bottom-expand-right,
+body.mode-fullscreen #bottom-expand-center { display: none; }
+
+/* 收起状态：隐藏左侧与中间工具项，仅保留展开按钮；降低高度与按钮尺寸 */
+body.mode-fullscreen.collapsed .bottombar { height: 55px; }
+/* 保留三列布局不移位，仅隐藏左侧内容 */
+body.mode-fullscreen.collapsed .bottombar .left { visibility: hidden; }
+body.mode-fullscreen.collapsed .bottombar .center .items { display: none; }
+body.mode-fullscreen.collapsed #bottom-collapse { display: none; }
+/* 全屏收起状态仅保留右侧展开按钮，隐藏中央展开按钮 */
+body.mode-fullscreen.collapsed #bottom-expand-right { display: inline-flex; }
+body.mode-fullscreen.collapsed #bottom-expand-center { display: none; }
+/* 右侧控制区：缩小按钮尺寸并隐藏文字 */
+body.mode-fullscreen.collapsed .bottombar .right .rect-btn { width: 36px; height: 36px; }
+body.mode-fullscreen.collapsed .bottombar .right .rect-btn i { font-size: 18px; }
+body.mode-fullscreen.collapsed .bottombar .right .rect-btn span { display: none; }
+/* 右侧展开按钮置于最左侧 */
+body.mode-fullscreen.collapsed #bottom-expand-right { order: -1; margin-right: 6px; }
+/* 适配较小高度的包裹内边距 */
+body.mode-fullscreen.collapsed .bottombar .area.has-content .wrap { padding: 6px 10px; }
+
+/* 顶栏：仅窗口化显示 */
+body.mode-windowed .titlebar { display: flex; }
+body.mode-maximized .titlebar, body.mode-fullscreen .titlebar { display: none; }
+
+/* 全屏时不显示置顶按钮 */
+body.mode-fullscreen #btn-pin { display: none; }
+
+.items { gap: 5px; display: flex; }

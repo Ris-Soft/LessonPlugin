@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI模板-低栏应用</title>
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- 顶栏：仅窗口化时显示 -->
+    <header id="topbar" class="titlebar">
+      <div class="left">
+        <i id="top-icon" class="ri-layout-bottom-line"></i>
+        <span id="top-title">UI模板-低栏应用</span>
+      </div>
+      <div class="right">
+        <button class="icon-btn" id="btn-min" title="最小化"><i class="ri-subtract-line"></i></button>
+        <button class="icon-btn" id="btn-max" title="最大化/还原"><i class="ri-window-2-line"></i></button>
+        <button class="icon-btn" id="btn-full" title="全屏/退出全屏"><i class="ri-fullscreen-line"></i></button>
+        <button class="icon-btn" id="btn-close" title="关闭"><i class="ri-close-line"></i></button>
+      </div>
+    </header>
+
+    <!-- 背景层 WebView，默认不显示 -->
+    <webview id="bgView" class="bg-view" src="" style="display:none"></webview>
+    <!-- 悬浮窗口遮罩：用于外部点击关闭（未固定时） -->
+    <div id="floatMask" style="display:none"></div>
+
+    <!-- 悬浮窗口容器（包含标题栏与 webview）默认不显示 -->
+    <div id="floatWin" class="float-win" style="display:none">
+      <div class="float-titlebar">
+        <button class="icon-btn left" id="float-pin" title="固定"><i class="ri-pushpin-line"></i></button>
+        <div class="drag-area"></div>
+        <button class="icon-btn" id="float-close" title="关闭"><i class="ri-close-line"></i></button>
+      </div>
+      <webview id="floatView" src=""></webview>
+    </div>
+
+    <!-- 底部工具栏：左、中、右三段 -->
+    <footer id="bottombar" class="bottombar">
+      <div class="left area has-content">
+        <div class="wrap">
+          <div class="window-meta">
+            <i id="bottom-icon" class="ri-layout-bottom-line"></i>
+            <span id="bottom-title">UI模板-低栏应用</span>
+          </div>
+          <button class="rect-btn" id="btn-pin" title="置顶"><i class="ri-pushpin-line"></i><span>置顶</span></button>
+          <div id="left-items" class="items"></div>
+        </div>
+      </div>
+      <div class="center area">
+        <div class="wrap">
+          <div id="center-items" class="items"></div>
+          <button class="rect-btn" id="bottom-expand-center" style="display:none"><i class="ri-arrow-up-s-line"></i><span>展开</span></button>
+        </div>
+      </div>
+      <div class="right area has-content">
+        <div class="wrap">
+          <button class="rect-btn" id="bottom-collapse" style="display:none"><i class="ri-arrow-down-s-line"></i><span>收起</span></button>
+          <button class="rect-btn" id="bottom-min"><i class="ri-subtract-line"></i><span>最小化</span></button>
+          <button class="rect-btn" id="bottom-max"><i class="ri-window-2-line"></i><span>最大化</span></button>
+          <button class="rect-btn" id="bottom-full"><i class="ri-fullscreen-line"></i><span>全屏</span></button>
+          <button class="rect-btn" id="bottom-close"><i class="ri-close-line"></i><span>关闭</span></button>
+          <button class="rect-btn" id="bottom-expand-right" style="display:none"><i class="ri-arrow-up-s-line"></i><span>展开</span></button>
+        </div>
+      </div>
+    </footer>
+
+    <script src="renderer.js"></script>
+  </body>
+  </html>

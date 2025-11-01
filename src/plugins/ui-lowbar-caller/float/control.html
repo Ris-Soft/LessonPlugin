@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>功能选择</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0f0f10; color: #e6e6e6; font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; }
+    .panel { padding: 14px; }
+    h1 { margin: 0 0 14px 0; font-size: 16px; letter-spacing: 0.5px; color: #f0f0f0; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .sub { margin-top: 16px; font-size: 13px; color: #cfcfcf; }
+    a.card { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; text-decoration: none; color: #e6e6e6; background: linear-gradient(180deg, rgba(34,34,36,0.9), rgba(28,28,30,0.9)); box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+    a.card i { font-size: 20px; opacity: 0.9; }
+    a.card .label { font-size: 13px; letter-spacing: 0.3px; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>功能选择</h1>
+    <div class="grid">
+      <a class="card" href="./control.html?mode=clock"><i class="ri-time-line"></i><span class="label">时钟</span></a>
+      <a class="card" href="./control.html?mode=calendar"><i class="ri-calendar-line"></i><span class="label">日历</span></a>
+      <a class="card" href="./control.html?mode=countdown"><i class="ri-timer-line"></i><span class="label">倒计时</span></a>
+      <a class="card" href="./control.html?mode=stopwatch"><i class="ri-stopwatch-line"></i><span class="label">秒表</span></a>
+    </div>
+  </div>
+</body>
+</html>
