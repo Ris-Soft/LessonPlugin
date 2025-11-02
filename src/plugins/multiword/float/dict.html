@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>在线词典</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0c2032; color:#e8f0fe; }
+      .wrap { padding: 12px; }
+      input, button { background:#10273f; color:#e8f0fe; border:1px solid #1f3f5e; border-radius:6px; padding:6px 8px; }
+      .result { margin-top: 10px; background:#0e2842; border:1px solid #1f3f5e; border-radius:8px; padding:10px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <input id="wd" placeholder="输入英文单词，如 heat" />
+        <button id="query"><i class="ri-search-line"></i> 查询</button>
+      </div>
+      <div class="result" id="res">结果将显示在此（停留超过3s才建议显示解析）。</div>
+    </div>
+    <script>
+      const api = () => window.lowbarAPI;
+      const resEl = document.getElementById('res');
+      document.getElementById('query').addEventListener('click', async () => {
+        const w = document.getElementById('wd').value.trim();
+        if (!w) return alert('请输入英文单词');
+        resEl.textContent = '查询中...';
+        try {
+          const r = await api().pluginCall('multi.word', 'dictLookup', [w]);
+          const pick = (obj, keys) => keys.map(k => `${k}: ${JSON.stringify(obj && obj[k])}`).join('\n');
+          const lines = [];
+          lines.push('远端API（尝试）摘要:');
+          lines.push(JSON.stringify(r.remote));
+          lines.push('\n本地示例JSON摘要:');
+          lines.push(pick(r.local || {}, ['code','msg']));
+          if (r.local && r.local.data) {
+            lines.push('word: ' + r.local.data.word);
+            lines.push('ukphone/usphone: ' + r.local.data.ukphone + ' / ' + r.local.data.usphone);
+            lines.push('释义示例:');
+            lines.push(JSON.stringify(r.local.data.translations));
+          }
+          resEl.textContent = lines.join('\n');
+        } catch (e) {
+          resEl.textContent = '查询失败：' + (e?.message||e);
+        }
+      });
+    </script>
+  </body>
+  </html>

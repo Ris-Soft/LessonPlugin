@@ -3,9 +3,11 @@
   (function ensureLowbarApi(){
     if (window.lowbarAPI) return;
     const makeUrl = (rel) => new URL(rel, window.location.href).href;
+    const query = new URLSearchParams(window.location.search || '');
+    const previewWindowMode = query.get('windowMode') || query.get('wm') || 'all_modes';
     const previewPayload = {
       title: 'UI模板-低栏应用',
-      windowMode: 'all_modes',
+      windowMode: previewWindowMode,
       icon: 'ri-layout-bottom-line',
       backgroundUrl: makeUrl('../ui-lowbar-caller/background/clock.html?date=0&seconds=0&blink=0'),
       floatingUrl: null,
@@ -144,6 +146,9 @@
   let gEventChannel = null;
   // 调用方插件ID（用于模板直接回调后端处理事件）
   let gCallerPluginId = null;
+  // 初始模式标记（用于在 onInit 后保持与窗口模式一致的样式与按钮状态）
+  let gInitialFull = false;
+  let gInitialMax = false;
   // 悬浮窗口边界预设（'left' | 'center' | null），用于每次打开时重算位置
   let gFloatingBoundsPreset = null;
   // 悬浮窗口刚打开时间戳（用于遮罩点击防抖，避免“闪一下”）
@@ -366,9 +371,8 @@
     const hookInsertCSS = (wv) => {
       if (!wv) return;
       const inject = () => { try { wv.insertCSS(iframeCSS); } catch {} };
+      // 仅在 dom-ready 注入，避免导航过程中调用导致 ERR_ABORTED (-3)
       wv.addEventListener('dom-ready', inject);
-      wv.addEventListener('did-navigate', inject);
-      wv.addEventListener('did-navigate-in-page', inject);
     };
     hookInsertCSS(bg);
     hookInsertCSS(fv);
@@ -549,15 +553,24 @@
     document.querySelector('.left').classList.add('has-content');
     document.querySelector('.right').classList.add('has-content');
 
-    // 初始模式（默认为窗口化）
-    setModeClass(false, false);
+    // 初始模式：根据调用方下发的 windowMode 设置样式，避免默认窗口化导致顶栏显示
+    const initMode = (payload && payload.windowMode) ? String(payload.windowMode) : 'all_modes';
+    if (initMode === 'fullscreen_only') {
+      gInitialFull = true; gInitialMax = false;
+    } else if (initMode === 'fullscreen_maximized') {
+      gInitialFull = false; gInitialMax = true;
+    } else {
+      gInitialFull = false; gInitialMax = false;
+    }
+    setModeClass(gInitialFull, gInitialMax);
   }
 
   // 顶栏按钮
   $('#btn-min').addEventListener('click', () => window.lowbarAPI.windowControl('minimize'));
   $('#btn-max').addEventListener('click', () => window.lowbarAPI.windowControl('maximize'));
   $('#btn-close').addEventListener('click', () => window.lowbarAPI.windowControl('close'));
-  let isFull = false;
+  // 根据初始模式同步折叠按钮与文档类名状态
+  let isFull = gInitialFull;
   let isCollapsed = false;
   $('#btn-full').addEventListener('click', () => {
     window.lowbarAPI.toggleFullscreen();

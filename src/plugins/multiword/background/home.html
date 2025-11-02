@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>多维单词 · 首页</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0b1b2b; color:#e8f0fe; }
+      .wrap { padding: 36px; }
+      h1 { margin:0 0 12px; font-size: 28px; display:flex; align-items:center; gap:10px; }
+      .grid { display:grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap:16px; margin-top: 16px; }
+      .card { background:#11263d; border:1px solid #1f3f5e; border-radius:8px; padding:14px; }
+      .card h3 { margin:0 0 8px; font-size: 18px; }
+      .hint { opacity: 0.85; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1><i class="ri-book-2-line"></i> 多维单词</h1>
+      <div class="hint">通过底栏中间的七个按钮打开相应悬浮窗：单词听力/自测/检查/外部词库/在线词典/偏好设置/关于插件。</div>
+      <div class="grid">
+        <div class="card"><h3>单词听力</h3><div>选择版本/书册/单元，整单元音频+LRC选段播放。</div></div>
+        <div class="card"><h3>单词自测</h3><div>多选多书多单元，支持选项/输入模式、数量与乱序设置。</div></div>
+        <div class="card"><h3>单词检查</h3><div>多人检查与抽查模式，提示语言与等待时长可设。</div></div>
+        <div class="card"><h3>外部词库</h3><div>连接自建词库服务端，支持增删改查与模式展示。</div></div>
+        <div class="card"><h3>在线词典</h3><div>调用API并在停留>3s时显示解析，含本地JSON示例。</div></div>
+        <div class="card"><h3>偏好设置</h3><div>英/美/全播放、轮播与乱序偏好保存并自动默认。</div></div>
+      </div>
+    </div>
+  </body>
+  </html>

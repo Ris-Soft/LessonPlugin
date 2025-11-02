@@ -1,0 +1,195 @@
+{
+    "code": 200,
+    "msg": "数据请求成功",
+    "data": {
+        "bookId": "CET4_2",
+        // 短语
+        "phrases": [
+            {
+                "p_cn": "热传递，传热",
+                "p_content": "heat transfer"
+            },
+            {
+                "p_cn": "热处理",
+                "p_content": "heat treatment"
+            },
+            {
+                "p_cn": "热交换器",
+                "p_content": "heat exchanger"
+            },
+            {
+                "p_cn": "热泵，蒸汽泵",
+                "p_content": "heat pump"
+            },
+            {
+                "p_cn": "热传导",
+                "p_content": "heat exchange"
+            },
+            {
+                "p_cn": "热传导",
+                "p_content": "heat conduction"
+            },
+            {
+                "p_cn": "[物]耐热性",
+                "p_content": "heat resistance"
+            },
+            {
+                "p_cn": "保温",
+                "p_content": "heat preservation"
+            },
+            {
+                "p_cn": "热源",
+                "p_content": "heat source"
+            },
+            {
+                "p_cn": "余热；废热",
+                "p_content": "waste heat"
+            },
+            {
+                "p_cn": "绝热",
+                "p_content": "heat insulation"
+            },
+            {
+                "p_cn": "[化]传热系数",
+                "p_content": "heat transfer coefficient"
+            },
+            {
+                "p_cn": "热流，热通量",
+                "p_content": "heat flux"
+            },
+            {
+                "p_cn": "[热力]高热量",
+                "p_content": "high heat"
+            },
+            {
+                "p_cn": "热能",
+                "p_content": "heat energy"
+            },
+            {
+                "p_cn": "热管；热导管",
+                "p_content": "heat pipe"
+            },
+            {
+                "p_cn": "加热",
+                "p_content": "heat up"
+            },
+            {
+                "p_cn": "热回收",
+                "p_content": "heat recovery"
+            },
+            {
+                "p_cn": "热损失，热损耗",
+                "p_content": "heat loss"
+            },
+            {
+                "p_cn": "热平衡；热量衡算",
+                "p_content": "heat balance"
+            }
+        ],
+         // 同根词
+        "relWords": [
+            {
+                "Hwds": [
+                    {
+                        "hwd": "heated",
+                        "tran": " 热的；激昂的；激动的"
+                    },
+                    {
+                        "hwd": "heatable",
+                        "tran": " 可被加热的"
+                    },
+                    {
+                        "hwd": "heatless",
+                        "tran": " 无热的"
+                    }
+                ],
+                "Pos": "adj"
+            },
+            {
+                "Hwds": [
+                    {
+                        "hwd": "heatedly",
+                        "tran": " 加热地；激昂地，热情的"
+                    }
+                ],
+                "Pos": "adv"
+            },
+            {
+                "Hwds": [
+                    {
+                        "hwd": "heater",
+                        "tran": " 加热器；加热工"
+                    }
+                ],
+                "Pos": "n"
+            },
+            {
+                "Hwds": [
+                    {
+                        "hwd": "heated",
+                        "tran": " 加热；使兴奋（heat的过去分词）"
+                    }
+                ],
+                "Pos": "v"
+            }
+        ],
+         // 例句
+        "sentences": [
+            {
+                "s_cn": "冰需要热才能融化。",
+                "s_content": "Ice needs heat to melt."
+            },
+            {
+                "s_cn": "为阁楼安装隔热层是减少热量流失的好方法。",
+                "s_content": "Insulating the attic is a good way to reduce heat loss."
+            }
+        ],
+        // 近义词
+        "synonyms": [
+            {
+                "Hwds": [
+                    {
+                        "word": "pressure"
+                    },
+                    {
+                        "word": "high temperature"
+                    }
+                ],
+                "pos": "n",
+                "tran": "高温；压力；热度；热烈"
+            },
+            {
+                "Hwds": [
+                    {
+                        "word": "impassion"
+                    },
+                    {
+                        "word": "emotionalize"
+                    }
+                ],
+                "pos": "vt",
+                "tran": "使激动；把…加热"
+            }
+        ],
+        // 翻译
+        "translations": [
+            {
+                "pos": "n",
+                "tran_cn": "热，炎热"
+            },
+            {
+                "pos": "v",
+                "tran_cn": "变热"
+            }
+        ],
+         // 英音音标
+        "ukphone": "hiːt",
+         // 英音示例
+        "ukspeech": "https://dict.youdao.com/dictvoice?audio=heat&type=1",
+         // 美音音标
+        "usphone": "hit",
+         // 英音示例
+        "usspeech": "https://dict.youdao.com/dictvoice?audio=heat&type=2",
+        "word": "heat"
+    }
+}

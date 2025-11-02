@@ -13,6 +13,8 @@ body { font-family: system-ui, -apple-system, Segoe UI, PingFang SC, Microsoft Y
 
 /* 背景 webview */
 .bg-view { position: absolute; top: 36px; left: 0; right: 0; bottom: 68px; }
+/* 全屏模式下背景视图占满窗口，贴顶到底 */
+body.mode-fullscreen .bg-view { top: 0; bottom: 0; }
 
 /* 悬浮窗口（内嵌 webview） */
 .float-win { position: absolute; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; overflow: hidden; backdrop-filter: blur(3px); box-shadow: 0 10px 26px rgba(0,0,0,0.35); opacity: 0; transform: translateY(8px); transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }

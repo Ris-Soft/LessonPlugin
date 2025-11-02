@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>外部词库</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0c2032; color:#e8f0fe; }
+      .wrap { padding: 12px; }
+      input, button { background:#10273f; color:#e8f0fe; border:1px solid #1f3f5e; border-radius:6px; padding:6px 8px; }
+      .modes { display:flex; gap:8px; margin-top: 12px; }
+      .card { background:#0e2842; border:1px solid #1f3f5e; border-radius:8px; padding:10px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <label>服务地址 <input id="url" placeholder="http://localhost:6100" /></label>
+        <button id="save"><i class="ri-plug-line"></i> 连接并保存</button>
+        <button id="disconnect"><i class="ri-shut-down-line"></i> 断开</button>
+        <span id="status" style="margin-left:8px; opacity:.85">未连接</span>
+      </div>
+      <div class="modes">
+        <div class="card"><b>轮播展示</b><div>占位：连接后可轮播词库内容。</div></div>
+        <div class="card"><b>全部展示</b><div>占位：连接后可分页展示全部词汇。</div></div>
+        <div class="card"><b>检查模式</b><div>占位：与内部词库类似的检查模式。</div></div>
+        <div class="card"><b>自测模式</b><div>占位：与内部词库类似的自测模式。</div></div>
+      </div>
+    </div>
+    <script>
+      const api = () => window.lowbarAPI;
+      const statusEl = document.getElementById('status');
+      const urlEl = document.getElementById('url');
+      const syncUrl = async () => {
+        try { const r = await api().pluginCall('multi.word', 'getWordbankUrl'); urlEl.value = (r && r.url) || ''; statusEl.textContent = r && r.url ? ('已保存：' + r.url) : '未连接'; } catch {}
+      };
+      document.getElementById('save').addEventListener('click', async () => {
+        try { const s = urlEl.value.trim(); await api().pluginCall('multi.word', 'setWordbankUrl', [s]); statusEl.textContent = s ? ('已保存：' + s) : '未连接'; alert('连接信息已保存（占位）'); } catch (e) { alert('保存失败：' + (e?.message||e)); }
+      });
+      document.getElementById('disconnect').addEventListener('click', async () => {
+        try { await api().pluginCall('multi.word', 'setWordbankUrl', ['']); statusEl.textContent = '未连接'; } catch {}
+      });
+      syncUrl();
+    </script>
+  </body>
+  </html>

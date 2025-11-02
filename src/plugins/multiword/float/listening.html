@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>单词听力</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0c2032; color:#e8f0fe; }
+      .top { display:flex; gap:8px; padding:10px; border-bottom:1px solid #1f3f5e; }
+      select, button, input[type=range] { background:#10273f; color:#e8f0fe; border:1px solid #1f3f5e; border-radius:6px; padding:6px 8px; }
+      .main { height: calc(100vh - 158px); display:flex; }
+      .left { width: 180px; border-right:1px solid #1f3f5e; padding:10px; overflow:auto; }
+      .right { flex:1; padding:10px; }
+      .lrc { height: 60%; overflow:auto; border:1px solid #1f3f5e; border-radius:8px; padding:10px; background:#0e2842; }
+      .progress { display:flex; align-items:center; gap:8px; margin-top:10px; }
+      .bottom { position: absolute; bottom: 8px; left: 8px; right: 8px; display:flex; justify-content:center; gap:8px; }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <label>版本<select id="ver"><option value="CET4">CET-4</option><option value="CET6">CET-6</option></select></label>
+      <label>书册<select id="book"><option value="CET4_2">CET4-2</option><option value="CET4_1">CET4-1</option></select></label>
+      <label>单元<select id="unit"><option>Unit 1</option><option>Unit 2</option><option>Unit 3</option></select></label>
+      <span style="flex:1"></span>
+      <button id="apply">开始播放</button>
+    </div>
+    <div class="main">
+      <div class="left" id="books"></div>
+      <div class="right">
+        <div class="lrc" id="lrc">准备好后显示LRC滚动内容（支持[E]/[A]过滤）。</div>
+        <div class="progress">
+          <span>进度</span>
+          <input type="range" id="seek" min="0" max="100" value="0" />
+        </div>
+      </div>
+    </div>
+    <div class="bottom">
+      <button id="back"><i class="ri-arrow-go-back-line"></i> 返回首页</button>
+      <button id="play"><i class="ri-play-line"></i> 播放</button>
+      <button id="prev"><i class="ri-skip-back-mini-line"></i> 上个单词</button>
+      <button id="next"><i class="ri-skip-forward-mini-line"></i> 下个单词</button>
+      <label>倍速<select id="rate"><option>1.0</option><option>1.25</option><option>1.5</option><option>2.0</option></select></label>
+      <label>音量<input type="range" id="vol" min="0" max="100" value="60" /></label>
+    </div>
+    <script>
+      // 简化：占位云URL（整单元音频与LRC）
+      const AUDIO_URL = 'https://example.com/multiword/unit-audio.mp3';
+      const LRC_URL = 'https://example.com/multiword/unit.lrc';
+
+      (function(){
+        const makeApi = () => window.lowbarAPI;
+        const loadPrefs = async () => {
+          try {
+            const r = await makeApi().pluginCall('multi.word', 'getPreferences');
+            return (r && r.prefs) || { voice:'ALL', enableCarousel:true, shuffleAfterCarousel:false };
+          } catch { return { voice:'ALL', enableCarousel:true, shuffleAfterCarousel:false }; }
+        };
+        const filterLrc = (text, voice) => {
+          const lines = String(text||'').split(/\r?\n/);
+          const keep = [];
+          for (const ln of lines) {
+            if (!ln.trim()) continue;
+            if (voice === 'E' && ln.startsWith('[E]')) keep.push(ln.replace(/^\[E\]\s*/, ''));
+            else if (voice === 'A' && ln.startsWith('[A]')) keep.push(ln.replace(/^\[A\]\s*/, ''));
+            else if (voice === 'ALL') {
+              keep.push(ln.replace(/^\[(E|A)\]\s*/, ''));
+            }
+          }
+          return keep.join('\n');
+        };
+        const applyLrc = async () => {
+          const lrcEl = document.getElementById('lrc');
+          const prefs = await loadPrefs();
+          try {
+            const res = await fetch(LRC_URL);
+            const txt = await res.text();
+            lrcEl.textContent = filterLrc(txt, prefs.voice || 'ALL') || 'LRC加载失败或为空';
+          } catch (e) {
+            lrcEl.textContent = '占位LRC加载失败：' + (e?.message||e);
+          }
+        };
+        document.getElementById('apply').addEventListener('click', applyLrc);
+        document.getElementById('back').addEventListener('click', () => {
+          try { makeApi().emitEvent('multiword.lowbar', { type:'left.click', id:'go-home' }); } catch {}
+        });
+      })();
+    </script>
+  </body>
+  </html>

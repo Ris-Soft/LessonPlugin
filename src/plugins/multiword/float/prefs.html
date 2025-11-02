@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>偏好设置</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0c2032; color:#e8f0fe; }
+      .wrap { padding: 12px; }
+      select, input, button { background:#10273f; color:#e8f0fe; border:1px solid #1f3f5e; border-radius:6px; padding:6px 8px; margin:6px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <label>音色偏好
+          <select id="voice">
+            <option value="E">英音</option>
+            <option value="A">美音</option>
+            <option value="ALL" selected>全播放</option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <label><input type="checkbox" id="enableCarousel" checked /> 启用轮播展示</label>
+        <label><input type="checkbox" id="shuffleAfterCarousel" /> 轮播后重新乱序</label>
+      </div>
+      <div>
+        <button id="save"><i class="ri-save-2-line"></i> 保存</button>
+      </div>
+    </div>
+    <script>
+      const api = () => window.lowbarAPI;
+      const voiceEl = document.getElementById('voice');
+      const enCarouselEl = document.getElementById('enableCarousel');
+      const shuffleEl = document.getElementById('shuffleAfterCarousel');
+      const load = async () => {
+        try { const r = await api().pluginCall('multi.word', 'getPreferences'); const p = (r && r.prefs) || {}; voiceEl.value = p.voice || 'ALL'; enCarouselEl.checked = !!p.enableCarousel; shuffleEl.checked = !!p.shuffleAfterCarousel; } catch {}
+      };
+      const save = async () => {
+        const prefs = { voice: voiceEl.value, enableCarousel: enCarouselEl.checked, shuffleAfterCarousel: shuffleEl.checked };
+        try { await api().pluginCall('multi.word', 'savePreferences', [prefs]); alert('已保存，下次默认生效'); } catch (e) { alert('保存失败：' + (e?.message||e)); }
+      };
+      document.getElementById('save').addEventListener('click', save);
+      load();
+    </script>
+  </body>
+  </html>
