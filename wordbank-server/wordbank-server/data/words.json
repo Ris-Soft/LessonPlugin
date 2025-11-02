@@ -1,0 +1,1819 @@
+{
+  "words": [
+    {
+      "word": "control",
+      "cn": "v. 控制，克制；n. 控制",
+      "createdAt": 1762047550860,
+      "translations": [
+        {
+          "pos": "v",
+          "cn": "控制，克制"
+        },
+        {
+          "pos": "n",
+          "cn": "控制"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "CET4_2",
+          "phrases": [
+            {
+              "p_cn": "控制系统",
+              "p_content": "control system"
+            },
+            {
+              "p_cn": "对…的控制",
+              "p_content": "control of"
+            },
+            {
+              "p_cn": "质量控制，质量管理",
+              "p_content": "quality control"
+            },
+            {
+              "p_cn": "处于控制之下；情况正常",
+              "p_content": "under control"
+            },
+            {
+              "p_cn": "失去控制",
+              "p_content": "out of control"
+            },
+            {
+              "p_cn": "控制方法，检查法",
+              "p_content": "control method"
+            },
+            {
+              "p_cn": "控制组（自变量的一种处理方法）；实验对照组",
+              "p_content": "control group"
+            },
+            {
+              "p_cn": "在...控制下",
+              "p_content": "under the control of"
+            },
+            {
+              "p_cn": "自动控制",
+              "p_content": "automatic control"
+            },
+            {
+              "p_cn": "过程控制；程序控制",
+              "p_content": "process control"
+            },
+            {
+              "p_cn": "数字控制；数值控制",
+              "p_content": "numerical control"
+            },
+            {
+              "p_cn": "控制策略",
+              "p_content": "control strategy"
+            },
+            {
+              "p_cn": "温度控制",
+              "p_content": "temperature control"
+            },
+            {
+              "p_cn": "控制措施；管理办法",
+              "p_content": "control measures"
+            },
+            {
+              "p_cn": "控制；支配；征服",
+              "p_content": "control over"
+            },
+            {
+              "p_cn": "模糊控制",
+              "p_content": "fuzzy control"
+            },
+            {
+              "p_cn": "在…控制下",
+              "p_content": "in the control of"
+            },
+            {
+              "p_cn": "控制理论，控制论",
+              "p_content": "control theory"
+            },
+            {
+              "p_cn": "n. 遥控；遥控装置",
+              "p_content": "remote control"
+            },
+            {
+              "p_cn": "成本控制",
+              "p_content": "cost control"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "controlled",
+                  "tran": " 受控制的；受约束的；克制的"
+                },
+                {
+                  "hwd": "controllable",
+                  "tran": " 可控制的；可管理的；能操纵的"
+                }
+              ],
+              "Pos": "adj"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "controller",
+                  "tran": " 控制器；管理员；主计长"
+                },
+                {
+                  "hwd": "controlling",
+                  "tran": " 控制"
+                },
+                {
+                  "hwd": "controllership",
+                  "tran": " 主计员或管理员之职位或任期"
+                }
+              ],
+              "Pos": "n"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "controlled",
+                  "tran": " 控制；约束（control的过去式）；指挥"
+                },
+                {
+                  "hwd": "controlling",
+                  "tran": " 控制；管理（control的ing形式）；验证"
+                }
+              ],
+              "Pos": "v"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "只好调来警察控制人群。",
+              "s_content": "Police had to be called in to control the crowds."
+            },
+            {
+              "s_cn": "驾驭烈马的一名技巧娴熟的骑手",
+              "s_content": "a skilled rider controlling a spirited horse"
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "governance"
+                },
+                {
+                  "word": "administration"
+                },
+                {
+                  "word": "management"
+                },
+                {
+                  "word": "supervision"
+                },
+                {
+                  "word": "checking"
+                }
+              ],
+              "pos": "n",
+              "tran": "[自]控制；[管理]管理；抑制；操纵装置"
+            },
+            {
+              "Hwds": [
+                {
+                  "word": "possess"
+                },
+                {
+                  "word": "manage"
+                },
+                {
+                  "word": "regulate"
+                },
+                {
+                  "word": "bottle"
+                },
+                {
+                  "word": "conduct"
+                }
+              ],
+              "pos": "vt",
+              "tran": "[自]控制；[管理]管理；抑制"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "v",
+              "tran_cn": "控制，克制"
+            },
+            {
+              "pos": "n",
+              "tran_cn": "控制"
+            }
+          ],
+          "ukphone": "kən'trəʊl",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=control&type=1",
+          "usphone": "kən'trol",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=control&type=2",
+          "word": "control"
+        },
+        "request_id": "992906179401edfc9a5d7d5a"
+      }
+    },
+    {
+      "id": "1762047651532-r50xop",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1762047651532,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "CET4_2",
+          "phrases": [
+            {
+              "p_cn": "打招呼；问好",
+              "p_content": "say hello"
+            },
+            {
+              "p_cn": "大家好",
+              "p_content": "hello everyone"
+            },
+            {
+              "p_cn": "欢迎莅临",
+              "p_content": "hello and welcome"
+            },
+            {
+              "p_cn": "回魂妻（电影名称）",
+              "p_content": "hello again"
+            }
+          ],
+          "relWords": [],
+          "sentences": [
+            {
+              "s_cn": "喂，约翰！你好吗？",
+              "s_content": "Hello, John! How are you?"
+            },
+            {
+              "s_cn": "斯坦利，过来和你的侄子打声招呼。",
+              "s_content": "Stanley, come and say hello to your nephew."
+            },
+            {
+              "s_cn": "嗨，你好！好久不见了。",
+              "s_content": "Well, hello there ! I haven’t seen you for ages."
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "hallo"
+                },
+                {
+                  "word": "holloo"
+                }
+              ],
+              "pos": "int",
+              "tran": "喂；哈罗"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "int",
+              "tran_cn": "喂"
+            }
+          ],
+          "ukphone": "hə'ləʊ; he-",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=hello&type=1",
+          "usphone": "hɛˈlo, hə-",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=hello&type=2",
+          "word": "hello"
+        },
+        "request_id": "50d0b792de8b3f48376a7836"
+      }
+    },
+    {
+      "id": "1762061868970-3xkr0q",
+      "word": "hi",
+      "cn": "int. 嗨(表示问候等)",
+      "createdAt": 1762061868970,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "嗨(表示问候等)"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "CET4_2",
+          "phrases": [
+            {
+              "p_cn": "嘿，你好(或你们好)",
+              "p_content": "hi there"
+            }
+          ],
+          "relWords": [],
+          "sentences": [
+            {
+              "s_cn": "嗨！你好吗？",
+              "s_content": "Hi! How are you?"
+            },
+            {
+              "s_cn": "嘿！好久不见。",
+              "s_content": "Hi there! I haven’t seen you for ages."
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "come"
+                },
+                {
+                  "word": "heigh"
+                }
+              ],
+              "pos": "int",
+              "tran": "嗨！（表示问候或用以唤起注意）"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "int",
+              "tran_cn": "嗨(表示问候等)"
+            }
+          ],
+          "ukphone": "haɪ",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=hi&type=1",
+          "usphone": "haɪ",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=hi&type=2",
+          "word": "hi"
+        },
+        "request_id": "2d1d35ff7c7a2f8ef1e1408f"
+      }
+    },
+    {
+      "id": "1762061893579-boxbmd",
+      "word": "structure",
+      "cn": "n. 结构；构造；建筑物；v. 组织；构成；建造",
+      "createdAt": 1762061893579,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "结构；构造；建筑物"
+        },
+        {
+          "pos": "v",
+          "cn": "组织；构成；建造"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "BEC_2",
+          "phrases": [
+            {
+              "p_cn": "产业结构",
+              "p_content": "industrial structure"
+            },
+            {
+              "p_cn": "简单结构；静定结构",
+              "p_content": "simple structure"
+            },
+            {
+              "p_cn": "结构设计",
+              "p_content": "structure design"
+            },
+            {
+              "p_cn": "系统结构；体制结构",
+              "p_content": "system structure"
+            },
+            {
+              "p_cn": "经济结构，经济体制",
+              "p_content": "economic structure"
+            },
+            {
+              "p_cn": "钢结构",
+              "p_content": "steel structure"
+            },
+            {
+              "p_cn": "数据结构",
+              "p_content": "data structure"
+            },
+            {
+              "p_cn": "基本结构",
+              "p_content": "basic structure"
+            },
+            {
+              "p_cn": "资本结构",
+              "p_content": "capital structure"
+            },
+            {
+              "p_cn": "结构特征",
+              "p_content": "structure characteristics"
+            },
+            {
+              "p_cn": "[化]分子结构",
+              "p_content": "molecular structure"
+            },
+            {
+              "p_cn": "网络结构",
+              "p_content": "network structure"
+            },
+            {
+              "p_cn": "组织结构；组织架构",
+              "p_content": "organizational structure"
+            },
+            {
+              "p_cn": "混凝土结构；具体结构；混凝土建造物",
+              "p_content": "concrete structure"
+            },
+            {
+              "p_cn": "市场结构",
+              "p_content": "market structure"
+            },
+            {
+              "p_cn": "[经]组织结构",
+              "p_content": "organization structure"
+            },
+            {
+              "p_cn": "密实结构；致密结构",
+              "p_content": "compact structure"
+            },
+            {
+              "p_cn": "框架结构；帧结构",
+              "p_content": "frame structure"
+            },
+            {
+              "p_cn": "社会结构",
+              "p_content": "social structure"
+            },
+            {
+              "p_cn": "治理结构；统治结构；规制结构",
+              "p_content": "governance structure"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "structural",
+                  "tran": " 结构的；建筑的"
+                },
+                {
+                  "hwd": "structured",
+                  "tran": " 有结构的；有组织的"
+                }
+              ],
+              "Pos": "adj"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "structurally",
+                  "tran": " 在结构上"
+                }
+              ],
+              "Pos": "adv"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "structuralism",
+                  "tran": " 结构主义；构造主义"
+                }
+              ],
+              "Pos": "n"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "structured",
+                  "tran": " 组织；构成（structure的过去分词）；建造"
+                }
+              ],
+              "Pos": "v"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "对现有权力结构的挑战",
+              "s_content": "challenges to the existing power structure"
+            },
+            {
+              "s_cn": "已推行一种新的管理结构。",
+              "s_content": "A new management structure has been introduced."
+            },
+            {
+              "s_cn": "分子结构",
+              "s_content": "molecular structures"
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "configuration"
+                },
+                {
+                  "word": "mechanics"
+                },
+                {
+                  "word": "formation"
+                },
+                {
+                  "word": "framework"
+                },
+                {
+                  "word": "texture"
+                },
+                {
+                  "word": "construction"
+                },
+                {
+                  "word": "fabric"
+                }
+              ],
+              "pos": "n",
+              "tran": "结构；构造；[建]建筑物"
+            },
+            {
+              "Hwds": [
+                {
+                  "word": "organize"
+                },
+                {
+                  "word": "constitute"
+                },
+                {
+                  "word": "form"
+                },
+                {
+                  "word": "frame"
+                }
+              ],
+              "pos": "vt",
+              "tran": "组织；构成；建造"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "n",
+              "tran_cn": "结构；构造；建筑物"
+            },
+            {
+              "pos": "v",
+              "tran_cn": "组织；构成；建造"
+            }
+          ],
+          "ukphone": "'strʌktʃə",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=structure&type=1",
+          "usphone": "'strʌktʃɚ",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=structure&type=2",
+          "word": "structure"
+        },
+        "request_id": "40aacba6755e4864c1312857"
+      }
+    },
+    {
+      "id": "1762061912255-st85ma",
+      "word": "initiative",
+      "cn": "n. 主动权；首创精神；adj. 主动的；自发的；起始的",
+      "createdAt": 1762061912255,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "主动权；首创精神"
+        },
+        {
+          "pos": "adj",
+          "cn": "主动的；自发的；起始的"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "BEC_2",
+          "phrases": [
+            {
+              "p_cn": "采取主动；带头",
+              "p_content": "take the initiative"
+            },
+            {
+              "p_cn": "主动地",
+              "p_content": "on one's own initiative"
+            },
+            {
+              "p_cn": "主观能动性",
+              "p_content": "subjective initiative"
+            },
+            {
+              "p_cn": "掌握主动",
+              "p_content": "have the initiative"
+            },
+            {
+              "p_cn": "积极主动",
+              "p_content": "take initiative"
+            },
+            {
+              "p_cn": "学习积极性",
+              "p_content": "learning initiative"
+            },
+            {
+              "p_cn": "和平倡议，倡议和平；和平的开端",
+              "p_content": "peace initiative"
+            },
+            {
+              "p_cn": "防扩散安全倡议",
+              "p_content": "proliferation security initiative"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "initiatory",
+                  "tran": " 入会的；最初的；起始的"
+                }
+              ],
+              "Pos": "adj"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "initiation",
+                  "tran": " 启蒙，传授；开始；入会"
+                }
+              ],
+              "Pos": "n"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "为什么你不主动约他出去呢？",
+              "s_content": "Why don’t you take the initiative and ask him out?"
+            },
+            {
+              "s_cn": "政治家需要对恐怖分子主动出击。",
+              "s_content": "Politicians need to seize the initiative from the terrorists."
+            },
+            {
+              "s_cn": "政府在打击恐怖主义方面不能失去主动权。",
+              "s_content": "The government must not lose the initiative in the fight against terrorism."
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "pioneering spirit"
+                }
+              ],
+              "pos": "n",
+              "tran": "主动权；首创精神"
+            },
+            {
+              "Hwds": [
+                {
+                  "word": "autonomous"
+                },
+                {
+                  "word": "active"
+                },
+                {
+                  "word": "spontaneous"
+                }
+              ],
+              "pos": "adj",
+              "tran": "主动的；自发的；起始的"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "n",
+              "tran_cn": "主动权；首创精神"
+            },
+            {
+              "pos": "adj",
+              "tran_cn": "主动的；自发的；起始的"
+            }
+          ],
+          "ukphone": "ɪ'nɪʃɪətɪv; -ʃə-",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=initiative&type=1",
+          "usphone": "ɪ'nɪʃətɪv",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=initiative&type=2",
+          "word": "initiative"
+        },
+        "request_id": "891df1e20dd9e4befd9ab986"
+      }
+    },
+    {
+      "id": "1762061940075-im7jaa",
+      "word": "potable",
+      "cn": "adj. 适于饮用的",
+      "createdAt": 1762061940075,
+      "translations": [
+        {
+          "pos": "adj",
+          "cn": "适于饮用的"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "GRE_2",
+          "phrases": [
+            {
+              "p_cn": "饮用水",
+              "p_content": "potable water"
+            },
+            {
+              "p_cn": "饮水供给",
+              "p_content": "potable water supply"
+            },
+            {
+              "p_cn": "饮用水系统",
+              "p_content": "potable water system"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "potation",
+                  "tran": " 喝；饮料"
+                }
+              ],
+              "Pos": "n"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "一般而言，近三分之一的卫生设施有适合饮用的水，并且仅仅四分之一仍然与一般排水系统或电源连接。",
+              "s_content": "In general, only one third of health facilities have potable water, and just one in four remain linked to the general sewerage system or to a power supply."
+            },
+            {
+              "s_cn": "食品加工将相对庞大的，易腐烂的，通常是不可食用的原料加工成更有用的，耐储存的和可口的食品或适于饮用的饮料。",
+              "s_content": "Food processing converts relatively bulky, perishable and typically inedible raw materials into more useful, shelf-stable and palatable foods or potable beverages."
+            },
+            {
+              "s_cn": "如果确实可以的话，那么生命的必需品之一——饮用水，对多数人来说将更容易获得。",
+              "s_content": "If it does then potable water, one of the necessities of life, may become easier for many people to obtain."
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "beverage"
+                },
+                {
+                  "word": "drink"
+                },
+                {
+                  "word": "belly-wash"
+                },
+                {
+                  "word": "bevvy"
+                }
+              ],
+              "pos": "n",
+              "tran": "饮料（常复数）"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "adj",
+              "tran_cn": "适于饮用的"
+            }
+          ],
+          "ukphone": "'pəʊtəb(ə)l",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=potable&type=1",
+          "usphone": "'potəbl",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=potable&type=2",
+          "word": "potable"
+        },
+        "request_id": "7f6a0c603231fc912b51c4bb"
+      }
+    },
+    {
+      "id": "1762061950553-3f3hea",
+      "word": "food",
+      "cn": "n. 食物，食品，养料",
+      "createdAt": 1762061950553,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "食物，食品，养料"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "CET4_2",
+          "phrases": [
+            {
+              "p_cn": "食品工业，食品产业",
+              "p_content": "food industry"
+            },
+            {
+              "p_cn": "饮食；食品与饮料",
+              "p_content": "food and drink"
+            },
+            {
+              "p_cn": "食品加工，食品处理；进食，食品热杀菌",
+              "p_content": "food processing"
+            },
+            {
+              "p_cn": "绿色食品",
+              "p_content": "green food"
+            },
+            {
+              "p_cn": "保健食品",
+              "p_content": "health food"
+            },
+            {
+              "p_cn": "速食，快餐",
+              "p_content": "fast food"
+            },
+            {
+              "p_cn": "食品生产；粮食生产；食品加工",
+              "p_content": "food production"
+            },
+            {
+              "p_cn": "中餐；中国食物；中式食品",
+              "p_content": "chinese food"
+            },
+            {
+              "p_cn": "粮食安全；食品安全；食物保障",
+              "p_content": "food security"
+            },
+            {
+              "p_cn": "食品和饮料",
+              "p_content": "food and beverage"
+            },
+            {
+              "p_cn": "美味食品",
+              "p_content": "delicious food"
+            },
+            {
+              "p_cn": "食品和药物管理局",
+              "p_content": "food and drug administration"
+            },
+            {
+              "p_cn": "垃圾食物；无营养的速食；华而不实的东西",
+              "p_content": "junk food"
+            },
+            {
+              "p_cn": "有益健康的食物",
+              "p_content": "healthy food"
+            },
+            {
+              "p_cn": "食品添加剂",
+              "p_content": "food additive"
+            },
+            {
+              "p_cn": "食品公司",
+              "p_content": "food company"
+            },
+            {
+              "p_cn": "食物供给",
+              "p_content": "food supply"
+            },
+            {
+              "p_cn": "食物链",
+              "p_content": "food chain"
+            },
+            {
+              "p_cn": "有机食品，有机食物",
+              "p_content": "organic food"
+            },
+            {
+              "p_cn": "食物中毒",
+              "p_content": "food poisoning"
+            }
+          ],
+          "relWords": [],
+          "sentences": [
+            {
+              "s_cn": "那家餐厅物美价廉。",
+              "s_content": "The restaurant serves good food at affordable prices."
+            },
+            {
+              "s_cn": "我喜欢意大利食物，尤其是面食。",
+              "s_content": "I love Italian food, especially pasta."
+            },
+            {
+              "s_cn": "他被告知要少吃过咸和油腻的食物。",
+              "s_content": "He was told to cut down on salty and fatty foods."
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "diet"
+                },
+                {
+                  "word": "eating"
+                },
+                {
+                  "word": "nourishment"
+                }
+              ],
+              "pos": "n",
+              "tran": "[食品]食物；养料"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "n",
+              "tran_cn": "食物，食品，养料"
+            }
+          ],
+          "ukphone": "fuːd",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=food&type=1",
+          "usphone": "fud",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=food&type=2",
+          "word": "food"
+        },
+        "request_id": "4585c1a4bcdbac33f49acd32"
+      }
+    },
+    {
+      "id": "1762061955151-6e3pvx",
+      "word": "water",
+      "cn": "n. 水；v. 使湿，灌溉",
+      "createdAt": 1762061955151,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "水"
+        },
+        {
+          "pos": "v",
+          "cn": "使湿，灌溉"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "CET4_2",
+          "phrases": [
+            {
+              "p_cn": "水质",
+              "p_content": "water quality"
+            },
+            {
+              "p_cn": "供水系统；水源",
+              "p_content": "water supply"
+            },
+            {
+              "p_cn": "水处理；水的处理",
+              "p_content": "water treatment"
+            },
+            {
+              "p_cn": "污水，废水",
+              "p_content": "waste water"
+            },
+            {
+              "p_cn": "饮用水",
+              "p_content": "drinking water"
+            },
+            {
+              "p_cn": "热水；困境",
+              "p_content": "hot water"
+            },
+            {
+              "p_cn": "水污染",
+              "p_content": "water pollution"
+            },
+            {
+              "p_cn": "水资源",
+              "p_content": "water resource"
+            },
+            {
+              "p_cn": "含水量",
+              "p_content": "water content"
+            },
+            {
+              "p_cn": "水系；供水系统（等于water supply）",
+              "p_content": "water system"
+            },
+            {
+              "p_cn": "水利；水资源保护",
+              "p_content": "water conservancy"
+            },
+            {
+              "p_cn": "冷却水",
+              "p_content": "cooling water"
+            },
+            {
+              "p_cn": "n. 水位；水平面；水准仪",
+              "p_content": "water level"
+            },
+            {
+              "p_cn": "由海路，乘船；由水路",
+              "p_content": "by water"
+            },
+            {
+              "p_cn": "[地]地表水",
+              "p_content": "surface water"
+            },
+            {
+              "p_cn": "湖水，淡水",
+              "p_content": "fresh water"
+            },
+            {
+              "p_cn": "冷水；凉水；凉开水",
+              "p_content": "cold water"
+            },
+            {
+              "p_cn": "高潮，高水位；水位达到最高点的",
+              "p_content": "high water"
+            },
+            {
+              "p_cn": "注水；喷水",
+              "p_content": "water injection"
+            },
+            {
+              "p_cn": "地下水",
+              "p_content": "ground water"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "watery",
+                  "tran": " 水的；淡的；湿的；松软的；有雨意的"
+                },
+                {
+                  "hwd": "watering",
+                  "tran": " 灌溉的；浇水用的"
+                },
+                {
+                  "hwd": "watered",
+                  "tran": " 掺水的；洒有水的，洒了水的；有波纹的；加虚股的（面值增加而实值未按比例增加）"
+                },
+                {
+                  "hwd": "waterless",
+                  "tran": " 无水的；干的；不用水的，不需水的"
+                }
+              ],
+              "Pos": "adj"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "watering",
+                  "tran": " 浇水；灌溉；排水沟"
+                },
+                {
+                  "hwd": "waterer",
+                  "tran": " 饮水器；供给饮水的人"
+                },
+                {
+                  "hwd": "wateriness",
+                  "tran": " 平淡；多水；稀薄"
+                }
+              ],
+              "Pos": "n"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "watering",
+                  "tran": " 浇水；灌溉（water的ing形式）"
+                },
+                {
+                  "hwd": "watered",
+                  "tran": " 浇水，供以水（water的过去式和过去分词）"
+                }
+              ],
+              "Pos": "v"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "浴室地面上都是水。",
+              "s_content": "There’s water all over the bathroom floor."
+            },
+            {
+              "s_cn": "有谁想喝杯水吗？",
+              "s_content": "Does anyone want a drink of water?"
+            },
+            {
+              "s_cn": "一杯有气矿泉水",
+              "s_content": "a glass of sparkling mineral water"
+            },
+            {
+              "s_cn": "所有房间都有冷热自来水供应。",
+              "s_content": "All rooms have hot and cold running water."
+            },
+            {
+              "s_cn": "在大米中倒入沸水浸泡。",
+              "s_content": "Pour boiling water over the rice and let it soak."
+            },
+            {
+              "s_cn": "淡水泉",
+              "s_content": "a fresh water spring"
+            },
+            {
+              "s_cn": "处理破裂水管时，一定要先把水关掉。",
+              "s_content": "When dealing with a burst pipe, always turn off the water first."
+            },
+            {
+              "s_cn": "当地供水受到污染",
+              "s_content": "contamination of the local water supply"
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "seawater"
+                },
+                {
+                  "word": "eau"
+                }
+              ],
+              "pos": "n",
+              "tran": "水；海水；雨水；海域，大片的水"
+            },
+            {
+              "Hwds": [
+                {
+                  "word": "shed tears"
+                },
+                {
+                  "word": "pipe one's eye"
+                }
+              ],
+              "pos": "vi",
+              "tran": "加水；流泪"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "n",
+              "tran_cn": "水"
+            },
+            {
+              "pos": "v",
+              "tran_cn": "使湿，灌溉"
+            }
+          ],
+          "ukphone": "'wɔːtə",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=water&type=1",
+          "usphone": "ˈwɔtɚ; ˈwɑtɚ",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=water&type=2",
+          "word": "water"
+        },
+        "request_id": "f3c31079b88f51d17eeeaa25"
+      }
+    },
+    {
+      "id": "1762061962443-7xqfoc",
+      "word": "everyday",
+      "cn": "adj. 每天的，日常的",
+      "createdAt": 1762061962443,
+      "translations": [
+        {
+          "pos": "adj",
+          "cn": "每天的，日常的"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "CET4_2",
+          "phrases": [
+            {
+              "p_cn": "日常生活",
+              "p_content": "everyday life"
+            },
+            {
+              "p_cn": "快乐每一天（祝福语）",
+              "p_content": "happy everyday"
+            },
+            {
+              "p_cn": "日常使用",
+              "p_content": "everyday use"
+            },
+            {
+              "p_cn": "日常英语",
+              "p_content": "everyday english"
+            },
+            {
+              "p_cn": "日常用品",
+              "p_content": "articles of everyday use"
+            },
+            {
+              "p_cn": "日常用语",
+              "p_content": "everyday language"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "everydayness",
+                  "tran": " 平淡无奇"
+                }
+              ],
+              "Pos": "n"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "日常生活中的问题",
+              "s_content": "the problems of everyday life"
+            },
+            {
+              "s_cn": "穿平常衣服",
+              "s_content": "wearing everyday clothes"
+            },
+            {
+              "s_cn": "简单的日常物品",
+              "s_content": "a simple, everyday object"
+            },
+            {
+              "s_cn": "用一般的日常语言把它描述一下。",
+              "s_content": "Describe it in ordinary everyday language."
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "daily"
+                },
+                {
+                  "word": "household"
+                },
+                {
+                  "word": "routine"
+                }
+              ],
+              "pos": "adj",
+              "tran": "每天的，日常的"
+            },
+            {
+              "Hwds": [
+                {
+                  "word": "peacetime"
+                }
+              ],
+              "pos": "n",
+              "tran": "平时；寻常日子"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "adj",
+              "tran_cn": "每天的，日常的"
+            }
+          ],
+          "ukphone": "'evrɪdeɪ; -'deɪ",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=everyday&type=1",
+          "usphone": "'ɛvrɪde",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=everyday&type=2",
+          "word": "everyday"
+        },
+        "request_id": "b353363b21c3fec039b4fc99"
+      }
+    },
+    {
+      "id": "1762061976550-k1cuck",
+      "word": "biology",
+      "cn": "n. 生物学",
+      "createdAt": 1762061976550,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "生物学"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "BeiShiGaoZhong_5",
+          "phrases": [
+            {
+              "p_cn": "[化]分子生物学",
+              "p_content": "molecular biology"
+            },
+            {
+              "p_cn": "细胞学，细胞生物学",
+              "p_content": "cell biology"
+            },
+            {
+              "p_cn": "海洋生物学",
+              "p_content": "marine biology"
+            },
+            {
+              "p_cn": "系统生物学",
+              "p_content": "systems biology"
+            },
+            {
+              "p_cn": "发育生物学；发生生物学，发展生物学",
+              "p_content": "developmental biology"
+            },
+            {
+              "p_cn": "现代生物学",
+              "p_content": "modern biology"
+            },
+            {
+              "p_cn": "保护生物学",
+              "p_content": "conservation biology"
+            },
+            {
+              "p_cn": "生物学系",
+              "p_content": "department of biology"
+            },
+            {
+              "p_cn": "进化生物学",
+              "p_content": "evolutionary biology"
+            },
+            {
+              "p_cn": "植物生物学",
+              "p_content": "plant biology"
+            },
+            {
+              "p_cn": "分子生物学；分子学",
+              "p_content": "molecule biology"
+            },
+            {
+              "p_cn": "人体生物学",
+              "p_content": "human biology"
+            },
+            {
+              "p_cn": "实验生物学",
+              "p_content": "experimental biology"
+            },
+            {
+              "p_cn": "环境生物学",
+              "p_content": "environmental biology"
+            },
+            {
+              "p_cn": "种群生物学；人口生物学",
+              "p_content": "population biology"
+            },
+            {
+              "p_cn": "辐射生物学；放射生物学",
+              "p_content": "radiation biology"
+            },
+            {
+              "p_cn": "水生生物学",
+              "p_content": "aquatic biology"
+            },
+            {
+              "p_cn": "普通生物学；一般生物",
+              "p_content": "general biology"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "biological",
+                  "tran": " 生物的；生物学的"
+                },
+                {
+                  "hwd": "biologic",
+                  "tran": " 生物的；生物学的"
+                },
+                {
+                  "hwd": "bioluminescent",
+                  "tran": " 生物性发光的"
+                }
+              ],
+              "Pos": "adj"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "biologically",
+                  "tran": " 生物学上，生物学地"
+                }
+              ],
+              "Pos": "adv"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "biologist",
+                  "tran": " 生物学家"
+                },
+                {
+                  "hwd": "bioluminescence",
+                  "tran": " 生物体之发光"
+                }
+              ],
+              "Pos": "n"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "生物学学位",
+              "s_content": "a degree in biology"
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "life-form"
+                },
+                {
+                  "word": "living things"
+                }
+              ],
+              "pos": "n",
+              "tran": "（一个地区全部的）[生物]生物；生物学"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "n",
+              "tran_cn": "生物学"
+            }
+          ],
+          "ukphone": "baɪ'ɒlədʒɪ",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=biology&type=1",
+          "usphone": "baɪ'ɑlədʒi",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=biology&type=2",
+          "word": "biology"
+        },
+        "request_id": "59127951a79b9949c0402101"
+      }
+    },
+    {
+      "id": "1762061982041-nc3mtc",
+      "word": "chemical",
+      "cn": "n. 化学物",
+      "createdAt": 1762061982041,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "化学物"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "BeiShiGaoZhong_3",
+          "phrases": [
+            {
+              "p_cn": "化学工业",
+              "p_content": "chemical industry"
+            },
+            {
+              "p_cn": "化学成分；化学组成",
+              "p_content": "chemical composition"
+            },
+            {
+              "p_cn": "化学工程",
+              "p_content": "chemical engineering"
+            },
+            {
+              "p_cn": "n. 化学反应",
+              "p_content": "chemical reaction"
+            },
+            {
+              "p_cn": "化工产品；化学产品",
+              "p_content": "chemical products"
+            },
+            {
+              "p_cn": "化学肥料",
+              "p_content": "chemical fertilizer"
+            },
+            {
+              "p_cn": "化学分析",
+              "p_content": "chemical analysis"
+            },
+            {
+              "p_cn": "n. 化学纤维",
+              "p_content": "chemical fiber"
+            },
+            {
+              "p_cn": "化学工厂",
+              "p_content": "chemical plant"
+            },
+            {
+              "p_cn": "化学结构",
+              "p_content": "chemical structure"
+            },
+            {
+              "p_cn": "化学过程；化工工艺",
+              "p_content": "chemical process"
+            },
+            {
+              "p_cn": "n. [医]化学法",
+              "p_content": "chemical method"
+            },
+            {
+              "p_cn": "化学修饰；化学改质",
+              "p_content": "chemical modification"
+            },
+            {
+              "p_cn": "化学稳定性",
+              "p_content": "chemical stability"
+            },
+            {
+              "p_cn": "化学公司",
+              "p_content": "chemical company"
+            },
+            {
+              "p_cn": "化学气相沉积；化学汽相淀积",
+              "p_content": "chemical vapor deposition"
+            },
+            {
+              "p_cn": "化学性质",
+              "p_content": "chemical property"
+            },
+            {
+              "p_cn": "化工材料",
+              "p_content": "chemical materials"
+            },
+            {
+              "p_cn": "化学清洗，化学脱垢",
+              "p_content": "chemical cleaning"
+            },
+            {
+              "p_cn": "化学合成",
+              "p_content": "chemical synthesis"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "chemic",
+                  "tran": " 化学的；炼金术的"
+                }
+              ],
+              "Pos": "adj"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "chemically",
+                  "tran": " 用化学；以化学方法"
+                }
+              ],
+              "Pos": "adv"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "chemistry",
+                  "tran": " 化学；化学过程"
+                },
+                {
+                  "hwd": "chemist",
+                  "tran": " 化学家；药剂师"
+                },
+                {
+                  "hwd": "chemic",
+                  "tran": " 炼金术士；化学家"
+                },
+                {
+                  "hwd": "chemiluminescence",
+                  "tran": " [化学] 化学发光，化合光"
+                },
+                {
+                  "hwd": "chemisorption",
+                  "tran": " [化学] 化学吸收作用"
+                },
+                {
+                  "hwd": "chemoreceptor",
+                  "tran": " 化学受体；[生理] 化学感受器（等于chemoceptor）"
+                },
+                {
+                  "hwd": "chemosynthesis",
+                  "tran": " [化学] 化学合成"
+                }
+              ],
+              "Pos": "n"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "chemisorb",
+                  "tran": " 用化学方法吸收；用化学方法吸附"
+                }
+              ],
+              "Pos": "vt"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "有机化学工业",
+              "s_content": "the organic chemicals industry"
+            },
+            {
+              "s_cn": "合成化学品",
+              "s_content": "synthetic chemicals"
+            }
+          ],
+          "synonyms": [
+            {
+              "Hwds": [
+                {
+                  "word": "chymic"
+                }
+              ],
+              "pos": "adj",
+              "tran": "[化工]化学的"
+            }
+          ],
+          "translations": [
+            {
+              "pos": "n",
+              "tran_cn": "化学物"
+            }
+          ],
+          "ukphone": "'kemɪk(ə)l",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=chemical&type=1",
+          "usphone": "'kɛmɪkl",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=chemical&type=2",
+          "word": "chemical"
+        },
+        "request_id": "a203e10da0c1ae813929fdc0"
+      }
+    },
+    {
+      "id": "1762061987337-lrmq70",
+      "word": "electronic",
+      "cn": "adj. 电子的；n. 电子电路；电子器件",
+      "createdAt": 1762061987337,
+      "translations": [
+        {
+          "pos": "adj",
+          "cn": "电子的"
+        },
+        {
+          "pos": "n",
+          "cn": "电子电路；电子器件"
+        }
+      ],
+      "dict": {
+        "code": 200,
+        "msg": "数据请求成功",
+        "data": {
+          "bookId": "BEC_2",
+          "phrases": [
+            {
+              "p_cn": "电子商务",
+              "p_content": "electronic commerce"
+            },
+            {
+              "p_cn": "电子设备",
+              "p_content": "electronic equipment"
+            },
+            {
+              "p_cn": "电子控制",
+              "p_content": "electronic control"
+            },
+            {
+              "p_cn": "电子产品；电子设备制造业",
+              "p_content": "electronic product"
+            },
+            {
+              "p_cn": "电子工业",
+              "p_content": "electronic industry"
+            },
+            {
+              "p_cn": "电子线路，电子电路",
+              "p_content": "electronic circuit"
+            },
+            {
+              "p_cn": "n. 电子工程学",
+              "p_content": "electronic engineering"
+            },
+            {
+              "p_cn": "电子设施，电子器件；电子仪表",
+              "p_content": "electronic device"
+            },
+            {
+              "p_cn": "电子元件",
+              "p_content": "electronic component"
+            },
+            {
+              "p_cn": "电子镇流器；电子安定器",
+              "p_content": "electronic ballast"
+            },
+            {
+              "p_cn": "扫描电子显微镜",
+              "p_content": "scanning electronic microscope"
+            },
+            {
+              "p_cn": "电子控制系统",
+              "p_content": "electronic control system"
+            },
+            {
+              "p_cn": "电子结构",
+              "p_content": "electronic structure"
+            },
+            {
+              "p_cn": "电子地图；电子海图",
+              "p_content": "electronic map"
+            },
+            {
+              "p_cn": "电子计算机；电脑",
+              "p_content": "electronic computer"
+            },
+            {
+              "p_cn": "电子媒体；电子媒介",
+              "p_content": "electronic media"
+            },
+            {
+              "p_cn": "使用电脑控制之武器的战争，电子战争",
+              "p_content": "electronic warfare"
+            },
+            {
+              "p_cn": "电子文件",
+              "p_content": "electronic document"
+            },
+            {
+              "p_cn": "n. 电子邮件",
+              "p_content": "electronic mail"
+            },
+            {
+              "p_cn": "电子音乐",
+              "p_content": "electronic music"
+            }
+          ],
+          "relWords": [
+            {
+              "Hwds": [
+                {
+                  "hwd": "electronically",
+                  "tran": " 电子地"
+                }
+              ],
+              "Pos": "adv"
+            },
+            {
+              "Hwds": [
+                {
+                  "hwd": "electronics",
+                  "tran": " 电子学；电子工业"
+                },
+                {
+                  "hwd": "electron",
+                  "tran": " 电子"
+                }
+              ],
+              "Pos": "n"
+            }
+          ],
+          "sentences": [
+            {
+              "s_cn": "电子游戏",
+              "s_content": "electronic games"
+            },
+            {
+              "s_cn": "电子记事本",
+              "s_content": "an electronic organizer (= a small piece of electronic equipment that you can use to record addresses, phone numbers etc )"
+            }
+          ],
+          "synonyms": [],
+          "translations": [
+            {
+              "pos": "adj",
+              "tran_cn": "电子的"
+            },
+            {
+              "pos": "n",
+              "tran_cn": "电子电路；电子器件"
+            }
+          ],
+          "ukphone": "ɪˌlekˈtrɒnɪk",
+          "ukspeech": "https://dict.youdao.com/dictvoice?audio=electronic&type=1",
+          "usphone": "ɪˌlekˈtrɑːnɪk",
+          "usspeech": "https://dict.youdao.com/dictvoice?audio=electronic&type=2",
+          "word": "electronic"
+        },
+        "request_id": "9cb3379402d91cae828ecb82"
+      }
+    }
+  ]
+}

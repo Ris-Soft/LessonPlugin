@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>检查模式设置（外部词库）</title>
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin:0; background:#121212; color:#e6e6e6; }
+    header { padding:12px 16px; border-bottom:1px solid #2c2c2c; display:flex; align-items:center; gap:10px; background:#171717; }
+    header b { font-size:16px; }
+    main { padding:12px 16px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+    fieldset { border:1px solid #2c2c2c; border-radius:10px; padding:12px 14px; background:#1b1b1b; transition: border-color .12s ease, box-shadow .12s ease; }
+    fieldset:hover { border-color:#3a3a3a; box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
+    legend { color:#9ab; }
+    label { display:block; margin:8px 0; }
+    input, select { background:#1b1b1b; color:#e6e6e6; border:1px solid #2c2c2c; border-radius:8px; padding:6px 10px; }
+    button { padding:6px 10px; border:1px solid #2c2c2c; background:#222; color:#e6e6e6; border-radius:8px; cursor:pointer; }
+    button:hover { background:#2a2a2a; }
+    .muted { color:#9aa0a6; }
+  </style>
+</head>
+<body>
+  <header>
+    <i class="ri-search-eye-line"></i>
+    <b>检查模式设置（外部词库）</b>
+    <span id="serverTip" class="muted"></span>
+  </header>
+  <main>
+    <fieldset id="step1">
+      <legend>步骤一：选择范围与数量</legend>
+      <label>最近天数<input type="number" id="days" min="1" value="7" /></label>
+      <label>抽取数量（为空则全部）<input type="number" id="pick" min="1" placeholder="全部" /></label>
+      <div class="muted">从范围中抽取不重复的单词作为待提问列表</div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="confirm"><i class="ri-checkbox-circle-line"></i> 选词完成，下一步</button>
+      </div>
+    </fieldset>
+    <fieldset id="step2" style="display:none">
+      <legend>步骤二：核对待提问列表（可删除/可添加）</legend>
+      <div id="selectedBox" class="muted">尚未生成列表</div>
+      <div id="selectedCount" class="muted" style="margin-top:6px"></div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="randomAdd"><i class="ri-add-line"></i> 随机添加1个</button>
+        <button id="toPreview"><i class="ri-arrow-right-line"></i> 下一步：设置预览</button>
+      </div>
+    </fieldset>
+    <fieldset id="step3" style="display:none">
+      <legend>步骤三：预览设置</legend>
+      <label>每词秒数<input type="number" id="wordsec" min="1" value="4" /></label>
+      <label>每译秒数<input type="number" id="cnsec" min="1" value="3" /></label>
+      <label>中文乱序<select id="shuffle"><option value="0">否</option><option value="1">是</option></select></label>
+      <label>默认显示中文<select id="showcn"><option value="0">否</option><option value="1">是</option></select></label>
+      <div class="muted">单页显示数量将根据可视区域高度自动计算</div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="preview"><i class="ri-slideshow-line"></i> 开始预览轮播</button>
+      </div>
+    </fieldset>
+  </main>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const server = qs.get('server')||'';
+    document.getElementById('serverTip').textContent = server ? ('已连接：' + server) : '(未传递服务器参数)';
+    const h = (id) => document.getElementById(id);
+    const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
+    const state = { selected: [], pool: [] };
+    async function fetchPool() {
+      try {
+        const u = new URL('/words', String(server||'').trim());
+        const r = await fetch(u.href); const j = await r.json();
+        const raw = Array.isArray(j?.words) ? j.words : [];
+        state.pool = raw;
+      } catch { state.pool = []; }
+    }
+    function renderSelected() {
+      const box = h('selectedBox');
+      const countEl = h('selectedCount');
+      if (!state.selected.length) { box.innerHTML = '<div class="muted">列表为空</div>'; if (countEl) countEl.textContent = ''; return; }
+      box.innerHTML = state.selected.map(w => `<button class="item" data-w="${w}" style="margin:4px; padding:6px 10px; border:1px solid #2c2c2c; border-radius:8px; background:#1b1b1b;">${w} <span style="color:#ff8a8a">×</span></button>`).join('');
+      if (countEl) countEl.textContent = `已选单词：${state.selected.length}`;
+    }
+    h('selectedBox').addEventListener('click', (ev) => {
+      const btn = ev.target.closest('.item'); if (!btn) return;
+      const w = btn.getAttribute('data-w');
+      state.selected = state.selected.filter(x => x !== w);
+      renderSelected();
+    });
+    h('confirm').onclick = async () => {
+      await fetchPool();
+      const days = parseInt(h('days').value||'7',10)||7;
+      const pick = parseInt(h('pick').value||'0',10)||0;
+      const cutoff = Date.now() - days * 24 * 3600 * 1000;
+      const recent = state.pool.filter(x => (x.createdAt||0) >= cutoff);
+      const uniq = Array.from(new Set(recent.map(x => String(x.word||'').toLowerCase())));
+      const out = [];
+      const n = pick > 0 ? Math.min(pick, uniq.length) : uniq.length;
+      while (out.length < n && uniq.length) {
+        const idx = Math.floor(Math.random() * uniq.length);
+        out.push(uniq[idx]); uniq.splice(idx,1);
+      }
+      state.selected = out;
+      h('step1').style.display = 'none'; h('step2').style.display = ''; h('step3').style.display = 'none';
+      renderSelected();
+    };
+    h('randomAdd').onclick = async () => {
+      if (!state.pool.length) await fetchPool();
+      const poolWords = Array.from(new Set(state.pool.map(x => String(x.word||'').toLowerCase())));
+      const remaining = poolWords.filter(w => !state.selected.includes(w));
+      if (!remaining.length) return alert('词库已无可添加的非重复单词');
+      const idx = Math.floor(Math.random() * remaining.length);
+      state.selected.push(remaining[idx]);
+      renderSelected();
+    };
+    h('toPreview').onclick = () => {
+      h('step1').style.display = 'none'; h('step2').style.display = 'none'; h('step3').style.display = '';
+    };
+    h('preview').onclick = () => {
+      const params = {
+        wordsec: parseInt(h('wordsec').value||'4',10)||4,
+        cnsec: parseInt(h('cnsec').value||'3',10)||3,
+        showcn: String(h('showcn').value||'0'),
+        shuffle: String(h('shuffle').value||'0'),
+        preview: '1',
+        server: String(server||'').trim(),
+        selected: state.selected.join(',')
+      };
+      const bg = new URL('../../../plugins/multiword/background/carousel.html', window.location.href).href;
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'backgroundUrl', value: toUrl(bg, params) });
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'centerItems', value: [
+        { id:'carousel-prev', text:'上一页', icon:'ri-skip-back-line' },
+        { id:'carousel-pause', text:'暂停', icon:'ri-pause-circle-line' },
+        { id:'carousel-next', text:'下一页', icon:'ri-skip-forward-line' },
+        { id:'carousel-toggle-cn', text:'中文开关', icon:'ri-translate' },
+        { id:'check-start', text:'开始检查', icon:'ri-checkbox-line' }
+      ] });
+      // 预览轮播启动后关闭设置浮窗
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: null });
+    };
+  </script>
+</body>
+</html>

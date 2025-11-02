@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>外部词库 · 轮播展示</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0f0f0f; color:#e6e6e6; }
+      .stage { position: absolute; inset: 0; padding: 20px 24px 120px; }
+      .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      .item { background:#141414; border:1px solid #252525; border-radius:10px; padding:12px; text-align:center; }
+      .word { font-size: 28px; font-weight: 600; letter-spacing: 0.5px; color: #f5f5f5; }
+      .cn { font-size: 16px; color: #cfcfcf; margin-top: 8px; }
+      /* 注意底部工具栏，占位高度约 85px */
+      .remain { position: absolute; right: 16px; bottom: 85px; background: rgba(24,24,24,0.85); border:1px solid #2c2c2c; border-radius: 8px; padding: 6px 10px; display:inline-flex; align-items:center; gap:8px; }
+      .muted { opacity: .85; }
+      .controls-hint { position:absolute; left: 16px; bottom: 85px; opacity: .7; }
+      a { color: #9bd; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="remain" id="remain"><i class="ri-time-line"></i><span id="timeLeft">--:--</span></div>
+    <div class="controls-hint">通过底栏可控制轮播展示</div>
+    <script>
+      const api = () => window.lowbarAPI;
+      const CH = 'multiword.lowbar';
+      const qs = new URLSearchParams(window.location.search || '');
+      const recentDays = parseInt(qs.get('days')||'7', 10) || 7;
+      const wordSec = parseInt(qs.get('wordsec')||'4', 10) || 4;
+      const cnSec = parseInt(qs.get('cnsec')||'3', 10) || 3;
+      // 单页显示数量改为按可视区域高度计算（不再使用 pagesize 参数）
+      let pageSize = 8;
+      const previewMode = (qs.get('preview')||'') === '1';
+      const selectedParam = String(qs.get('selected')||'').trim();
+      const selectedList = selectedParam ? selectedParam.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean) : [];
+      const pageSec = (wordSec + cnSec);
+      const gridEl = document.getElementById('grid');
+      const timeLeftEl = document.getElementById('timeLeft');
+      let words = []; let pages = []; let pageIdx = 0; let paused = false; let pageRemain = pageSec; let showCn = (qs.get('showcn')||'1') !== '0';
+      let serverBase = '';
+
+      function calcPageSize() {
+        try {
+          const columns = 4; // 与 .grid 的列数一致
+          const stagePaddingTop = 20, stagePaddingBottom = 120; // 与 .stage 的 padding 对齐
+          const viewportH = (window.innerHeight || document.documentElement.clientHeight || 640);
+          const avail = Math.max(200, viewportH - stagePaddingTop - stagePaddingBottom);
+          // 创建一个临时条目用于测量高度（考虑 showCn 对高度的影响）
+          const temp = document.createElement('div');
+          temp.className = 'item';
+          temp.style.visibility = 'hidden';
+          temp.style.position = 'absolute';
+          temp.style.inset = 'auto';
+          temp.innerHTML = `<div class="word">W</div><div class="cn" style="${showCn?'':'display:none'}">CN</div>`;
+          gridEl.appendChild(temp);
+          const itemHeight = Math.max(60, temp.offsetHeight || 60);
+          gridEl.removeChild(temp);
+          const rowGap = 16; // 与 .grid 的 gap 一致
+          const rows = Math.max(1, Math.floor((avail + rowGap) / (itemHeight + rowGap)));
+          return Math.max(columns, rows * columns);
+        } catch { return 8; }
+      }
+
+      async function fetchWords() {
+        try {
+          const r1 = await api().pluginCall('multi.word', 'getWordbankUrl', []);
+          let base = String(r1?.url||'').trim();
+          // 回退：优先使用页面参数 server，其次尝试本地默认 6100
+          if (!base) base = String(qs.get('server')||'').trim();
+          if (!base) base = 'http://localhost:6100';
+          serverBase = base;
+          const u = new URL('/words', base);
+          const r = await fetch(u.href);
+          const json = await r.json();
+          const cutoff = Date.now() - recentDays * 24 * 3600 * 1000;
+          const raw = Array.isArray(json?.words) ? json.words : [];
+          if (selectedList.length) {
+            const set = new Set(selectedList);
+            words = raw.filter(x => set.has(String(x.word||'').toLowerCase()));
+          } else {
+            words = raw.filter(x => (x.createdAt || 0) >= cutoff);
+          }
+          words.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+          pageSize = calcPageSize();
+          pages = [];
+          for (let i=0;i<words.length;i+=pageSize) pages.push(words.slice(i,i+pageSize));
+          pageIdx = 0; pageRemain = pageSec;
+          if (!pages.length) { gridEl.innerHTML = '<div class="item"><div class="word">无符合时间条件的词汇</div></div>'; }
+        } catch (e) {
+          gridEl.innerHTML = '<div class="item"><div class="word">加载失败 / 未连接词库</div><div class="cn">'+(e?.message||'请在“外部词库”页绑定，或通过 server 参数传入地址')+'</div></div>';
+        }
+      }
+
+      function fmt(sec){ sec = Math.max(0, Math.floor(sec)); const m = Math.floor(sec/60), s = sec%60; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
+      function renderPage() {
+        const page = pages[pageIdx] || [];
+        if (!page.length) { gridEl.innerHTML = ''; return; }
+        gridEl.innerHTML = page.map(it => {
+          const cn = it.cn || (Array.isArray(it.translations)? it.translations.map(t=>t.cn).join('；') : '');
+          const w = String(it.word||'');
+          return `<div class="item" data-w="${w}"><div class="word">${w}</div><div class="cn" style="${showCn?'':'display:none'}">${cn}</div></div>`;
+        }).join('');
+        // 点击任一条目打开在线词典浮窗
+        Array.from(gridEl.querySelectorAll('.item')).forEach(el => {
+          el.addEventListener('click', () => {
+            const w = el.getAttribute('data-w') || '';
+            try { api().pluginCall('multi.word', 'onLowbarEvent', [{ type:'click', id:'dictWord', word: w }]); } catch {}
+          });
+        });
+      }
+      function prevPage() { pageIdx = Math.max(0, pageIdx-1); pageRemain = pageSec; renderPage(); }
+      function nextPage() { pageIdx = Math.min(pages.length-1, pageIdx+1); pageRemain = pageSec; renderPage(); }
+
+      let tickHandle = null;
+      function startLoop() {
+        if (tickHandle) clearInterval(tickHandle);
+        renderPage(); pageRemain = pageSec;
+        tickHandle = setInterval(() => {
+          if (paused) return;
+          pageRemain = Math.max(0, pageRemain-1);
+          timeLeftEl.textContent = fmt(pageRemain);
+          if (pageRemain <= 0) {
+            const lastPage = (pageIdx >= pages.length - 1);
+            if (lastPage) {
+              if (previewMode) {
+                // 预览模式：最后一页结束后停止并播放退场音效
+                try { if (tickHandle) clearInterval(tickHandle); } catch {}
+                try { api().pluginCall('notify.plugin', 'playSound', ['out']); } catch {}
+              } else {
+                // 常规模式：返回第一页并继续
+                pageIdx = 0; renderPage();
+                pageRemain = pageSec;
+              }
+            } else {
+              nextPage(); pageRemain = pageSec;
+            }
+          }
+        }, 1000);
+      }
+
+      // 订阅控制事件：来自底栏按钮
+      try {
+        api().subscribe(CH);
+        api().onEvent((name,payload)=>{
+          if (name !== CH || !payload) return;
+          // 优先处理后端派发的控制事件
+          if (payload.type === 'control' && payload.action === 'carousel') {
+            const cmd = String(payload.cmd||'');
+            if (cmd === 'prev') prevPage();
+            else if (cmd === 'next') nextPage();
+            else if (cmd === 'pause') paused = !paused;
+            else if (cmd === 'stop') { if (tickHandle) clearInterval(tickHandle); }
+            else if (cmd === 'toggle-cn') { 
+              showCn = !showCn; 
+              const newSize = calcPageSize();
+              if (newSize !== pageSize) {
+                pageSize = newSize;
+                const flatIndex = pageIdx * pageSize;
+                pages = [];
+                for (let i=0;i<words.length;i+=pageSize) pages.push(words.slice(i,i+pageSize));
+                pageIdx = Math.max(0, Math.min(pages.length-1, Math.floor(flatIndex / Math.max(1,pageSize))));
+              }
+              renderPage(); 
+            }
+            return;
+          }
+          // 兜底：直接响应模板派发的按钮点击事件（避免后端未处理时无响应）
+          if (payload.type === 'click') {
+            const id = String(payload.id||'');
+            if (id === 'carousel-prev') prevPage();
+            else if (id === 'carousel-next') nextPage();
+            else if (id === 'carousel-pause') paused = !paused;
+            else if (id === 'carousel-stop') { if (tickHandle) clearInterval(tickHandle); }
+            else if (id === 'carousel-toggle-cn') { 
+              showCn = !showCn; 
+              const newSize = calcPageSize();
+              if (newSize !== pageSize) {
+                pageSize = newSize;
+                const flatIndex = pageIdx * pageSize;
+                pages = [];
+                for (let i=0;i<words.length;i+=pageSize) pages.push(words.slice(i,i+pageSize));
+                pageIdx = Math.max(0, Math.min(pages.length-1, Math.floor(flatIndex / Math.max(1,pageSize))));
+              }
+              renderPage(); 
+            }
+            else if (id === 'check-start') {
+              // 从预览进入检查流程
+              const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
+              const bg = new URL('../../../plugins/multiword/background/checker.html', window.location.href).href;
+              const params = { selected: selectedParam, server: serverBase };
+              try { api().emitEvent(CH, { type:'update', target:'backgroundUrl', value: toUrl(bg, params) }); } catch {}
+            }
+          }
+        });
+      } catch {}
+
+      try {
+        window.addEventListener('resize', () => {
+          const newSize = calcPageSize();
+          if (newSize !== pageSize && Array.isArray(words) && words.length) {
+            const flatIndex = pageIdx * pageSize;
+            pageSize = newSize;
+            pages = [];
+            for (let i=0;i<words.length;i+=pageSize) pages.push(words.slice(i,i+pageSize));
+            pageIdx = Math.max(0, Math.min(pages.length-1, Math.floor(flatIndex / Math.max(1,pageSize))));
+            renderPage();
+          }
+        });
+      } catch {}
+
+      (async function init(){ await fetchWords(); startLoop(); })();
+    </script>
+  </body>
+  </html>

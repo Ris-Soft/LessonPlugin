@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>外部词库 · 正式检查</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#0f0f0f; color:#e6e6e6; }
+      .stage { position:absolute; inset:0; padding: 24px 28px 120px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+      .card { background:#151515; border:1px solid #262626; border-radius:14px; padding:28px 24px; width: 820px; max-width: 92vw; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+      .title { font-size: 46px; font-weight: 800; text-align:center; letter-spacing: .8px; color:#f2f2f2; }
+      .title.done { color:#7fe38a; }
+      .cn { font-size: 20px; text-align:center; margin-top: 14px; color:#cfcfcf; }
+      .muted { opacity: .85; }
+      .progress { margin-top: 14px; text-align:center; color:#9aa0a6; font-size: 14px; }
+      .summary { margin-top: 14px; background:#141414; border:1px solid #252525; border-radius:12px; padding:14px; width: 820px; max-width: 92vw; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="card" id="card">
+        <div class="title" id="word">准备中...</div>
+        <div class="cn" id="cn" style="display:none">——</div>
+        <div class="progress" id="progress">0 / 0</div>
+      </div>
+      <div class="summary" id="summary" style="display:none">
+        <div><i class="ri-checkbox-circle-line"></i> 检查总结</div>
+        <div id="stats" style="margin-top:6px"></div>
+      </div>
+    </div>
+    <script>
+      const api = () => window.lowbarAPI;
+      const CH = 'multiword.lowbar';
+      const qs = new URLSearchParams(location.search || '');
+      const selectedParam = String(qs.get('selected')||'').trim();
+      const selectedList = selectedParam ? selectedParam.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean) : [];
+      const server = String(qs.get('server')||'').trim() || 'http://localhost:6100';
+      const wordEl = document.getElementById('word');
+      const cnEl = document.getElementById('cn');
+      const progressEl = document.getElementById('progress');
+      const summaryEl = document.getElementById('summary');
+      const statsEl = document.getElementById('stats');
+      let list = []; let idx = 0; let done = new Set(); let startAt = Date.now(); let showCnCurrent = false;
+      // 事件去抖：避免同一命令在极短时间内被重复触发（导致跳奇数/闪烁）
+      let lastCmd = '';
+      let lastCmdAt = 0;
+      function handleCmd(cmd) {
+        const now = Date.now();
+        const c = String(cmd||'').toLowerCase();
+        const canon = (
+          c === 'prev' || c === 'check-prev' || c === 'checker-prev' ? 'prev' :
+          c === 'next' || c === 'check-next' || c === 'checker-next' ? 'next' :
+          c === 'mark' || c === 'check-mark' || c === 'checker-mark-done' || c === 'mark-done' ? 'mark' :
+          c === 'showcn' || c === 'check-showcn' || c === 'checker-toggle-cn' || c === 'toggle-cn' ? 'showcn' :
+          c === 'random' || c === 'check-random' || c === 'checker-random' ? 'random' :
+          c === 'stop' || c === 'check-stop' || c === 'checker-end' || c === 'end' ? 'stop' :
+          c === 'summary-review' ? 'summary-review' :
+          c === 'summary-exit' ? 'summary-exit' : c
+        );
+        if (lastCmd === canon && (now - lastCmdAt) < 300) return; // 忽略短时间内的重复命令（click+control 双派发）
+        lastCmd = canon; lastCmdAt = now;
+        if (canon === 'prev') prev();
+        else if (canon === 'next') next();
+        else if (canon === 'mark') markDone();
+        else if (canon === 'showcn') toggleCn();
+        else if (canon === 'random') randomPick();
+        else if (canon === 'stop') endCheck();
+        else if (canon === 'summary-review') {
+          const box = document.getElementById('reviewList');
+          if (box) box.style.display = (box.style.display === 'none') ? '' : 'none';
+        }
+        else if (canon === 'summary-exit') {
+          try { api().emitEvent(CH, { type:'update', target:'backgroundUrl', value: null }); } catch {}
+        }
+      }
+
+      async function loadList() {
+        try {
+          const u = new URL('/words', server);
+          const r = await fetch(u.href);
+          const j = await r.json();
+          const raw = Array.isArray(j?.words) ? j.words : [];
+          if (selectedList.length) {
+            const set = new Set(selectedList);
+            list = raw.filter(x => set.has(String(x.word||'').toLowerCase()));
+          } else {
+            list = raw.slice(0, 20);
+          }
+          idx = 0; done = new Set(); startAt = Date.now(); showCnCurrent = false;
+          // 设置底栏按钮（检查模式）
+          try {
+            api().emitEvent(CH, { type:'update', target:'centerItems', value: [
+              { id:'check-prev', text:'上一个', icon:'ri-arrow-left-s-line' },
+              { id:'check-next', text:'下一个', icon:'ri-arrow-right-s-line' },
+              { id:'check-mark', text:'标记完成', icon:'ri-checkbox-line' },
+              { id:'check-showcn', text:'显示中文', icon:'ri-translate' },
+              { id:'check-random', text:'随机抽选', icon:'ri-shuffle-line' },
+              { id:'check-stop', text:'结束提问', icon:'ri-stop-circle-line' }
+            ] });
+          } catch {}
+          render();
+        } catch (e) {
+          wordEl.textContent = '加载失败';
+          cnEl.textContent = e?.message || String(e);
+          cnEl.style.display = '';
+        }
+      }
+
+      function render() {
+        const it = list[idx];
+        if (!it) { return finish(); }
+        const w = String(it.word||'');
+        const cn = it.cn || (Array.isArray(it.translations)? it.translations.map(t=>t.cn).join('；') : '');
+        wordEl.textContent = w;
+        wordEl.classList.toggle('done', done.has(idx));
+        cnEl.textContent = cn || '（暂无翻译）';
+        cnEl.style.display = showCnCurrent ? '' : 'none';
+        progressEl.textContent = `${idx+1} / ${list.length}`;
+        // 点击英文单词，打开在线词典浮窗
+        try {
+          wordEl.onclick = () => {
+            const ww = String(list[idx]?.word||'');
+            try { api().pluginCall('multi.word','onLowbarEvent',[{ type:'click', id:'dictWord', word: ww }]); } catch {}
+          };
+        } catch {}
+      }
+
+      function finish() {
+        document.getElementById('card').style.display = 'none';
+        summaryEl.style.display = '';
+        const elapsedMs = Math.max(0, Date.now() - startAt);
+        const minutes = Math.floor(elapsedMs/60000); const seconds = Math.floor((elapsedMs%60000)/1000);
+        const total = list.length; const doneCount = done.size;
+        statsEl.textContent = `单词总数：${total}；已完成：${doneCount}；耗时：${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+        // 检查完毕后不播放音频
+        // 构建回顾列表（所有单词，已完成高亮，可点击打开词典）
+        try {
+          const review = document.createElement('div');
+          review.id = 'reviewList';
+          review.style.marginTop = '10px';
+          review.style.maxHeight = '40vh';
+          review.style.overflow = 'auto';
+          review.style.border = '1px solid #2c2c2c';
+          review.style.borderRadius = '8px';
+          review.style.padding = '8px';
+          review.style.display = 'none';
+          review.innerHTML = list.map((it,i)=>{
+            const cn = it.cn || (Array.isArray(it.translations)? it.translations.map(t=>t.cn).join('；') : '');
+            const doneMark = done.has(i) ? '<span style="color:#7fe38a">✔</span>' : '<span style="color:#ff8a8a">✘</span>';
+            return `<div class='row' data-w='${String(it.word||'')}' style='display:grid; grid-template-columns: 160px 1fr 40px; gap:8px; padding:6px 8px; border-bottom:1px solid #222;'>
+              <div style='font-weight:600;'>${String(it.word||'')}</div>
+              <div class='muted'>${cn||'（暂无翻译）'}</div>
+              <div>${doneMark}</div>
+            </div>`;
+          }).join('');
+          summaryEl.appendChild(review);
+          Array.from(review.querySelectorAll('.row')).forEach(el=>{
+            el.addEventListener('click', ()=>{
+              const w = el.getAttribute('data-w')||'';
+              try { api().pluginCall('multi.word','onLowbarEvent',[{ type:'click', id:'dictWord', word: w }]); } catch {}
+            });
+          });
+        } catch {}
+        // 更新底栏为总结页按钮
+        try {
+          api().emitEvent(CH, { type:'update', target:'centerItems', value: [
+            { id:'summary-review', text:'回顾列表', icon:'ri-list-check' },
+            { id:'summary-exit', text:'退出提问', icon:'ri-close-circle-line' }
+          ] });
+        } catch {}
+      }
+      function prev() {
+        idx = Math.max(0, idx-1); showCnCurrent = false; render();
+      }
+      function next() {
+        if (idx >= list.length - 1) {
+          // 到达最后一个词时，检查是否还有未完成的词
+          const unfinished = []; for (let i=0;i<list.length;i++){ if (!done.has(i)) unfinished.push(i); }
+          if (unfinished.length) { 
+            // 如果有未完成的词，跳转到第一个未完成的词
+            idx = unfinished[0]; showCnCurrent = false; return render(); 
+          }
+          return finish();
+        }
+        // 正常递增序号
+        idx = idx + 1; showCnCurrent = false; render();
+      }
+      function nextUnfinishedIndex(fromIdx) {
+        // 先向后查找，再从头部回滚查找
+        for (let i = fromIdx + 1; i < list.length; i++) { if (!done.has(i)) return i; }
+        for (let i = 0; i <= fromIdx; i++) { if (!done.has(i)) return i; }
+        return -1;
+      }
+      function markDone() {
+        done.add(idx); wordEl.classList.add('done');
+        const ni = nextUnfinishedIndex(idx);
+        if (ni >= 0) { idx = ni; showCnCurrent = false; render(); }
+        else finish();
+      }
+      function toggleCn() {
+        showCnCurrent = !showCnCurrent; render();
+        // 同步底栏“显示中文/隐藏中文”文案
+        try {
+          const items = [
+            { id:'check-prev', text:'上一个', icon:'ri-arrow-left-s-line' },
+            { id:'check-next', text:'下一个', icon:'ri-arrow-right-s-line' },
+            { id:'check-mark', text:'标记完成', icon:'ri-checkbox-line' },
+            { id:'check-showcn', text: (showCnCurrent?'隐藏中文':'显示中文'), icon:'ri-translate' },
+            { id:'check-random', text:'随机抽选', icon:'ri-shuffle-line' },
+            { id:'check-stop', text:'结束提问', icon:'ri-stop-circle-line' }
+          ];
+          api().emitEvent(CH, { type:'update', target:'centerItems', value: items });
+        } catch {}
+      }
+      function randomPick() {
+        // 预留按钮：不执行抽选逻辑
+      }
+      function endCheck() { finish(); }
+
+      // 底栏控制事件：统一通过 handleCmd 去抖处理，避免同一命令被重复触发
+      try {
+        api().subscribe(CH);
+        api().onEvent((name, payload) => {
+          if (name !== CH || !payload) return;
+          // 统一处理后端派发的控制事件（checker/summary 等动作）
+          if (payload.type === 'control') {
+            const act = String(payload.action||'');
+            const cmd = String(payload.cmd||'');
+            if (act === 'check') { handleCmd(cmd); return; }
+            if (act === 'summary') { handleCmd(cmd === 'review' ? 'summary-review' : (cmd === 'exit' ? 'summary-exit' : cmd)); return; }
+            if (act === 'checker') { handleCmd(cmd); return; }
+            handleCmd(cmd);
+            return;
+          }
+          // 兜底：直接处理点击事件（模板派发）
+          if (payload.type === 'click') {
+            const id = String(payload.id||'');
+            handleCmd(id);
+          }
+        });
+      } catch {}
+
+      (async function init(){ await loadList(); })();
+    </script>
+  </body>
+  </html>

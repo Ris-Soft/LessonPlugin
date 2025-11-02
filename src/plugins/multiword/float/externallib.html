@@ -6,41 +6,260 @@
     <title>外部词库</title>
     <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
     <style>
-      body { margin:0; font-family: system-ui, sans-serif; background:#0c2032; color:#e8f0fe; }
-      .wrap { padding: 12px; }
-      input, button { background:#10273f; color:#e8f0fe; border:1px solid #1f3f5e; border-radius:6px; padding:6px 8px; }
-      .modes { display:flex; gap:8px; margin-top: 12px; }
-      .card { background:#0e2842; border:1px solid #1f3f5e; border-radius:8px; padding:10px; }
+      body { margin:0; font-family: system-ui, sans-serif; background:#121212; color:#e6e6e6; }
+      .wrap { padding: 16px; }
+      input, button { background:#1b1b1b; color:#e6e6e6; border:1px solid #2c2c2c; border-radius:8px; padding:6px 10px; }
+      /* 取消输入框选中时的黄色/高亮边线 */
+      input:focus, input:focus-visible, textarea:focus, button:focus { outline: none; box-shadow: none; border-color: #2c2c2c; }
+      /* 处理 WebKit 自动填充的黄色背景 */
+      input:-webkit-autofill {
+        -webkit-box-shadow: 0 0 0px 1000px #1b1b1b inset;
+        -webkit-text-fill-color: #e6e6e6;
+        caret-color: #e6e6e6;
+      }
+      /* 美化纵向滚动条 */
+      * { scrollbar-width: thin; scrollbar-color: #444 #1a1a1a; }
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 8px; }
+      ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3b3b3b, #555); border-radius: 8px; border: 1px solid #2c2c2c; }
+      ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #4a4a4a, #666); }
+      .modes { display:flex; flex-wrap:wrap; gap:12px; margin-top: 16px; justify-content:center; }
+      @media (max-width: 840px) { .modes { justify-content:center; } }
+      .card { background:#1f1f1f; border:1px solid #2c2c2c; border-radius:10px; padding:14px; box-shadow: 0 6px 12px rgba(0,0,0,0.12); }
+      .card.square { width:140px; height:140px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; font-size:14px; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; cursor: pointer; }
+      .card.square i { font-size:28px; margin-bottom:4px; }
+      .card.square .label { font-size:14px; color:#e6e6e6; }
+      .card.square:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.18); border-color:#3a3a3a; }
+      .hero { text-align:center; padding:40px 20px; }
+      .hero h1 { font-size: 28px; margin:0 0 18px; color:#fafafa; }
+      .hero .row { display:flex; justify-content:center; gap:10px; }
+      .section { margin-top: 18px; }
+      table { width:100%; border-collapse: collapse; }
+      th, td { border:1px solid #2c2c2c; padding:8px; }
+      th { background:#1b1b1b; }
+      .subtle { opacity:.85; font-size: 13px; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div>
-        <label>服务地址 <input id="url" placeholder="http://localhost:6100" /></label>
-        <button id="save"><i class="ri-plug-line"></i> 连接并保存</button>
-        <button id="disconnect"><i class="ri-shut-down-line"></i> 断开</button>
-        <span id="status" style="margin-left:8px; opacity:.85">未连接</span>
+      <div id="bindPanel" class="section">
+        <div class="hero">
+          <h1><i class="ri-plug-line"></i> 绑定服务器</h1>
+          <div class="row">
+            <input id="url" placeholder="http://localhost:6100" style="min-width: 340px;" />
+            <button id="save"><i class="ri-link"></i> 连接服务器</button>
+          </div>
+          <div id="status" style="margin-top:10px; opacity:.9">未连接</div>
+          <div class="subtle" style="margin-top:6px;">支持 http(s)；连接后可在下方直接开启轮播或全部展示。</div>
+        </div>
       </div>
-      <div class="modes">
-        <div class="card"><b>轮播展示</b><div>占位：连接后可轮播词库内容。</div></div>
-        <div class="card"><b>全部展示</b><div>占位：连接后可分页展示全部词汇。</div></div>
-        <div class="card"><b>检查模式</b><div>占位：与内部词库类似的检查模式。</div></div>
-        <div class="card"><b>自测模式</b><div>占位：与内部词库类似的自测模式。</div></div>
+
+      <div id="connectedPanel" class="section" style="display:none;">
+        <div class="card" style="display:flex; align-items:center; gap:10px; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="subtle" style="background:#243a4a; border:1px solid #2f4d61; color:#d8ecff; padding:4px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:6px;"><i class="ri-checkbox-circle-line"></i> 已连接</span>
+            <span id="connectedUrl" style="font-weight:600;"></span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button id="disconnect"><i class="ri-shut-down-line"></i> 断开</button>
+          </div>
+        </div>
+
+        <div id="sectionAdd" class="section">
+          <div class="card">
+            <b><i class="ri-add-line"></i> 添加词汇</b>
+            <div style="margin-top:8px; display:flex; gap:10px; align-items:center;">
+              <input id="wWord" placeholder="英文单词（不支持短语）" />
+              <input id="wCN" placeholder="汉语解释（可留空）" />
+              <button id="btnAdd"><i class="ri-save-2-line"></i> 添加</button>
+            </div>
+            <div id="addResult" style="margin-top:8px; opacity:.9"></div>
+          </div>
+        </div>
+
+        <div id="sectionList" class="section">
+          <div class="card">
+            <b><i class="ri-article-line"></i> 词库列表</b>
+            <div style="margin-top:8px;">
+              <table>
+                <thead><tr><th>单词</th><th>汉语</th><th>时间</th></tr></thead>
+                <tbody id="wordsTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="modes">
+          <div class="card square" data-act="carousel">
+            <i class="ri-slideshow-line"></i>
+            <div class="label">轮播展示</div>
+          </div>
+          <div class="card square" data-act="all">
+            <i class="ri-list-check-2"></i>
+            <div class="label">全部展示</div>
+          </div>
+          <div class="card square" data-act="check">
+            <i class="ri-search-eye-line"></i>
+            <div class="label">检查模式</div>
+          </div>
+          <div class="card square" data-act="dict">
+            <i class="ri-book-open-line"></i>
+            <div class="label">在线词典</div>
+          </div>
+        </div>
       </div>
     </div>
     <script>
-      const api = () => window.lowbarAPI;
+      // 在Electron环境中通过 lowbarAPI 调用插件；在静态预览中提供本地后备实现
+      const api = () => {
+        const lb = window.lowbarAPI;
+        if (lb && typeof lb.pluginCall === 'function') return lb;
+        return {
+          pluginCall: async (plugin, method, args = []) => {
+            if (plugin !== 'multi.word') return { ok: false, error: 'unsupported plugin in static preview' };
+            if (method === 'getWordbankUrl') {
+              const url = localStorage.getItem('multiword:wordbank:url') || '';
+              return { ok: true, url };
+            }
+            if (method === 'setWordbankUrl') {
+              const s = String((args && args[0]) || '');
+              localStorage.setItem('multiword:wordbank:url', s);
+              return { ok: true };
+            }
+            return { ok: false, error: 'unsupported method in static preview' };
+          }
+        };
+      };
       const statusEl = document.getElementById('status');
       const urlEl = document.getElementById('url');
+      const bindPanel = document.getElementById('bindPanel');
+      const connectedPanel = document.getElementById('connectedPanel');
+      const connectedUrlEl = document.getElementById('connectedUrl');
+      const sectionAdd = document.getElementById('sectionAdd');
+      const sectionList = document.getElementById('sectionList');
+      const tbody = document.getElementById('wordsTbody');
+      const addResEl = document.getElementById('addResult');
+
+      const showBindOnly = () => { bindPanel.style.display = ''; connectedPanel.style.display = 'none'; };
+      const isLocalUrl = (u) => { try { const url = new URL(u); return ['localhost','127.0.0.1','::1'].includes(url.hostname); } catch { return false; } };
+      const showConnected = (u) => {
+        bindPanel.style.display = 'none'; connectedPanel.style.display = ''; connectedUrlEl.textContent = u;
+        // 界面简化：默认不提供数据设置，统一隐藏“添加词汇”和“词库列表”区块
+        sectionAdd.style.display = 'none';
+        sectionList.style.display = 'none';
+        // 绑定模式按钮：启动轮播与全部展示
+        try {
+          const h = (id) => document.getElementById(id);
+          const toUrl = (page, params={}) => {
+            const base = new URL(page, window.location.href);
+            Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v)));
+            return base.href;
+          };
+          const openCarousel = () => {
+            const float = new URL('../../../plugins/multiword/float/externallib-settings.html', window.location.href).href;
+            const href = toUrl(float, { server: String(u||'').trim() });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 820, height: 560 } });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
+          };
+          const openAll = () => {
+            const float = new URL('../../../plugins/multiword/float/allwords-settings.html', window.location.href).href;
+            const href = toUrl(float, { server: String(u||'').trim() });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 740, height: 520 } });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
+          };
+          const openCheck = () => {
+            const float = new URL('../../../plugins/multiword/float/check-setup.html', window.location.href).href;
+            const href = toUrl(float, { server: String(u||'').trim() });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 840, height: 580 } });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
+          };
+          const openDict = () => {
+            const float = new URL('../../../plugins/multiword/float/dict.html', window.location.href).href;
+            const href = toUrl(float, { server: String(u||'').trim() });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 720, height: 560 } });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
+          };
+          // 卡片点击：上图标下文字，无嵌套按钮
+          try {
+            document.querySelectorAll('.modes .card.square').forEach(card => {
+              card.addEventListener('click', () => {
+                switch (card.getAttribute('data-act')) {
+                  case 'carousel': return openCarousel();
+                  case 'all': return openAll();
+                  case 'check': return openCheck();
+                  case 'dict': return openDict();
+                }
+              });
+            });
+          } catch {}
+          // 保持首页为四个正方形卡片入口
+        } catch {}
+      };
+
+      const fetchHealth = async (base) => {
+        try { const r = await fetch(base.replace(/\/$/, '') + '/health'); const j = await r.json(); return !!(j && j.ok); } catch { return false; }
+      };
+      const loadWords = async (base) => {
+        try { const r = await fetch(base.replace(/\/$/, '') + '/words'); const j = await r.json(); tbody.innerHTML = (j.words||[]).map(w => `<tr><td>${w.word}</td><td>${w.cn||''}</td><td>${new Date(w.createdAt||Date.now()).toLocaleString()}</td></tr>`).join(''); } catch { tbody.innerHTML = '<tr><td colspan="3">加载失败</td></tr>'; }
+      };
       const syncUrl = async () => {
-        try { const r = await api().pluginCall('multi.word', 'getWordbankUrl'); urlEl.value = (r && r.url) || ''; statusEl.textContent = r && r.url ? ('已保存：' + r.url) : '未连接'; } catch {}
+        try {
+          const r = await api().pluginCall('multi.word', 'getWordbankUrl');
+          const saved = (r && r.url) || '';
+          let last = saved;
+          if (!last) {
+            try { last = localStorage.getItem('multiword.externallib.url') || ''; } catch {}
+          }
+          urlEl.value = last;
+          if (!last) { statusEl.textContent = '未连接'; showBindOnly(); return; }
+          const ok = await fetchHealth(last);
+          statusEl.textContent = ok ? ('服务器健康正常：' + last) : ('无法连接：' + last);
+          if (ok) {
+            showConnected(last);
+            await loadWords(last);
+            if (!saved && last) { try { await api().pluginCall('multi.word', 'setWordbankUrl', [last]); } catch {} }
+          } else {
+            showBindOnly();
+          }
+        } catch { showBindOnly(); }
       };
       document.getElementById('save').addEventListener('click', async () => {
-        try { const s = urlEl.value.trim(); await api().pluginCall('multi.word', 'setWordbankUrl', [s]); statusEl.textContent = s ? ('已保存：' + s) : '未连接'; alert('连接信息已保存（占位）'); } catch (e) { alert('保存失败：' + (e?.message||e)); }
+        try {
+          const s = urlEl.value.trim();
+          if (!s) { statusEl.textContent = '未连接'; showBindOnly(); return; }
+          await api().pluginCall('multi.word', 'setWordbankUrl', [s]);
+          const ok = await fetchHealth(s);
+          statusEl.textContent = ok ? ('服务器健康正常：' + s) : ('无法连接：' + s);
+          if (ok) {
+            try { localStorage.setItem('multiword.externallib.url', s); } catch {}
+            showConnected(s);
+            await loadWords(s);
+          }
+        } catch (e) { alert('连接失败：' + (e?.message||e)); }
       });
       document.getElementById('disconnect').addEventListener('click', async () => {
-        try { await api().pluginCall('multi.word', 'setWordbankUrl', ['']); statusEl.textContent = '未连接'; } catch {}
+        try {
+          await api().pluginCall('multi.word', 'setWordbankUrl', ['']);
+          try { localStorage.removeItem('multiword.externallib.url'); } catch {}
+          statusEl.textContent = '未连接';
+          showBindOnly();
+        } catch {}
       });
+
+      document.getElementById('btnAdd').addEventListener('click', async () => {
+        const word = document.getElementById('wWord').value.trim();
+        const cn = document.getElementById('wCN').value.trim();
+        if (!word) { addResEl.textContent = '请输入英文单词'; return; }
+        try {
+          const r = await api().pluginCall('multi.word', 'getWordbankUrl');
+          const base = (r && r.url) || '';
+          if (!base) { addResEl.textContent = '未连接服务器'; return; }
+          const resp = await fetch(base.replace(/\/$/, '') + '/words', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ word, cn }) });
+          const j = await resp.json();
+          if (j && j.ok) { addResEl.textContent = '已添加：' + j.item.word; await loadWords(base); } else { addResEl.textContent = '添加失败'; }
+        } catch (e) { addResEl.textContent = '添加失败：' + (e?.message||e); }
+      });
+
       syncUrl();
     </script>
   </body>

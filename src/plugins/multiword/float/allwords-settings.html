@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>全部展示设置</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      body { margin:0; font-family: system-ui, sans-serif; background:#121212; color:#e6e6e6; }
+      .wrap { padding: 16px; }
+      .card { background:#1f1f1f; border:1px solid #2c2c2c; border-radius:10px; padding:14px; box-shadow: 0 6px 12px rgba(0,0,0,0.12); }
+      .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+      select, button { background:#1b1b1b; color:#e6e6e6; border:1px solid #2c2c2c; border-radius:8px; padding:6px 10px; }
+      .ops { display:flex; gap:10px; margin-top:10px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h3><i class="ri-list-check-2"></i> 全部展示设置</h3>
+        <div class="row">
+          <label>默认排序
+            <select id="sort">
+              <option value="time">按时间（新→旧）</option>
+              <option value="alpha">按首字母（A→Z）</option>
+            </select>
+          </label>
+          <label>显示提示
+            <select id="hint">
+              <option value="1">是</option>
+              <option value="0">否</option>
+            </select>
+          </label>
+        </div>
+        <div class="ops">
+          <button id="start"><i class="ri-play-circle-line"></i> 开始全部展示</button>
+          <button id="back"><i class="ri-arrow-go-back-line"></i> 返回外部词库首页</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const CH = 'multiword.lowbar';
+      const qs = new URLSearchParams(location.search||'');
+      const server = String(qs.get('server')||'').trim();
+      const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
+      const h = (id) => document.getElementById(id);
+      h('start').onclick = () => {
+        const bg = new URL('../../../plugins/multiword/background/allwords.html', window.location.href).href;
+        const full = toUrl(bg, { server, sort: h('sort').value, hint: h('hint').value });
+        window.lowbarAPI.emitEvent(CH, { type:'update', target:'backgroundUrl', value: full });
+        window.lowbarAPI.emitEvent(CH, { type:'update', target:'centerItems', value: [
+          { id:'allwords-sort-time', text:'按时间', icon:'ri-time-line' },
+          { id:'allwords-sort-alpha', text:'按字母', icon:'ri-sort-alphabet-asc' },
+          { id:'allwords-stop', text:'停止浏览', icon:'ri-stop-line' }
+        ] });
+        // 关闭设置浮窗
+        window.lowbarAPI.emitEvent(CH, { type:'update', target:'floatingUrl', value: null });
+      };
+      h('back').onclick = () => {
+        const home = new URL('./externallib.html', window.location.href).href;
+        window.lowbarAPI.emitEvent(CH, { type:'update', target:'floatingUrl', value: home });
+      };
+    </script>
+  </body>
+  </html>

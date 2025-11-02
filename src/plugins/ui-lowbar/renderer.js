@@ -158,6 +158,8 @@
   // 悬浮窗口绝对尺寸（像素），优先于相对尺寸
   let gFloatWidthPx = null;
   let gFloatHeightPx = null;
+  // 悬浮窗最大化模式：取消 90% 与 1200px 的限制，尽可能充满可见区域
+  let gFloatMaximize = false;
 
   function setModeClass(isFull, isMax) {
     body.classList.remove('mode-windowed','mode-maximized','mode-fullscreen');
@@ -274,9 +276,17 @@
               if (!fw2) break;
               const v = data.value;
               if (typeof v === 'string') {
-                const preset = v === 'left' ? 'left' : 'center';
-                gFloatingBoundsPreset = preset;
-                positionFloatWin(preset);
+                if (v === 'max') {
+                  gFloatMaximize = true;
+                  const preset = 'center';
+                  gFloatingBoundsPreset = preset;
+                  positionFloatWin(preset);
+                } else {
+                  gFloatMaximize = false;
+                  const preset = v === 'left' ? 'left' : 'center';
+                  gFloatingBoundsPreset = preset;
+                  positionFloatWin(preset);
+                }
               } else if (v && typeof v === 'object') {
                 const { x, y, width, height } = v;
                 if (Number.isFinite(width) && width > 0) gFloatWidthPx = Math.floor(width);
@@ -287,10 +297,18 @@
                   if (Number.isFinite(width) && width > 0) fw2.style.width = Math.floor(width) + 'px';
                   if (Number.isFinite(height) && height > 0) fw2.style.height = Math.floor(height) + 'px';
                 } else {
+                  gFloatMaximize = false;
                   const preset = gFloatingBoundsPreset || 'center';
                   positionFloatWin(preset);
                 }
               }
+              break;
+            }
+            case 'floatingMaximize': {
+              const v = !!data.value;
+              gFloatMaximize = v;
+              const preset = gFloatingBoundsPreset || 'center';
+              positionFloatWin(preset);
               break;
             }
             case 'floatingSizePercent': {
@@ -343,19 +361,23 @@
     const positionFloatWin = (preset) => {
       const vw = window.innerWidth || 1200;
       const vh = window.innerHeight || 800;
-      const maxW = Math.min(1200, Math.floor(vw * 0.9));
       const scale = Math.min(100, Math.max(1, gFloatSizePercent)) / 100;
-      const wDesired = (gFloatWidthPx && gFloatWidthPx > 0) ? gFloatWidthPx : Math.floor(vw * scale);
-      const hDesired = (gFloatHeightPx && gFloatHeightPx > 0) ? gFloatHeightPx : Math.floor(vh * scale);
-      const w = Math.min(wDesired, maxW);
-      const maxH = Math.floor(vh * 0.9);
-      const h = Math.min(hDesired, maxH);
+      let wDesired = (gFloatWidthPx && gFloatWidthPx > 0) ? gFloatWidthPx : Math.floor(vw * scale);
+      let hDesired = (gFloatHeightPx && gFloatHeightPx > 0) ? gFloatHeightPx : Math.floor(vh * scale);
       const isCenter = preset === 'center';
-      const left = isCenter ? Math.max(24, Math.round((vw - w) / 2)) : 24;
       // 贴近底栏定位：根据底栏高度与小间距计算
       const bb = document.getElementById('bottombar');
       const bottomH = bb ? bb.offsetHeight : (document.body.classList.contains('mode-fullscreen') ? 80 : 68);
       const gap = 6;
+      // 最大化模式：尽可能占满宽高（保留左右与顶部少量边距）
+      if (gFloatMaximize) {
+        wDesired = vw; hDesired = vh;
+      }
+      const maxW = gFloatMaximize ? Math.max(200, vw - 48) : Math.min(1200, Math.floor(vw * 0.9));
+      const w = Math.min(wDesired, maxW);
+      const maxH = gFloatMaximize ? Math.max(160, Math.floor(vh - bottomH - gap - 12)) : Math.floor(vh * 0.9);
+      const h = Math.min(hDesired, maxH);
+      const left = isCenter ? Math.max(24, Math.round((vw - w) / 2)) : 24;
       const top = Math.max(12, vh - bottomH - gap - h);
       fw.style.left = left + 'px';
       fw.style.top = top + 'px';

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>外部词库详细设置</title>
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin:0; background: rgba(18,18,18,1);
+      color:#e6e6e6; }
+    header { padding:12px 16px; border-bottom:1px solid #2c2c2c; display:flex; align-items:center; gap:10px; background:#171717; }
+    header b { font-size:16px; }
+    main { padding:12px 16px; }
+    fieldset { border:1px solid #2c2c2c; border-radius:10px; padding:10px 12px; background:#1b1b1b; }
+    legend { color:#9ab; }
+    label { display:block; margin:6px 0; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .ops { display:flex; gap:8px; margin-top:10px; }
+    button { padding:6px 10px; border:1px solid #2c2c2c; background:#222; color:#e6e6e6; border-radius:8px; cursor:pointer; }
+    button:hover { background:#2a2a2a; }
+    .muted { color:#9aa0a6; }
+  </style>
+</head>
+<body>
+  <header>
+    <i class="ri-settings-3-line"></i>
+    <b>外部词库详细设置</b>
+    <span id="serverTip" class="muted"></span>
+  </header>
+  <main>
+    <fieldset>
+      <legend>轮播参数</legend>
+      <div class="row">
+        <label>最近天数<input type="number" id="days" min="1" value="7" /></label>
+        <label>每词秒数<input type="number" id="wordsec" min="1" value="4" /></label>
+        <label>每译秒数<input type="number" id="cnsec" min="1" value="3" /></label>
+        <label>默认显示中文<select id="showcn"><option value="1">是</option><option value="0">否</option></select></label>
+      </div>
+      <div class="muted">单页显示数量将根据可视区域高度自动计算</div>
+      <div class="ops">
+        <button id="startCarousel"><i class="ri-play-circle-line"></i> 开始轮播</button>
+        <button id="backHome"><i class="ri-arrow-go-back-line"></i> 返回首页</button>
+      </div>
+    </fieldset>
+  </main>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const server = qs.get('server')||'';
+    document.getElementById('serverTip').textContent = server ? ('已连接：' + server) : '(未传递服务器参数)';
+    const h = (id) => document.getElementById(id);
+    const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
+    h('startCarousel').onclick = () => {
+      const params = {
+        days: parseInt(h('days').value||'7',10)||7,
+        wordsec: parseInt(h('wordsec').value||'4',10)||4,
+        cnsec: parseInt(h('cnsec').value||'3',10)||3,
+        showcn: String(h('showcn').value||'1'),
+        server: String(server||'').trim()
+      };
+      const bg = new URL('../../../plugins/multiword/background/carousel.html', window.location.href).href;
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'backgroundUrl', value: toUrl(bg, params) });
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'centerItems', value: [
+        { id:'carousel-prev', text:'上一页', icon:'ri-skip-back-line' },
+        { id:'carousel-pause', text:'暂停', icon:'ri-pause-circle-line' },
+        { id:'carousel-next', text:'下一页', icon:'ri-skip-forward-line' },
+        { id:'carousel-toggle-cn', text:'中文开关', icon:'ri-translate' },
+        { id:'carousel-stop', text:'结束轮播', icon:'ri-stop-circle-line' }
+      ] });
+      // 启动轮播后关闭设置浮窗
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: null });
+    };
+    h('backHome').onclick = () => {
+      const home = new URL('./externallib.html', window.location.href).href;
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: home });
+    };
+  </script>
+</body>
+</html>

@@ -24,7 +24,7 @@
     </header>
 
     <!-- 背景层 WebView，默认不显示 -->
-    <webview id="bgView" class="bg-view" src="" style="display:none"></webview>
+    <webview id="bgView" class="bg-view" src="" style="display:none" preload="webview-preload.js"></webview>
     <!-- 悬浮窗口遮罩：用于外部点击关闭（未固定时） -->
     <div id="floatMask" style="display:none"></div>
 
@@ -35,7 +35,7 @@
         <div class="drag-area"></div>
         <button class="icon-btn" id="float-close" title="关闭"><i class="ri-close-line"></i></button>
       </div>
-      <webview id="floatView" src=""></webview>
+      <webview id="floatView" src="" preload="webview-preload.js"></webview>
     </div>
 
     <!-- 底部工具栏：左、中、右三段 -->

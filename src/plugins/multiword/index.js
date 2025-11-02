@@ -7,6 +7,15 @@ const state = {
   eventChannel: 'multiword.lowbar',
   floatPages: {},
   backgroundHome: '',
+  defaultCenterItems: [
+    { id: 'listen', text: '单词听力', icon: 'ri-headphone-line' },
+    { id: 'selftest', text: '单词自测', icon: 'ri-edit-2-line' },
+    { id: 'check', text: '单词检查', icon: 'ri-search-eye-line' },
+    { id: 'externallib', text: '外部词库', icon: 'ri-database-2-line' },
+    { id: 'dict', text: '在线词典', icon: 'ri-book-open-line' },
+    { id: 'prefs', text: '偏好设置', icon: 'ri-settings-5-line' },
+    { id: 'about', text: '关于插件', icon: 'ri-information-line' }
+  ],
   prefs: {
     voice: 'ALL', // E(英) / A(美) / ALL
     enableCarousel: true,
@@ -58,15 +67,7 @@ const functions = {
         floatingSizePercent: 54,
         floatingBounds: 'center',
         leftItems: [ { id: 'go-home', text: '返回首页', icon: 'ri-home-3-line' } ],
-        centerItems: [
-          { id: 'listen', text: '单词听力', icon: 'ri-headphone-line' },
-          { id: 'selftest', text: '单词自测', icon: 'ri-edit-2-line' },
-          { id: 'check', text: '单词检查', icon: 'ri-search-eye-line' },
-          { id: 'externallib', text: '外部词库', icon: 'ri-database-2-line' },
-          { id: 'dict', text: '在线词典', icon: 'ri-book-open-line' },
-          { id: 'prefs', text: '偏好设置', icon: 'ri-settings-5-line' },
-          { id: 'about', text: '关于插件', icon: 'ri-information-line' }
-        ],
+        centerItems: state.defaultCenterItems,
         backgroundUrl: state.backgroundHome,
         floatingUrl: null
       };
@@ -79,6 +80,8 @@ const functions = {
   onLowbarEvent: async (payload = {}) => {
     try {
       if (!payload || typeof payload !== 'object') return true;
+      // 广播原始事件到 Webview（开发者可直接在前端订阅处理）
+      try { pluginApi.emit(state.eventChannel, payload); } catch {}
       if (payload.type === 'click') {
         // 七个悬浮窗入口
         if (payload.id === 'listen') {
@@ -101,6 +104,14 @@ const functions = {
           emitUpdate('floatingBounds', 'center');
           emitUpdate('floatingBounds', { width: 680, height: 520 });
           emitUpdate('floatingUrl', state.floatPages.dict);
+        } else if (payload.id === 'dictWord') {
+          // 从轮播或列表点击某词，直接打开在线词典浮窗并填充查询词
+          const w = String(payload.word || '').trim();
+          emitUpdate('floatingBounds', 'center');
+          emitUpdate('floatingBounds', { width: 680, height: 520 });
+          const dictUrl = new URL(state.floatPages.dict);
+          if (w) dictUrl.searchParams.set('word', w);
+          emitUpdate('floatingUrl', dictUrl.href);
         } else if (payload.id === 'prefs') {
           emitUpdate('floatingBounds', 'center');
           emitUpdate('floatingBounds', { width: 600, height: 440 });
@@ -109,11 +120,54 @@ const functions = {
           emitUpdate('floatingBounds', 'center');
           emitUpdate('floatingBounds', { width: 520, height: 380 });
           emitUpdate('floatingUrl', state.floatPages.about);
+        } else if (payload.id === 'close-dict') {
+          emitUpdate('floatingUrl', null);
+          emitUpdate('centerItems', state.defaultCenterItems);
+        } else if (payload.id === 'carousel-prev') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'prev' });
+        } else if (payload.id === 'carousel-next') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'next' });
+        } else if (payload.id === 'carousel-pause') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'pause' });
+        } else if (payload.id === 'carousel-stop') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'stop' });
+          // 结束轮播后恢复首页与默认底栏
+          emitUpdate('backgroundUrl', state.backgroundHome);
+          emitUpdate('centerItems', state.defaultCenterItems);
+        } else if (payload.id === 'carousel-toggle-cn') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'toggle-cn' });
+        } else if (payload.id === 'allwords-sort-time') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'allwords', cmd: 'sort-time' });
+        } else if (payload.id === 'allwords-sort-alpha') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'allwords', cmd: 'sort-alpha' });
+        } else if (payload.id === 'allwords-stop') {
+          // 停止浏览：返回首页并恢复默认底栏
+          emitUpdate('backgroundUrl', state.backgroundHome);
+          emitUpdate('centerItems', state.defaultCenterItems);
+        } else if (payload.id === 'check-prev') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'check', cmd: 'prev' });
+        } else if (payload.id === 'check-next') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'check', cmd: 'next' });
+        } else if (payload.id === 'check-mark') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'check', cmd: 'mark' });
+        } else if (payload.id === 'check-showcn') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'check', cmd: 'showcn' });
+        } else if (payload.id === 'check-random') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'check', cmd: 'random' });
+        } else if (payload.id === 'check-stop') {
+          // 交由检查页自行显示总结并切换底栏
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'check', cmd: 'stop' });
+        } else if (payload.id === 'summary-exit') {
+          // 总结页退出：返回首页并恢复默认底栏
+          emitUpdate('backgroundUrl', state.backgroundHome);
+          emitUpdate('centerItems', state.defaultCenterItems);
         }
       } else if (payload.type === 'left.click') {
+        try { pluginApi.emit(state.eventChannel, payload); } catch {}
         if (payload.id === 'go-home') {
           emitUpdate('floatingUrl', null);
           emitUpdate('backgroundUrl', state.backgroundHome);
+          emitUpdate('centerItems', state.defaultCenterItems);
         }
       }
       return true;
@@ -185,6 +239,10 @@ const functions = {
       if (typeof s === 'string') state.wordbankServerUrl = s;
       return { ok: true, url: state.wordbankServerUrl };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  },
+  getDefaultCenterItems: async () => {
+    try { return { ok: true, items: state.defaultCenterItems }; }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }
 };
 
