@@ -3,7 +3,6 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import fs from 'fs';
 import path from 'path';
-import https from 'https';
 import { fileURLToPath } from 'url';
 
 const app = express();
@@ -29,7 +28,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // 查询全部
 app.get('/words', (_req, res) => { res.json(readWords()); });
 
-// 新增词汇（若包含空格则不调用词典API）
+// 新增词汇（不持久化词典原始数据以节省空间）
 app.post('/words', requireEditKey, async (req, res) => {
   const { word, cn, translations } = req.body || {};
   if (!word || !word.trim()) return res.status(400).json({ ok: false, error: 'word required' });
@@ -39,21 +38,7 @@ app.post('/words', requireEditKey, async (req, res) => {
   if (Array.isArray(translations)) {
     item.translations = translations.map((t) => ({ pos: String(t?.pos || '').trim(), cn: String(t?.cn || t?.tran_cn || '').trim() })).filter((x) => x.cn);
   }
-  // 若单词不含空格，尝试调用词典API获取翻译（占位实现）
-  if (!item.word.includes(' ')) {
-    try {
-      const apiUrl = new URL('https://v2.xxapi.cn/api/englishwords');
-      apiUrl.searchParams.set('word', item.word);
-      const remote = await new Promise((resolve, reject) => {
-        https.get(apiUrl, (r) => {
-          let buf = '';
-          r.on('data', (d) => (buf += d));
-          r.on('end', () => { try { resolve(JSON.parse(buf)); } catch { resolve({ raw: buf }); } });
-        }).on('error', reject);
-      });
-      item.dict = remote;
-    } catch {}
-  }
+  // 不保存 dict 字段，避免 words.json 体积膨胀；如需词典，请在客户端按需调用并选择译文写入 translations
   data.words.push(item);
   writeWords(data);
   res.json({ ok: true, item });

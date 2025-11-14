@@ -57,6 +57,7 @@ const functions = {
       };
 
       const params = {
+        id: 'multiword.lowbar',
         title: '多维单词',
         eventChannel: state.eventChannel,
         subscribeTopics: [state.eventChannel],

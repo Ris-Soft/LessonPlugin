@@ -2,7 +2,8 @@ const path = require('path');
 const { BrowserWindow } = require('electron');
 
 // 支持多窗口：使用 Map 跟踪所有窗口
-const winMap = new Map(); // id -> BrowserWindow
+const winMap = new Map(); // electron window id -> BrowserWindow
+const namedWinMap = new Map(); // custom name/id -> BrowserWindow（用于调用方防止重复创建）
 
 const WindowModes = {
   FULLSCREEN_ONLY: 'fullscreen_only',
@@ -42,6 +43,45 @@ const functions = {
     const height = parseInt(params.height, 10) || 800;
     const title = params.title || 'UI模板-低栏应用';
     const windowMode = params.windowMode || WindowModes.ALL_MODES;
+    const customKey = String(params.id || params.windowId || '').trim();
+
+    // 若调用方提供了窗口标识，则尝试复用现有窗口（避免重复创建同类窗口）
+    if (customKey) {
+      const existing = namedWinMap.get(customKey);
+      if (existing && !existing.isDestroyed()) {
+        try {
+          existing.setTitle(title);
+          existing.webContents.send('lowbar:init', {
+            title,
+            windowMode,
+            icon: params.icon || 'ri-layout-bottom-line',
+            backgroundUrl: params.backgroundUrl || null,
+            floatingUrl: params.floatingUrl || null,
+            floatingBounds: params.floatingBounds || null,
+            floatingWidth: (typeof params.floatingWidth === 'number') ? params.floatingWidth : undefined,
+            floatingHeight: (typeof params.floatingHeight === 'number') ? params.floatingHeight : undefined,
+            floatingSizePercent: (typeof params.floatingSizePercent === 'number') ? params.floatingSizePercent : undefined,
+            backgroundTargets: (typeof params.backgroundTargets === 'object') ? params.backgroundTargets : undefined,
+            callerPluginId: params.callerPluginId || null,
+            eventChannel: params.eventChannel || null,
+            subscribeTopics: Array.isArray(params.subscribeTopics) ? params.subscribeTopics : (params.eventChannel ? [params.eventChannel] : []),
+            leftItems: Array.isArray(params.leftItems) ? params.leftItems : [],
+            centerItems: Array.isArray(params.centerItems) ? params.centerItems : [],
+            capabilities: {
+              maximizable: typeof existing.isMaximizable === 'function' ? !!existing.isMaximizable() : true,
+              fullscreenable: typeof existing.isFullScreenable === 'function' ? !!existing.isFullScreenable() : true
+            },
+            windowId: existing.id
+          });
+          applyInitialMode(existing, windowMode);
+          existing.show();
+          existing.focus();
+          return true;
+        } catch {}
+      } else {
+        try { namedWinMap.delete(customKey); } catch {}
+      }
+    }
     const bw = new BrowserWindow({
       width,
       height,
@@ -56,6 +96,7 @@ const functions = {
         webviewTag: true
       }
     });
+    try { bw.setTitle(title); } catch {}
     bw.loadFile(path.join(__dirname, 'index.html'));
 
     bw.webContents.once('did-finish-load', () => {
@@ -93,8 +134,18 @@ const functions = {
 
     applyInitialMode(bw, windowMode);
     bw.once('ready-to-show', () => { try { bw.show(); } catch {} });
-    bw.on('closed', () => { try { winMap.delete(bw.id); } catch {} });
+    bw.on('closed', () => {
+      try { winMap.delete(bw.id); } catch {}
+      try {
+        if (customKey) namedWinMap.delete(customKey);
+        else namedWinMap.delete(String(bw.id));
+      } catch {}
+    });
     winMap.set(bw.id, bw);
+    try {
+      if (customKey) namedWinMap.set(customKey, bw);
+      else namedWinMap.set(String(bw.id), bw);
+    } catch {}
     return true;
   },
   toggleFullscreen: async (targetWindowId) => {

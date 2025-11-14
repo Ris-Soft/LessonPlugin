@@ -30,8 +30,8 @@
       const CH = 'multiword.lowbar';
       const qs = new URLSearchParams(window.location.search || '');
       const recentDays = parseInt(qs.get('days')||'7', 10) || 7;
-      const wordSec = parseInt(qs.get('wordsec')||'4', 10) || 4;
-      const cnSec = parseInt(qs.get('cnsec')||'3', 10) || 3;
+      const wordSec = parseInt(qs.get('wordsec')||'2', 10) || 2;
+      const cnSec = parseInt(qs.get('cnsec')||'1', 10) || 1;
       // 单页显示数量改为按可视区域高度计算（不再使用 pagesize 参数）
       let pageSize = 8;
       const previewMode = (qs.get('preview')||'') === '1';
@@ -40,7 +40,14 @@
       const pageSec = (wordSec + cnSec);
       const gridEl = document.getElementById('grid');
       const timeLeftEl = document.getElementById('timeLeft');
-      let words = []; let pages = []; let pageIdx = 0; let paused = false; let pageRemain = pageSec; let showCn = (qs.get('showcn')||'1') !== '0';
+      let words = []; let pages = []; let pageIdx = 0; let paused = false; let pageRemain = 0; let showCn = (qs.get('showcn')||'1') !== '0';
+      const shufflePreview = (qs.get('shuffle')||'0') === '1';
+      function computePageRemain() {
+        try {
+          const len = (pages[pageIdx] || []).length;
+          return Math.max(0, len * pageSec);
+        } catch { return pageSec; }
+      }
       let serverBase = '';
 
       function calcPageSize() {
@@ -79,16 +86,27 @@
           const cutoff = Date.now() - recentDays * 24 * 3600 * 1000;
           const raw = Array.isArray(json?.words) ? json.words : [];
           if (selectedList.length) {
-            const set = new Set(selectedList);
-            words = raw.filter(x => set.has(String(x.word||'').toLowerCase()));
+            // 保持第二步已编好的顺序（selectedList），仅在预览乱序开启时才打乱显示顺序
+            const byWord = new Map();
+            for (const it of raw) { const w = String(it.word||'').toLowerCase(); if (!byWord.has(w)) byWord.set(w, it); }
+            const ordered = [];
+            for (const w of selectedList) { if (byWord.has(w)) ordered.push(byWord.get(w)); }
+            words = ordered;
+            if (shufflePreview) {
+              try { for (let i = words.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [words[i], words[j]] = [words[j], words[i]]; } } catch {}
+            }
           } else {
+            // 无已编列表时，按最近天数筛选并按时间排序；预览乱序则在排序后打乱
             words = raw.filter(x => (x.createdAt || 0) >= cutoff);
+            words.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+            if (shufflePreview) {
+              try { for (let i = words.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [words[i], words[j]] = [words[j], words[i]]; } } catch {}
+            }
           }
-          words.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
           pageSize = calcPageSize();
           pages = [];
           for (let i=0;i<words.length;i+=pageSize) pages.push(words.slice(i,i+pageSize));
-          pageIdx = 0; pageRemain = pageSec;
+          pageIdx = 0; pageRemain = computePageRemain();
           if (!pages.length) { gridEl.innerHTML = '<div class="item"><div class="word">无符合时间条件的词汇</div></div>'; }
         } catch (e) {
           gridEl.innerHTML = '<div class="item"><div class="word">加载失败 / 未连接词库</div><div class="cn">'+(e?.message||'请在“外部词库”页绑定，或通过 server 参数传入地址')+'</div></div>';
@@ -112,13 +130,13 @@
           });
         });
       }
-      function prevPage() { pageIdx = Math.max(0, pageIdx-1); pageRemain = pageSec; renderPage(); }
-      function nextPage() { pageIdx = Math.min(pages.length-1, pageIdx+1); pageRemain = pageSec; renderPage(); }
+      function prevPage() { pageIdx = Math.max(0, pageIdx-1); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); }
+      function nextPage() { pageIdx = Math.min(pages.length-1, pageIdx+1); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); }
 
       let tickHandle = null;
       function startLoop() {
         if (tickHandle) clearInterval(tickHandle);
-        renderPage(); pageRemain = pageSec;
+        renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain);
         tickHandle = setInterval(() => {
           if (paused) return;
           pageRemain = Math.max(0, pageRemain-1);
@@ -133,10 +151,10 @@
               } else {
                 // 常规模式：返回第一页并继续
                 pageIdx = 0; renderPage();
-                pageRemain = pageSec;
+                pageRemain = computePageRemain();
               }
             } else {
-              nextPage(); pageRemain = pageSec;
+              nextPage(); pageRemain = computePageRemain();
             }
           }
         }, 1000);
@@ -165,6 +183,7 @@
                 pageIdx = Math.max(0, Math.min(pages.length-1, Math.floor(flatIndex / Math.max(1,pageSize))));
               }
               renderPage(); 
+              pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain);
             }
             return;
           }
@@ -186,6 +205,7 @@
                 pageIdx = Math.max(0, Math.min(pages.length-1, Math.floor(flatIndex / Math.max(1,pageSize))));
               }
               renderPage(); 
+              pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain);
             }
             else if (id === 'check-start') {
               // 从预览进入检查流程

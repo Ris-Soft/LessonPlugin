@@ -61,6 +61,8 @@
 
       <section class="card" style="margin-top:14px;">
         <b><i class="ri-add-line"></i> 添加词汇</b>
+        <!-- 将翻译选择框移到输入行上方，避免遮挡输入和建议列表 -->
+        <div id="dictBox" class="pos-list" style="margin-bottom:8px;"></div>
         <div class="row" style="margin-top:8px;">
           <div class="sugg-box" style="flex:1; min-width:240px; max-width:420px;">
             <input id="word" placeholder="英文单词（不支持短语）" style="width:100%;" />
@@ -69,7 +71,6 @@
           <input id="cn" placeholder="汉语解释（可留空）" />
           <button id="addBtn"><i class="ri-save-2-line"></i> 添加</button>
         </div>
-        <div id="dictBox" class="pos-list"></div>
         <div id="addRes" class="muted" style="margin-top:8px;"></div>
       </section>
 
@@ -186,9 +187,9 @@
           if (!cn && !hasDictChoices) { await fetchDict(word.toLowerCase()); }
           // 提取勾选的词典翻译
           const chips = Array.from(document.querySelectorAll('#dictBox input[type="checkbox"]'));
-          const pickedPairs = chips.filter(x => x.checked).map(x => ({ pos: x.getAttribute('data-pos') || '', cn: x.getAttribute('data-cn') || '' })).filter(it => it.cn);
+          const pickedPairs = cn ? [] : chips.filter(x => x.checked).map(x => ({ pos: x.getAttribute('data-pos') || '', cn: x.getAttribute('data-cn') || '' })).filter(it => it.cn);
           const picked = pickedPairs.map(it => (it.pos ? (it.pos + '. ' + it.cn) : it.cn));
-          const cnAll = [cn, ...picked].filter(Boolean).join('；');
+          const cnAll = cn ? cn : picked.join('；');
           const r = await fetch('/words', { method:'POST', headers:{'Content-Type':'application/json', 'x-edit-key': getEditKey()}, body: JSON.stringify({ word, cn: cnAll, translations: pickedPairs }) });
           const j = await r.json();
           if (j.ok) {
@@ -204,12 +205,73 @@
       document.getElementById('addBtn').addEventListener('click', addWord);
       const onInputSuggest = debounce((v) => fetchSuggest(v.toLowerCase()), 200);
       document.getElementById('word').addEventListener('input', (ev) => { const v = ev.target.value; onInputSuggest(v); });
-      document.getElementById('word').addEventListener('blur', (ev) => { const v = ev.target.value.trim(); if (v) fetchDict(v.toLowerCase()); });
+      // 输入框失焦时关闭自动补全建议框；若未从建议列表点击，则触发词典获取
+      let suggClicking = false;
+      document.getElementById('suggestions').addEventListener('mousedown', () => { suggClicking = true; });
+      document.getElementById('word').addEventListener('blur', (ev) => {
+        const v = ev.target.value.trim();
+        setTimeout(() => {
+          const box = document.getElementById('suggestions'); box.style.display = 'none'; box.innerHTML = '';
+          const cnCurrent = document.getElementById('cn').value.trim();
+          if (v && !suggClicking && !cnCurrent) fetchDict(v.toLowerCase());
+          suggClicking = false;
+        }, 120);
+      });
       document.getElementById('suggestions').addEventListener('click', (ev) => {
         const btn = ev.target.closest('.sugg-item'); if (!btn) return;
         const w = btn.getAttribute('data-w');
         document.getElementById('word').value = w; document.getElementById('suggestions').style.display = 'none';
-        fetchDict(w.toLowerCase());
+        const cnCurrent = document.getElementById('cn').value.trim();
+        if (!cnCurrent) fetchDict(w.toLowerCase());
+      });
+      // 在英文输入框按下回车视为"提交"并收起建议框
+      document.getElementById('word').addEventListener('keydown', (ev) => {
+        const isEnter = ev.key === 'Enter' || ev.code === 'Enter' || ev.keyCode === 13;
+        if (!isEnter) return;
+        ev.preventDefault();
+        const box = document.getElementById('suggestions'); box.style.display = 'none'; box.innerHTML = '';
+        addWord();
+      });
+      // 在汉语解释输入框按下回车也视为"提交"并立即清空表单
+      document.getElementById('cn').addEventListener('keydown', async (ev) => {
+        const isEnter = ev.key === 'Enter' || ev.code === 'Enter' || ev.keyCode === 13;
+        if (!isEnter) return;
+        ev.preventDefault();
+        const box = document.getElementById('suggestions'); box.style.display = 'none'; box.innerHTML = '';
+        
+        const word = document.getElementById('word').value.trim();
+        const cn = document.getElementById('cn').value.trim();
+        const resEl = document.getElementById('addRes');
+        
+        if (!word) { 
+          resEl.textContent = '请输入英文单词'; 
+          return; 
+        }
+        
+        try {
+          // 立即清空表单并显示提交状态
+          document.getElementById('word').value = '';
+          document.getElementById('cn').value = '';
+          document.getElementById('dictBox').innerHTML = '';
+          resEl.textContent = '正在提交...';
+          
+          // 提交数据（使用手动输入的中文解释，不使用词典翻译）
+          const r = await fetch('/words', { 
+            method:'POST', 
+            headers:{'Content-Type':'application/json', 'x-edit-key': getEditKey()}, 
+            body: JSON.stringify({ word, cn: cn, translations: [] }) 
+          });
+          const j = await r.json();
+          
+          if (j.ok) {
+            resEl.textContent = '已提交：' + j.item.word;
+            await loadWords();
+          } else { 
+            resEl.textContent = '提交失败：' + (j.error||''); 
+          }
+        } catch (e) { 
+          resEl.textContent = '提交失败：' + (e.message||e); 
+        }
       });
       document.addEventListener('click', async (ev) => {
         const btn = ev.target.closest('button[data-id],button[data-word]');

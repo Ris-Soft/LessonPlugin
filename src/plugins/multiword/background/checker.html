@@ -82,8 +82,12 @@
           const j = await r.json();
           const raw = Array.isArray(j?.words) ? j.words : [];
           if (selectedList.length) {
-            const set = new Set(selectedList);
-            list = raw.filter(x => set.has(String(x.word||'').toLowerCase()));
+            // 保持第二步生成的“编号序”（selectedList 的顺序）
+            const byWord = new Map();
+            for (const it of raw) { const w = String(it.word||'').toLowerCase(); if (!byWord.has(w)) byWord.set(w, it); }
+            const ordered = [];
+            for (const w of selectedList) { if (byWord.has(w)) ordered.push(byWord.get(w)); else ordered.push({ word: w, cn: '' }); }
+            list = ordered;
           } else {
             list = raw.slice(0, 20);
           }

@@ -1,0 +1,71 @@
+{
+  "words": [
+    {
+      "id": "1762094206100-mbvigq",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1762094206100,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1762094227594-o3gwn0",
+      "word": "fuck",
+      "cn": "int. 喂",
+      "createdAt": 1762094227594,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1762094347514-zk6iyj",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1762094347514,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1762094416464-ud2f65",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1762094416464,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1762094427820-pvcz3w",
+      "word": "hello",
+      "cn": "114514",
+      "createdAt": 1762094427820,
+      "translations": []
+    },
+    {
+      "id": "1762097399840-002raw",
+      "word": "hi",
+      "cn": "int. 嗨(表示问候等)",
+      "createdAt": 1762097399840,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "嗨(表示问候等)"
+        }
+      ]
+    }
+  ]
+}

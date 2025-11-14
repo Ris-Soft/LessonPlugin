@@ -30,6 +30,8 @@ let tray = null;
 let splashReady = false;
 let splashQueue = [];
 let automationManager = null;
+// 判断是否通过协议参数启动（LessonPlugin://...），用于控制是否创建主窗口
+const hasProtocolArgAtBoot = Array.isArray(process.argv) && process.argv.some((s) => /^LessonPlugin:\/\//i.test(String(s || '')));
 
 function createSplashWindow() {
   // 读取配置以决定窗口尺寸与是否显示名言
@@ -424,12 +426,14 @@ app.whenReady().then(async () => {
       const m = arg.match(/^LessonPlugin:\/\/task\/(.+)$/i);
       if (m) automationManager?.invokeProtocol(decodeURIComponent(m[1]));
     }
-    // 重复启动时打开设置页面（创建并置顶显示）
+    // 若为普通重复启动（非协议调用），打开设置页面；协议调用不创建主窗口
     try {
-      if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
-      if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
-      settingsWindow.show();
-      settingsWindow.focus();
+      if (!arg) {
+        if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
+        if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+        settingsWindow.show();
+        settingsWindow.focus();
+      }
     } catch {}
   });
   app.on('open-url', (_e, url) => {
@@ -438,7 +442,10 @@ app.whenReady().then(async () => {
   });
 
   createTray();
-  createSettingsWindow();
+  // 常规启动才创建主设置窗口；通过协议启动时不创建主窗口
+  if (!hasProtocolArgAtBoot) {
+    createSettingsWindow();
+  }
 
   // 若为快速重启触发，则启动后自动打开设置页（仅一次）
   try {
