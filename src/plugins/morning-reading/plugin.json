@@ -16,4 +16,5 @@
     "notify-plugin@^1.0.0"
   ],
   "version": "1.0.0"
+  ,"variables": ["timeISO","pluginName"]
 }

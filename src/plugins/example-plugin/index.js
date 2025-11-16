@@ -15,7 +15,15 @@ const functions = {
     win.loadFile(path.join(__dirname, 'index.html'));
     win.show();
     return true;
-  }
+  },
+  getVariable: async (name) => {
+    const key = String(name || '').trim();
+    if (key === 'timeISO') return new Date().toISOString();
+    if (key === 'pluginName') return '基础示例';
+    if (key === 'random') return String(Math.random());
+    return '';
+  },
+  listVariables: () => ['timeISO','pluginName','random']
 };
 
 const init = async (api) => {

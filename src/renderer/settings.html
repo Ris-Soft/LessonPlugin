@@ -20,8 +20,8 @@
       <nav>
         <button class="nav-item active" data-page="plugins"><i class="ri-puzzle-line"></i> 插件管理</button>
         <button class="nav-item" data-page="market"><i class="ri-store-2-line"></i> 功能市场</button>
+        <button class="nav-item" data-page="components"><i class="ri-layout-3-line"></i> 组件管理</button>
         <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
-        <button class="nav-item" data-page="profiles"><i class="ri-archive-line"></i> 档案管理</button>
         <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
         <button class="nav-item" data-page="npm"><i class="ri-box-3-line"></i> 依赖管理</button>
         <button class="nav-item" data-page="debug" style="display: none;"><i class="ri-tools-line"></i> 调试功能</button>
@@ -50,6 +50,13 @@
             拖入插件ZIP安装包以开始安装
           </div>
           <div id="plugins" class="plugins"></div>
+        </section>
+        <section id="page-components" hidden>
+          <header>
+            <h1>组件管理</h1>
+            <p>管理并预览已安装的组件（按组归类）</p>
+          </header>
+          <div id="components-list" class="plugins"></div>
         </section>
         <section id="page-market" hidden>
           <header>
@@ -441,39 +448,6 @@
 
         </section>
 
-        <!-- 档案管理页面 -->
-        <section id="page-profiles" hidden>
-          <header>
-            <h1>档案管理</h1>
-            <p>维护学生列表，支持文本导入与筛选</p>
-          </header>
-          <!-- 子夹（子页面）导航，与通用设置相同结构 -->
-          <div class="subnav">
-            <button class="sub-item active" data-sub="students"><i class="ri-user-3-line"></i> 学生列表</button>
-          </div>
-          <div id="profiles-students" class="panel">
-            <div class="profiles-toolbar">
-              <button id="profiles-import-toggle" class="btn secondary"><i class="ri-file-text-line"></i> 文本导入</button>
-              <button id="profiles-add" class="btn secondary"><i class="ri-add-line"></i> 新增学生</button>
-              <button id="profiles-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
-              <span class="muted" style="margin-left: 8px;">提示：可直接复制 Excel 中纵向学生列表并粘贴</span>
-            </div>
-            <div id="profiles-import" class="profiles-import" hidden>
-              <textarea id="profiles-import-text" placeholder="每行一个学生姓名"></textarea>
-              <div class="import-actions">
-                <button id="profiles-import-apply" class="btn primary"><i class="ri-download-2-line"></i> 导入到列表</button>
-                <button id="profiles-import-cancel" class="btn secondary"><i class="ri-close-line"></i> 关闭</button>
-              </div>
-            </div>
-            <div id="profiles-filters" class="profiles-filters"></div>
-            <div class="profiles-table-wrap">
-              <table class="profiles-table">
-                <thead id="profiles-thead"></thead>
-                <tbody id="profiles-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
 
         <!-- 自动执行页面 -->
         <section id="page-automation" hidden>
@@ -706,7 +680,7 @@
   <script src="./settings/handler/market.js"></script>
   <script src="./settings/handler/market.init.js"></script>
   <script src="./settings/handler/plugin.js"></script>
-  <script src="./settings/handler/profile.js"></script>
+  
   <script src="./settings/main.js"></script>
 
 
@@ -775,7 +749,7 @@
   <script src="./settings/handler/market.js"></script>
   <script src="./settings/handler/market.init.js"></script>
   <script src="./settings/handler/plugin.js"></script>
-  <script src="./settings/handler/profile.js"></script>
+  
   <script src="./settings/main.js"></script>
 
 

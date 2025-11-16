@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>分工列表</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../../renderer/settings.css" />
+    <style>
+      body { margin: 0; }
+      .section { padding: 16px; background: transparent !important; border: none !important; }
+      .list { display: flex; flex-direction: column; gap: 8px; }
+      .item { display: flex; gap: 8px; align-items: center; }
+      .item input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); }
+      .btn { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); cursor: pointer; }
+      .btn.secondary { background: rgba(255,255,255,0.08); }
+      .btn.danger { background: rgba(255, 100, 100, 0.2); border-color: rgba(255, 100, 100, 0.4); }
+      .actions { display: flex; gap: 8px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <div class="section-title"><i class="ri-list-check"></i> 分工列表</div>
+      <div id="list" class="list"></div>
+      <div class="actions">
+        <button id="add" class="btn secondary"><i class="ri-add-line"></i> 新增分工</button>
+        <button id="save" class="btn"><i class="ri-save-3-line"></i> 保存</button>
+      </div>
+    </div>
+    <script>
+      let channel=''; let caller=''; let cfg={ roles:[] };
+      function el(t,c){ const e=document.createElement(t); if(c) e.className=c; return e }
+      async function load(){
+        try {
+          if (window.lowbarAPI?.pluginCall) {
+            const res = await window.lowbarAPI.pluginCall(caller,'getConfig');
+            const r = res?.result || res; cfg = r?.config || {};
+          } else if (window.lowbarAPI?.configEnsureDefaults) {
+            await window.lowbarAPI.configEnsureDefaults('duty.easy',{
+              roles: ['清洁','黑板','值日生'],
+              groups: [
+                { name: '一组', roles: { '清洁': [], '黑板': [], '值日生': [] } },
+                { name: '二组', roles: { '清洁': [], '黑板': [], '值日生': [] } }
+              ]
+            });
+            const all = await window.lowbarAPI.configGetAll('duty.easy'); cfg = all || {};
+          } else if (window.pluginAPI?.configEnsureDefaults) {
+            await window.pluginAPI.configEnsureDefaults('duty.easy',{});
+            const all = await window.pluginAPI.configGetAll('duty.easy'); cfg = all || {};
+          }
+        } catch {}
+        if(!Array.isArray(cfg.roles)) cfg.roles=[]; if(!Array.isArray(cfg.groups)) cfg.groups=[]; render()
+      }
+      function render(){ const box=document.getElementById('list'); box.innerHTML=''; cfg.roles.forEach((name,idx)=>{ const row=el('div','item'); const inp=document.createElement('input'); inp.value=name||''; inp.placeholder='分工名称'; const up=document.createElement('button'); up.className='btn secondary'; up.innerHTML='<i class="ri-arrow-up-s-line"></i>'; const down=document.createElement('button'); down.className='btn secondary'; down.innerHTML='<i class="ri-arrow-down-s-line"></i>'; const del=document.createElement('button'); del.className='btn danger'; del.innerHTML='<i class="ri-delete-bin-line"></i>'; inp.addEventListener('input',()=>{ cfg.roles[idx]=inp.value }); up.addEventListener('click',()=>{ if(idx>0){ const t=cfg.roles[idx]; cfg.roles[idx]=cfg.roles[idx-1]; cfg.roles[idx-1]=t; render() } }); down.addEventListener('click',()=>{ if(idx<cfg.roles.length-1){ const t=cfg.roles[idx]; cfg.roles[idx]=cfg.roles[idx+1]; cfg.roles[idx+1]=t; render() } }); del.addEventListener('click',()=>{ cfg.roles.splice(idx,1); render() }); row.appendChild(inp); row.appendChild(up); row.appendChild(down); row.appendChild(del); box.appendChild(row) }) }
+      async function save(){
+        try {
+          const all=Array.isArray(cfg.groups)?cfg.groups:[];
+          all.forEach(g=>{ const next={}; (cfg.roles||[]).forEach(r=>{ next[r]=Array.isArray(g.roles?.[r])?g.roles[r]:[] }); g.roles=next });
+          if (window.lowbarAPI?.pluginCall) {
+            await window.lowbarAPI.pluginCall(caller,'saveConfig', [{ roles: cfg.roles, groups: all }]);
+            const res = await window.lowbarAPI.pluginCall(caller, 'getConfig'); const r=res?.result||res; cfg=r?.config||cfg;
+          } else if (window.lowbarAPI?.configEnsureDefaults) {
+            await window.lowbarAPI.configEnsureDefaults('duty.easy',{
+              roles: ['清洁','黑板','值日生'],
+              groups: [
+                { name: '一组', roles: { '清洁': [], '黑板': [], '值日生': [] } },
+                { name: '二组', roles: { '清洁': [], '黑板': [], '值日生': [] } }
+              ]
+            });
+            await window.lowbarAPI.configSet('duty.easy','roles',cfg.roles);
+            await window.lowbarAPI.configSet('duty.easy','groups',all);
+            const verify=await window.lowbarAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+          } else if (window.pluginAPI?.configEnsureDefaults) {
+            await window.pluginAPI.configEnsureDefaults('duty.easy',{});
+            await window.pluginAPI.configSet('duty.easy','roles',cfg.roles);
+            await window.pluginAPI.configSet('duty.easy','groups',all);
+            const verify=await window.pluginAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+          }
+        } catch {}
+      }
+      (function(){ try{ const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'') }catch{}
+        if(window.lowbarAPI){ if(channel) window.lowbarAPI.subscribe?.(channel); window.lowbarAPI.onEvent?.(async (n,p)=>{ if(n!==channel) return; if(p?.type==='update'){ if(p.target==='duty.save'){ await save(); await load(); render() } } }); }
+        load(); document.getElementById('add').addEventListener('click',()=>{ cfg.roles.push('新分工'); render() });
+        document.getElementById('save').addEventListener('click',async ()=>{ await save(); await load(); render() })
+      })();
+    </script>
+  </body>
+  </html>

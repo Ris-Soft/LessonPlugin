@@ -31,7 +31,7 @@ body.mode-fullscreen .bg-view { top: 0; bottom: 0; }
 #floatMask { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 9; background: rgba(0,0,0,0.08); transition: background 160ms ease; }
 
 /* 底部工具栏（暗色） */
-.bottombar { position: fixed; left: 0; right: 0; bottom: 0; height: 68px; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; background: linear-gradient(180deg, rgba(24,24,24,0.96), rgba(16,16,16,0.92)); border-top: 1px solid rgba(255,255,255,0.08); column-gap: 12px; backdrop-filter: saturate(120%); }
+.bottombar { position: fixed; left: 0; right: 0; bottom: 0; height: 68px; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; background: linear-gradient(180deg, rgba(24,24,24,0.96), rgba(16,16,16,0.92)); border-top: 1px solid rgba(255,255,255,0.08); column-gap: 12px; backdrop-filter: saturate(120%); z-index: 100; }
 body.mode-fullscreen  .bottombar { height: 80px; }
 .bottombar .area { display: flex; align-items: center; padding: 0 12px; }
 .bottombar .area .wrap { display: inline-flex; align-items: center; gap: 12px; }

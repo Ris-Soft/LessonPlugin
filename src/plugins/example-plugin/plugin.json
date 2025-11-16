@@ -6,5 +6,6 @@
   "description": "示例插件，演示窗口与接口",
   "actions": [
     { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口", "target": "openWindow" }
-  ]
+  ],
+  "variables": ["timeISO","pluginName","random"]
 }

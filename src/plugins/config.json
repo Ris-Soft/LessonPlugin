@@ -4,7 +4,7 @@
     "UtilPlugin": true,
     "AutomationDemo": true,
     "student-columns-demo": true,
-    "student-list-demo": true,
+    "profiles.students": true,
     "插件开发示例": true,
     "UI模板-低栏应用": true,
     "UI预览器": true,

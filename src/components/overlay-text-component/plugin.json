@@ -1,0 +1,9 @@
+{
+  "id": "component.overlay.text",
+  "name": "遮罩通知-纯文本组件",
+  "version": "1.0.0",
+  "type": "component",
+  "group": "notify.overlay",
+  "entry": "index.html",
+  "icon": "ri-text"
+}

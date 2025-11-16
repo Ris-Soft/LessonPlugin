@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>轻松值日</title>
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../renderer/settings.css" />
+    <style>
+      :root { --panel: rgba(255,255,255,0.06); }
+      body { margin: 0; }
+      .section { padding: 16px; background: transparent !important; border: none !important; }
+      .muted { color: var(--muted); }
+      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+      .card { border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; }
+      .card h4 { margin: 0 0 8px 0; font-size: 15px; }
+      .role { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+      .role .name { font-weight: 600; width: 88px; flex: 0 0 88px; color: var(--muted); }
+      .role .list { display: flex; flex-wrap: wrap; gap: 6px; }
+      .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); cursor: grab; }
+      .tag button { border: none; background: transparent; color: var(--muted); cursor: pointer; }
+      .editor { margin-top: 16px; }
+      .editor .row { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+      .editor label { width: 96px; flex: 0 0 96px; color: var(--muted); }
+      .editor input, .editor select, .editor textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); }
+      .table-wrap { margin-top: 12px; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; overflow: auto; }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      th, td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 8px; vertical-align: top; }
+      th { text-align: left; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: #0b1520; }
+      td .cell { min-height: 40px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; }
+      td .cell.drag-over { background: rgba(255,255,255,0.06); }
+      .cell .tag { margin: 4px; }
+      .actions { display: flex; gap: 8px; margin-top: 8px; }
+      .btn { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); cursor: pointer; }
+      .btn.primary { background: rgba(72, 207, 173, 0.2); border-color: rgba(72, 207, 173, 0.4); }
+      .btn.secondary { background: rgba(255,255,255,0.08); }
+      .btn.danger { background: rgba(255, 100, 100, 0.2); border-color: rgba(255, 100, 100, 0.4); }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <div class="section-title"><i class="ri-calendar-check-line"></i> 值日信息</div>
+      <div class="muted">展示今天和后三天的值日安排。</div>
+      <div id="preview" class="grid"></div>
+
+      <div class="section-title" style="margin-top:16px"><i class="ri-list-check"></i> 分工与规则</div>
+      <div class="editor">
+        <div class="row">
+          <label>分工列表</label>
+          <textarea id="roles" rows="2" placeholder="每行一个分工"></textarea>
+        </div>
+        <div class="row">
+          <label>组别列表</label>
+          <input id="groupNames" placeholder="用逗号分隔组名" />
+        </div>
+        <div class="row">
+          <label>值日规则</label>
+          <select id="ruleMode">
+            <option value="list">按照列表顺序</option>
+            <option value="weekday">按照星期对应组别</option>
+          </select>
+        </div>
+        <div class="row" id="weekdayRow" style="display:none">
+          <label>星期映射</label>
+          <input id="weekdayMap" placeholder="如 0:一组,1:二组" />
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:16px"><i class="ri-team-line"></i> 组别分工表</div>
+      <div class="table-wrap">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title" style="margin-top:16px"><i class="ri-loop-left-line"></i> 轮执列表</div>
+      <div class="editor">
+        <div id="rotLists"></div>
+        <div class="actions">
+          <button id="addRot" class="btn secondary"><i class="ri-add-line"></i> 新增轮执表</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btn-save" class="btn primary"><i class="ri-save-3-line"></i> 保存设置</button>
+      </div>
+    </div>
+
+    <script>
+      let channel = '';
+      let caller = '';
+      let cfg = { roles: [], groups: [], rule: {}, rotationLists: [], lastStartupDate: '' };
+
+      function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+
+      async function loadConfig() {
+        try {
+          if (window.lowbarAPI?.pluginCall) {
+            const res = await window.lowbarAPI.pluginCall(caller, 'getConfig'); const r=res?.result||res; cfg=r?.config||{};
+          } else if (window.lowbarAPI?.configEnsureDefaults) {
+            await window.lowbarAPI.configEnsureDefaults('duty.easy', {});
+            const all = await window.lowbarAPI.configGetAll('duty.easy'); cfg = all || {};
+          } else if (window.pluginAPI?.configEnsureDefaults) {
+            await window.pluginAPI.configEnsureDefaults('duty.easy', {});
+            const all = await window.pluginAPI.configGetAll('duty.easy'); cfg = all || {};
+          }
+        } catch {}
+        if (!Array.isArray(cfg.roles)) cfg.roles = [];
+        if (!Array.isArray(cfg.groups)) cfg.groups = [];
+        if (!Array.isArray(cfg.rotationLists)) cfg.rotationLists = [];
+        if (!cfg.rule || typeof cfg.rule !== 'object') cfg.rule = { mode: 'list', currentGroupIndex: 0, weekdayMap: {}, currentRotationIndex: 0 };
+      }
+
+      async function loadPreview() {
+        let res = null;
+        if (window.lowbarAPI?.pluginCall) {
+          res = await window.lowbarAPI.pluginCall(caller, 'getPreview');
+          res = res?.result || res;
+        }
+        const list = Array.isArray(res?.list) ? res.list : [];
+        const wrap = document.getElementById('preview');
+        wrap.innerHTML = '';
+        list.forEach(item => {
+          const card = el('div', 'card');
+          const h = el('h4');
+          h.textContent = `${item.dateISO}（${item.groupName || '未设置组'}）`;
+          card.appendChild(h);
+          item.roles.forEach(r => {
+            const row = el('div', 'role');
+            const name = el('div', 'name'); name.textContent = r;
+            const lst = el('div', 'list');
+            const arr = Array.isArray(item.members?.[r]) ? item.members[r] : [];
+            if (arr.length === 0) { const t = el('span', 'muted'); t.textContent = '未设置'; lst.appendChild(t); }
+            arr.forEach(n => { const t = el('span', 'tag'); t.textContent = n || ''; lst.appendChild(t); });
+            row.appendChild(name); row.appendChild(lst); card.appendChild(row);
+          });
+          wrap.appendChild(card);
+        });
+      }
+
+      function renderRuleEditor() {
+        const rolesArea = document.getElementById('roles');
+        rolesArea.value = (cfg.roles || []).join('\n');
+        const groupNames = document.getElementById('groupNames');
+        groupNames.value = (cfg.groups || []).map(g => g.name || '').join(',');
+        const modeSel = document.getElementById('ruleMode');
+        modeSel.value = String(cfg.rule?.mode || 'list');
+        const wdRow = document.getElementById('weekdayRow');
+        wdRow.style.display = (modeSel.value === 'weekday') ? '' : 'none';
+        const wdInput = document.getElementById('weekdayMap');
+        const names = (cfg.groups || []).map(g => g.name || '');
+        const map = cfg.rule?.weekdayMap || {};
+        const parts = [0,1,2,3,4,5,6].map(i => `${i}:${names[Number(map[i])||0]||''}`);
+        wdInput.value = parts.join(',');
+        modeSel.addEventListener('change', () => { wdRow.style.display = (modeSel.value === 'weekday') ? '' : 'none'; });
+      }
+
+      function renderGrid() {
+        const thead = document.getElementById('thead');
+        const tbody = document.getElementById('tbody');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        const trh = el('tr');
+        const thRole = el('th'); thRole.textContent = '分工'; trh.appendChild(thRole);
+        (cfg.groups||[]).forEach(g => { const th = el('th'); th.textContent = g.name || ''; trh.appendChild(th); });
+        thead.appendChild(trh);
+        (cfg.roles||[]).forEach(r => {
+          const tr = el('tr');
+          const tdName = el('td'); tdName.textContent = r; tr.appendChild(tdName);
+          (cfg.groups||[]).forEach((g, gi) => {
+            const td = el('td');
+            const cell = el('div', 'cell');
+            const arr = Array.isArray(g.roles?.[r]) ? g.roles[r] : [];
+            arr.forEach((n, ni) => {
+              const t = el('span', 'tag'); t.draggable = true; t.textContent = n || '';
+              const rm = el('button'); rm.innerHTML = '<i class="ri-close-line"></i>';
+              rm.addEventListener('click', (e) => { e.stopPropagation(); const a = Array.isArray(cfg.groups?.[gi]?.roles?.[r]) ? cfg.groups[gi].roles[r] : []; a.splice(ni,1); renderGrid(); });
+              t.appendChild(rm);
+              t.addEventListener('dragstart', (e) => {
+                try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/json', JSON.stringify({ type:'name', from:{ gi, r, ni }, name: n })); e.dataTransfer.setData('text/plain', JSON.stringify({ type:'name', from:{ gi, r, ni }, name: n })); } catch {}
+              });
+              t.addEventListener('dragover', (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch {} });
+              t.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+                const data = safeParse(raw);
+                if (data?.type === 'name') {
+                  const sgi = data.from.gi; const sr = data.from.r; const sni = data.from.ni;
+                  const srcArr = Array.isArray(cfg.groups?.[sgi]?.roles?.[sr]) ? cfg.groups[sgi].roles[sr] : [];
+                  const tgtArr = Array.isArray(cfg.groups?.[gi]?.roles?.[r]) ? cfg.groups[gi].roles[r] : [];
+                  const srcName = srcArr[sni];
+                  srcArr[sni] = tgtArr[ni];
+                  tgtArr[ni] = srcName;
+                  renderGrid();
+                }
+              });
+              cell.appendChild(t);
+            });
+            cell.addEventListener('dragover', (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch {} cell.classList.add('drag-over'); });
+            cell.addEventListener('dragleave', () => { cell.classList.remove('drag-over'); });
+            cell.addEventListener('drop', (e) => {
+              e.preventDefault(); cell.classList.remove('drag-over');
+              const data = safeParse(e.dataTransfer.getData('text/plain'));
+              if (data?.type === 'name') {
+                const sgi = data.from.gi; const sr = data.from.r; const sni = data.from.ni;
+                const srcArr = Array.isArray(cfg.groups?.[sgi]?.roles?.[sr]) ? cfg.groups[sgi].roles[sr] : [];
+                const tgtArr = Array.isArray(cfg.groups?.[gi]?.roles?.[r]) ? cfg.groups[gi].roles[r] : [];
+                const mv = srcArr.splice(sni, 1)[0];
+                tgtArr.push(mv);
+                renderGrid();
+              }
+            });
+            const addBtn = el('button', 'btn secondary'); addBtn.innerHTML = '<i class="ri-add-line"></i> 添加';
+            addBtn.addEventListener('click', () => {
+              try {
+                const url = new URL('../../plugins/profiles-students/index.html', window.location.href);
+                url.searchParams.set('channel', 'profiles.students.channel');
+                url.searchParams.set('caller', 'profiles.students');
+                window.lowbarAPI?.emitEvent?.(channel, { type:'update', target:'floatingUrl', value: url.href });
+                window.__dutyGridPick__ = { gi, r };
+              } catch {}
+            });
+            cell.appendChild(addBtn);
+            td.appendChild(cell); tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderRotLists() {
+        const box = document.getElementById('rotLists');
+        box.innerHTML = '';
+        (cfg.rotationLists||[]).forEach((it, idx) => {
+          const row = el('div', 'row');
+          const name = el('input'); name.value = it.name || ''; name.placeholder = '轮执表名称';
+          const roles = el('input'); roles.value = Array.isArray(it.roles)? it.roles.join(',') : ''; roles.placeholder = '使用的分工，逗号分隔';
+          const del = el('button', 'btn danger'); del.innerHTML = '<i class="ri-delete-bin-line"></i> 删除';
+          del.addEventListener('click', () => { cfg.rotationLists.splice(idx,1); renderRotLists(); });
+          name.addEventListener('input', () => { cfg.rotationLists[idx].name = name.value; });
+          roles.addEventListener('input', () => { cfg.rotationLists[idx].roles = roles.value.split(',').map(s => s.trim()).filter(s => s); });
+          row.appendChild(name); row.appendChild(roles); row.appendChild(del); box.appendChild(row);
+        });
+      }
+
+      function safeParse(t){ try { return JSON.parse(String(t||'')); } catch { return null; } }
+
+      async function collectAndSave() {
+        const rolesArea = document.getElementById('roles');
+        const groupNames = document.getElementById('groupNames');
+        const modeSel = document.getElementById('ruleMode');
+        const wdInput = document.getElementById('weekdayMap');
+        const roles = rolesArea.value.split('\n').map(s => s.trim()).filter(s => s);
+        const names = groupNames.value.split(',').map(s => s.trim()).filter(s => s);
+        cfg.roles = roles;
+        const oldGroups = Array.isArray(cfg.groups) ? cfg.groups : [];
+        const newGroups = names.map((nm, i) => {
+          const g = oldGroups[i] || { name: nm, roles: {} };
+          const obj = { name: nm, roles: {} };
+          roles.forEach(r => { obj.roles[r] = Array.isArray(g.roles?.[r]) ? g.roles[r] : []; });
+          return obj;
+        });
+        cfg.groups = newGroups;
+        cfg.rule = cfg.rule || {};
+        cfg.rule.mode = modeSel.value;
+        if (modeSel.value === 'weekday') {
+          const pairs = wdInput.value.split(',').map(s => s.trim()).filter(s => s);
+          const map = {};
+          pairs.forEach(p => {
+            const [k,v] = p.split(':');
+            const idx = names.indexOf((v||'').trim());
+            const ki = parseInt(k,10);
+            if (Number.isFinite(ki) && idx >= 0) map[ki] = idx;
+          });
+          cfg.rule.weekdayMap = map;
+        }
+        try {
+          if (window.lowbarAPI?.pluginCall) {
+            await window.lowbarAPI.pluginCall(caller,'saveConfig', [{ roles: cfg.roles, groups: cfg.groups, rule: cfg.rule, rotationLists: cfg.rotationLists }]);
+            const res = await window.lowbarAPI.pluginCall(caller, 'getConfig'); const r=res?.result||res; cfg=r?.config||cfg;
+          } else if (window.lowbarAPI?.configEnsureDefaults) {
+            await window.lowbarAPI.configEnsureDefaults('duty.easy', {});
+            await window.lowbarAPI.configSet('duty.easy', 'roles', cfg.roles);
+            await window.lowbarAPI.configSet('duty.easy', 'groups', cfg.groups);
+            await window.lowbarAPI.configSet('duty.easy', 'rule', cfg.rule);
+            await window.lowbarAPI.configSet('duty.easy', 'rotationLists', cfg.rotationLists);
+            const verify = await window.lowbarAPI.configGetAll('duty.easy'); cfg = verify || cfg;
+          } else if (window.pluginAPI?.configEnsureDefaults) {
+            await window.pluginAPI.configEnsureDefaults('duty.easy', {});
+            await window.pluginAPI.configSet('duty.easy', 'roles', cfg.roles);
+            await window.pluginAPI.configSet('duty.easy', 'groups', cfg.groups);
+            await window.pluginAPI.configSet('duty.easy', 'rule', cfg.rule);
+            await window.pluginAPI.configSet('duty.easy', 'rotationLists', cfg.rotationLists);
+            const verify = await window.pluginAPI.configGetAll('duty.easy'); cfg = verify || cfg;
+          }
+        } catch {}
+      }
+
+      async function init() {
+        try {
+          const u = new URL(window.location.href);
+          channel = String(u.searchParams.get('channel') || '');
+          caller = String(u.searchParams.get('caller') || '');
+        } catch {}
+        if (window.lowbarAPI) {
+          window.lowbarAPI.subscribe?.(channel);
+          window.lowbarAPI.onEvent?.(async (name, payload) => {
+            if (name !== channel && !(payload?.type === 'pick')) return;
+            if (payload?.type === 'update') {
+              if (payload.target === 'duty.save') { await collectAndSave(); await loadPreview(); }
+              if (payload.target === 'refresh') { loadPreview(); }
+            }
+            if (payload?.type === 'pick' && payload.name) {
+              try {
+                const pick = window.__dutyGridPick__;
+                const nm = String(payload.name || '').trim();
+                if (pick && nm) {
+                  const arr = Array.isArray(cfg.groups?.[pick.gi]?.roles?.[pick.r]) ? cfg.groups[pick.gi].roles[pick.r] : (cfg.groups[pick.gi].roles[pick.r] = []);
+                  arr.push(nm);
+                  window.__dutyGridPick__ = null;
+                  renderGrid();
+                  window.lowbarAPI?.emitEvent?.(channel, { type:'update', target:'floatingUrl', value: null });
+                }
+              } catch {}
+            }
+          });
+        }
+        await loadConfig();
+        renderRuleEditor();
+        renderGrid();
+        renderRotLists();
+        await loadPreview();
+        document.getElementById('addRot').addEventListener('click', () => { cfg.rotationLists.push({ name: '新轮执', roles: (cfg.roles||[]).slice() }); renderRotLists(); });
+        document.getElementById('btn-save').addEventListener('click', async () => { await collectAndSave(); await loadPreview(); });
+      }
+
+      init();
+    </script>
+  </body>
+  </html>

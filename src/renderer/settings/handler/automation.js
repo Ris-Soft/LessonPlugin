@@ -438,7 +438,7 @@ async function initAutomationSettings() {
               const curEvs = Array.isArray(curRes?.events) ? curRes.events : (Array.isArray(curRes) ? curRes : []);
               const def = curEvs.find(e => e.name === evSel.value);
               const defs = Array.isArray(def?.params) ? def.params : [];
-              const resEdit = await showParamsEditorForEvent(defs, Array.isArray(a.params) ? a.params : []);
+              const resEdit = await showParamsEditorForEvent(defs, Array.isArray(a.params) ? a.params : [], plugSel.value);
               if (Array.isArray(resEdit)) { a.params = resEdit; paramsPreview.textContent = `参数项数：${resEdit.length}`; }
             };
             cfg.appendChild(plugSel); cfg.appendChild(evSel); cfg.appendChild(editParams); cfg.appendChild(paramsPreview);
@@ -485,7 +485,7 @@ async function initAutomationSettings() {
               paramsPreview.textContent = `参数项数：${a.params.length}`;
             });
             editParams.onclick = async () => {
-              const resEdit = await showParamsEditor(Array.isArray(a.params) ? a.params : []);
+              const resEdit = await showParamsEditor(Array.isArray(a.params) ? a.params : [], plugSel.value);
               if (Array.isArray(resEdit)) { a.params = resEdit; paramsPreview.textContent = `参数项数：${resEdit.length}`; }
             };
             cfg.appendChild(plugSel); cfg.appendChild(actSel); cfg.appendChild(editParams); cfg.appendChild(paramsPreview);

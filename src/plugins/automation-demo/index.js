@@ -35,7 +35,9 @@ const functions = {
     } catch (e) {
       return null;
     }
-  }
+  },
+  getVariable: async (name) => { const k=String(name||''); if (k==='timeISO') return new Date().toISOString(); if (k==='pluginName') return '自动化演示'; return ''; },
+  listVariables: () => ['timeISO','pluginName']
 };
 
 // 自动化事件声明（供设置页查询）

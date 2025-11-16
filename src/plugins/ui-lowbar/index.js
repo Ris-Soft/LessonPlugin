@@ -101,6 +101,7 @@ const functions = {
 
     bw.webContents.once('did-finish-load', () => {
       try {
+        bw.setTitle(title);
         bw.webContents.send('lowbar:init', {
           title,
           windowMode,
@@ -208,5 +209,9 @@ module.exports = {
   name: 'UI模板-低栏应用',
   version: '0.1.0',
   init,
-  functions
+  functions: {
+    ...functions,
+    getVariable: async (name) => { const k=String(name||''); if (k==='timeISO') return new Date().toISOString(); if (k==='windowsCount') return String(winMap.size || 0); return ''; },
+    listVariables: () => ['timeISO','windowsCount']
+  }
 };

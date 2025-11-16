@@ -48,6 +48,12 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   pluginAutomationCreateShortcut: (pluginId, options) => ipcRenderer.invoke('plugin:automation:createShortcut', pluginId, options),
   // 直接调用插件函数（用于 actions 目标指向 functions 中的函数）
   pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
+  // 插件变量：列表与取值
+  pluginVariablesList: (pluginId) => ipcRenderer.invoke('plugin:variables:list', pluginId),
+  pluginVariableGet: (pluginId, varName) => ipcRenderer.invoke('plugin:variables:get', pluginId, varName),
+  // 组件管理：列表与入口URL
+  componentsList: (group) => ipcRenderer.invoke('components:list', group),
+  componentEntryUrl: (idOrName) => ipcRenderer.invoke('components:entryUrl', idOrName),
   // 设置页导航事件订阅（供主进程触发页面切换）
   onNavigate: (handler) => {
     ipcRenderer.on('settings:navigate', (_e, page) => handler && handler(page));
@@ -63,6 +69,12 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   // 打开插件信息模态框事件订阅
   onOpenPluginInfo: (handler) => {
     ipcRenderer.on('settings:openPluginInfo', (_e, pluginKey) => handler && handler(pluginKey));
+  },
+  onOpenStoreItem: (handler) => {
+    ipcRenderer.on('settings:openStoreItem', (_e, payload) => handler && handler(payload));
+  },
+  onMarketInstall: (handler) => {
+    ipcRenderer.on('settings:marketInstall', (_e, payload) => handler && handler(payload));
   },
   // 自动化执行确认覆盖层通信
   onAutomationConfirmInit: (handler) => {

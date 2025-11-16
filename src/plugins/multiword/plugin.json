@@ -6,5 +6,6 @@
   "description": "多维单词：听力、自测、检查、外部词库、在线词典、偏好设置、关于",
   "actions": [
     { "id": "openTemplate", "icon": "ri-window-line", "text": "打开多维单词", "target": "openMultiword" }
-  ]
+  ],
+  "variables": ["timeISO","pluginName","wordbankUrl"]
 }

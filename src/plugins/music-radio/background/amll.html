@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>播放页面背景</title>
+  <link href="https://assets.3r60.top/icons/bootstrap-icons.css" rel="stylesheet" />
+  <link href="file:///d:/LessonPlugin/example/kmp_zynMw/kmp.css" rel="stylesheet" />
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; color: #eee; font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; }
+    .overlay { position: absolute; left: 0; top: 0; right: 0; height: 48px; display: flex; align-items: center; padding: 0 12px; color: #cfcfcf; font-size: 13px; backdrop-filter: blur(6px); background: rgba(0,0,0,0.25); z-index: 9999; }
+    .overlay a { color: #9cd2ff; text-decoration: none; }
+    .wrap { height: 100%; }
+    .search-bar { display: none; }
+  </style>
+  <script src="file:///d:/LessonPlugin/example/kmp_zynMw/config.js"></script>
+  <script src="file:///d:/LessonPlugin/example/kmp_zynMw/kmp.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const statusEl = document.querySelector('.overlay');
+      const params = new URL(location.href).searchParams;
+      const musicUrl = params.get('music') || '';
+      const albumUrl = params.get('album') || '';
+      const title = params.get('title') || '';
+      const artist = params.get('artist') || '';
+      const container = document.querySelector('.container');
+      const audioBar = document.getElementById('audioBar');
+      const audio = document.getElementById('audio');
+      const audioCover = document.getElementById('audioCover');
+      const audioTitle = document.getElementById('audioTitle');
+      const audioArtist = document.getElementById('audioArtist');
+      const playerModalCover = document.getElementById('playerModalCover');
+      const playerModalTitle = document.getElementById('playerModalTitle');
+      const playerModalArtist = document.getElementById('playerModalArtist');
+      if (container) container.classList.add('centered');
+      if (musicUrl) {
+        audio.src = musicUrl;
+        audioBar.style.display = 'flex';
+        audioCover.src = albumUrl || '';
+        audioTitle.textContent = title || '';
+        audioArtist.textContent = artist || '';
+        playerModalCover.src = albumUrl || '';
+        playerModalTitle.textContent = title || '';
+        playerModalArtist.textContent = artist || '';
+        try { audio.play(); if (statusEl) statusEl.textContent = '播放页面背景：播放中'; } catch {}
+      } else {
+        if (statusEl) statusEl.textContent = '播放页面背景：未提供音源';
+      }
+      if (albumUrl && typeof updateBackground === 'function') {
+        try { updateBackground(albumUrl); } catch {}
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="overlay">播放页面背景：通过 URL 传入 music/album/title/artist。</div>
+    <div id="mount" style="position:absolute; inset:0;">
+      <div class="container">
+        <div class="app-title">KMP Music</div>
+        <div class="search-bar">
+          <input id="searchInput" type="text" placeholder="搜索歌曲/歌手/专辑..." autofocus />
+          <button id="searchBtn" title="搜索"><i class="bi bi-search"></i></button>
+        </div>
+        <div id="results" class="results" style="display: none"></div>
+      </div>
+      <div class="audio-bar" id="audioBar" style="display: flex">
+        <div class="audio-progress-bar" id="audioProgressBar">
+          <div class="audio-progress" id="audioProgress"></div>
+          <div class="audio-progress-dot" id="audioProgressDot"></div>
+        </div>
+        <div class="audio-bar-inner">
+          <img class="audio-cover" id="audioCover" src="" alt="cover" />
+          <div class="audio-info">
+            <div class="audio-title" id="audioTitle"></div>
+            <div class="audio-artist" id="audioArtist"></div>
+          </div>
+          <div class="audio-time" id="audioTime">0:00/0:00</div>
+          <div class="audio-controls">
+            <button class="audio-btn" id="audioPlayBtn" title="播放/暂停"><i class="bi bi-play-fill"></i></button>
+            <button class="audio-btn" id="audioDownloadBtn" title="下载"><i class="bi bi-download"></i></button>
+          </div>
+        </div>
+      </div>
+      <div id="playerModal" style="display: none">
+        <div class="player-modal-mask" id="playerModalMask">
+          <div class="player-modal" id="playerModalPanel">
+            <div class="player-modal-content">
+              <img class="player-modal-cover" id="playerModalCover" src="" alt="cover" />
+              <div class="player-modal-title" id="playerModalTitle"></div>
+              <div class="player-modal-artist" id="playerModalArtist"></div>
+            </div>
+            <div class="player-modal-right">
+              <div class="lyrics-container">
+                <div id="lyrics" class="lyrics"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <audio id="audio" preload="auto" style="display: none" loop></audio>
+    </div>
+  </div>
+</body>
+</html>

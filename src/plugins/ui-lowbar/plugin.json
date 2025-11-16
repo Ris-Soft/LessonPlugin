@@ -11,5 +11,6 @@
       "text": "打开模板窗口",
       "target": "openTemplate"
     }
-  ]
+  ],
+  "variables": ["timeISO","windowsCount"]
 }

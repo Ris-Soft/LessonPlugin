@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>档案-学生列表</title>
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../renderer/settings.css" />
+    <style>
+      :root { --panel: rgba(255,255,255,0.06); }
+      body { margin: 0; }
+      /* 覆盖卡片背景，保持与主界面统一的纯背景 */
+      .section { padding: 16px; background: transparent !important; border: none !important; }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      th, td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 8px; }
+      th { text-align: left; color: var(--muted); font-weight: 600; }
+      td input, td select { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); }
+      .muted { color: var(--muted); }
+      .list-wrap { max-height: calc(100vh - 120px); overflow: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; margin-top: 8px; position: relative; }
+      thead th { position: sticky; top: 0; background: #0b1520; }
+      .list-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+      .list-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+      .list-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 8px; }
+      .list-wrap::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
+      th:not(.col-index):not(.col-actions), td:not(.col-index):not(.col-actions) { width: 220px; max-width: 220px; }
+      th.col-name, td.col-name { width: 240px !important; }
+      th.col-gender, td.col-gender { width: 120px !important; }
+      th.col-index, td.col-index { width: 56px; max-width: 56px; min-width: 48px; position: sticky; left: 0; z-index: 2; background: rgba(255,255,255,0.04); text-align: center; }
+      th.col-actions, td.col-actions { width: 140px; max-width: 140px; position: sticky; right: 0; z-index: 2; background: rgba(255,255,255,0.04); text-align: right; }
+      thead th.col-index, thead th.col-actions { z-index: 3; background: #0b1520; }
+      th:not(.col-index):not(.col-actions):not(.col-spacer), td:not(.col-index):not(.col-actions):not(.col-spacer) { max-width: 240px; }
+      th.col-spacer, td.col-spacer { width: auto; }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <div class="section-title"><i class="ri-file-user-line"></i> 学生列表</div>
+      <div class="muted">学生数据保存在 `profiles.students`，通过底栏操作新增与保存。</div>
+      <div id="actions" class="actions" style="display:none; gap:8px; margin:8px 0;">
+        <button id="btn-add" class="btn secondary"><i class="ri-user-add-line"></i> 新增学生</button>
+        <button id="btn-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
+      </div>
+      <div class="list-wrap">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      let columns = [];
+      let students = [];
+      let channel = '';
+      let caller = '';
+
+      async function loadColumns() {
+        let defsRes = null;
+        if (window.lowbarAPI?.profilesGetColumnDefs) {
+          defsRes = await window.lowbarAPI.profilesGetColumnDefs();
+        } else if (window.lowbarAPI?.pluginCall) {
+          defsRes = await window.lowbarAPI.pluginCall?.(caller, 'getColumns');
+          defsRes = defsRes?.result || defsRes;
+        } else {
+          defsRes = await window.pluginAPI?.profilesGetColumnDefs?.();
+        }
+        const extraCols = Array.isArray(defsRes?.columns) ? defsRes.columns : [];
+        columns = [
+          { key: 'index', label: '序号' },
+          { key: 'name', label: '姓名' },
+          { key: 'gender', label: '性别' },
+          ...extraCols.map(c => ({ key: c.key, label: c.label })),
+          { key: 'spacer', label: '' },
+          { key: 'actions', label: '操作' }
+        ];
+        const headRow = document.createElement('tr');
+        columns.forEach(col => { const th = document.createElement('th'); th.textContent = col.label; th.className = `col-${col.key}`; headRow.appendChild(th); });
+        // 使用 colgroup 明确列宽，避免响应式按百分比扩张
+        try {
+          const table = document.querySelector('.list-wrap table');
+          const old = table.querySelector('colgroup'); if (old) old.remove();
+          const cg = document.createElement('colgroup');
+          const widthOf = (key) => {
+            if (key === 'index') return 56;
+            if (key === 'name') return 240;
+            if (key === 'gender') return 120;
+            if (key === 'actions') return 140;
+            if (key === 'spacer') return null; // 由剩余空间承担
+            return 220; // 自定义列默认宽度
+          };
+          columns.forEach(col => {
+            const c = document.createElement('col'); c.className = `col-${col.key}`;
+            const w = widthOf(col.key);
+            if (w != null) c.style.width = `${w}px`;
+            cg.appendChild(c);
+          });
+          table.insertBefore(cg, table.firstChild);
+        } catch {}
+        const thead = document.getElementById('thead'); thead.innerHTML = ''; thead.appendChild(headRow);
+      }
+
+      function renderBody() {
+        const tbody = document.getElementById('tbody');
+        tbody.innerHTML = '';
+        students.forEach((stu, idx) => {
+          const tr = document.createElement('tr');
+          columns.forEach(col => {
+            const td = document.createElement('td');
+            td.dataset.key = col.key;
+            td.className = `col-${col.key}`;
+            if (col.key === 'index') { td.textContent = String(idx + 1); tr.appendChild(td); return; }
+            if (col.key === 'spacer') { tr.appendChild(td); return; }
+            if (col.key === 'actions') {
+              const btnPick = document.createElement('button'); btnPick.className = 'btn secondary'; btnPick.innerHTML = '<i class="ri-check-line"></i> 选择';
+              btnPick.addEventListener('click', () => { try { const name = String((students[idx]?.name) || '').trim(); if (name) window.lowbarAPI?.emitEvent?.(channel, { type: 'pick', name }); } catch {} });
+              const btnDel = document.createElement('button'); btnDel.className = 'btn danger'; btnDel.innerHTML = '<i class="ri-delete-bin-line"></i> 删除';
+              btnDel.addEventListener('click', async () => { students.splice(idx, 1); renderBody(); await saveStudents(); });
+              td.appendChild(btnPick); td.appendChild(btnDel); tr.appendChild(td); return;
+            }
+            if (col.key === 'gender') {
+              const sel = document.createElement('select');
+              ['','男','女'].forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v || '未填'; sel.appendChild(o); });
+              const g = (stu.gender === '未选择') ? '' : (stu.gender || '');
+              sel.value = g;
+              sel.addEventListener('change', () => { stu.gender = sel.value; });
+              td.appendChild(sel); tr.appendChild(td); return;
+            }
+            const inp = document.createElement('input');
+            let val = (stu[col.key] ?? '');
+            if (!val && stu && typeof stu === 'object') {
+              const labelKey = col.label;
+              if (labelKey && Object.prototype.hasOwnProperty.call(stu, labelKey)) {
+                val = stu[labelKey] ?? '';
+              }
+            }
+            inp.value = val;
+            inp.placeholder = col.label;
+            inp.addEventListener('input', () => { stu[col.key] = inp.value; });
+            td.appendChild(inp); tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function loadStudents() {
+        let list = [];
+        if (window.lowbarAPI?.configGet) {
+          await window.lowbarAPI.configEnsureDefaults('profiles', { students: [] });
+          const res = await window.lowbarAPI.configGet('profiles', 'students');
+          list = Array.isArray(res) ? res : [];
+        } else if (window.lowbarAPI?.pluginCall) {
+          let res = await window.lowbarAPI.pluginCall?.(caller, 'getStudents');
+          res = res?.result || res;
+          list = Array.isArray(res?.students) ? res.students : [];
+        } else {
+          await window.pluginAPI?.configEnsureDefaults('profiles', { students: [] });
+          const res = await window.pluginAPI?.configGet('profiles', 'students');
+          list = Array.isArray(res) ? res : [];
+        }
+        students = normalizeStudents(list);
+        renderBody();
+      }
+
+      async function saveStudents() {
+        let toSave = collectStudentsFromDom();
+        if ((!Array.isArray(toSave) || toSave.length === 0) && Array.isArray(students) && students.length) {
+          toSave = students.map((s) => ({ ...s }));
+        }
+        try { if (window.lowbarAPI?.configEnsureDefaults) await window.lowbarAPI.configEnsureDefaults('profiles', { students: [] }); } catch {}
+        // 双写：优先直写配置，再调用后端保存，确保持久化
+        if (window.lowbarAPI?.configSet) {
+          try { await window.lowbarAPI.configSet('profiles', 'students', toSave); } catch {}
+        } else if (window.pluginAPI?.configSet) {
+          try { await window.pluginAPI.configSet('profiles', 'students', toSave); } catch {}
+        }
+        if (window.lowbarAPI?.pluginCall) {
+          try { await window.lowbarAPI.pluginCall?.(caller, 'saveStudents', { students: toSave }); } catch {}
+        }
+        await loadStudents();
+      }
+
+      function collectStudentsFromDom() {
+        const rows = Array.from(document.querySelectorAll('#tbody tr'));
+        const out = [];
+        rows.forEach((tr) => {
+          const obj = {};
+          const cells = Array.from(tr.querySelectorAll('td'));
+          cells.forEach((td) => {
+            const key = td.dataset.key || '';
+            if (!key || key === 'index' || key === 'actions') return;
+            if (key === 'gender') {
+              const sel = td.querySelector('select');
+              obj.gender = sel ? (sel.value || '') : '';
+            } else {
+              const inp = td.querySelector('input');
+              obj[key] = inp ? (inp.value || '') : '';
+            }
+          });
+          const hasValue = Object.keys(obj).some((k) => String(obj[k] || '').trim() !== '');
+          if (hasValue) out.push(obj);
+        });
+        return out;
+      }
+
+      function normalizeStudents(list) {
+        const out = [];
+        const labelMap = new Map(columns.map(c => [c.label, c.key]));
+        for (const it of (Array.isArray(list) ? list : [])) {
+          const obj = { ...it };
+          if (obj.gender === '未选择') obj.gender = '';
+          Object.keys(obj).forEach(k => {
+            const key = labelMap.get(k);
+            if (key && key !== k && obj[key] == null) {
+              obj[key] = obj[k];
+            }
+          });
+          out.push(obj);
+        }
+        return out;
+      }
+
+
+      (async function init() {
+        try {
+          const u = new URL(window.location.href);
+          channel = String(u.searchParams.get('channel') || '');
+          caller = String(u.searchParams.get('caller') || '');
+        } catch {}
+        if (window.lowbarAPI) {
+          window.lowbarAPI.subscribe?.(channel);
+          window.lowbarAPI.onEvent?.((name, payload) => {
+            if (name !== channel) return;
+            if (payload?.type === 'update') {
+              if (payload.target === 'refresh') loadStudents();
+              if (payload.target === 'students.save') saveStudents();
+            }
+          });
+        } else {
+          // 简易方案：显示顶部操作按钮
+          const actions = document.getElementById('actions');
+          if (actions) actions.style.display = 'flex';
+          document.getElementById('btn-add')?.addEventListener('click', () => { students.push({ name:'', gender:'' }); renderBody(); });
+          document.getElementById('btn-save')?.addEventListener('click', saveStudents);
+        }
+        await loadColumns();
+        await loadStudents();
+      })();
+    </script>
+  </body>
+  </html>

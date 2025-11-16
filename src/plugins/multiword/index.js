@@ -258,5 +258,15 @@ module.exports = {
   name: '多维单词',
   version: '0.1.0',
   init,
-  functions
+  functions: {
+    ...functions,
+    getVariable: async (name) => {
+      const k = String(name||'');
+      if (k==='timeISO') return new Date().toISOString();
+      if (k==='pluginName') return '多维单词';
+      if (k==='wordbankUrl') return String(state.wordbankServerUrl || '');
+      return '';
+    },
+    listVariables: () => ['timeISO','pluginName','wordbankUrl']
+  }
 };

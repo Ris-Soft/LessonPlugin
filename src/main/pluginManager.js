@@ -96,14 +96,19 @@ module.exports.init = function init(paths) {
       const full = path.join(pluginsRoot, entry);
       // 跳过非目录和已知配置文件目录
       if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) continue;
-      // 期望存在 index.js 作为插件入口
-      const indexPath = path.join(full, 'index.js');
-      if (!fs.existsSync(indexPath)) continue;
       // 读取 plugin.json 元数据（如有）
       let meta = {};
       const metaPath = path.join(full, 'plugin.json');
       if (fs.existsSync(metaPath)) {
         meta = readJsonSafe(metaPath, {});
+      }
+      // 判断是否为组件：允许无 index.js，仅要求 plugin.json 声明 type=component 且存在入口HTML
+      const indexPath = path.join(full, 'index.js');
+      const isComponent = String(meta?.type || '').toLowerCase() === 'component';
+      const entryHtml = meta?.entry || 'index.html';
+      const entryPath = path.join(full, entryHtml);
+      if (!fs.existsSync(indexPath)) {
+        if (!isComponent || !fs.existsSync(entryPath)) continue;
       }
       // 尝试从 package.json 读取版本与作者、依赖
       // 已统一在下方读取 package.json 并解析版本与其它元信息
@@ -139,6 +144,9 @@ module.exports.init = function init(paths) {
         icon: meta.icon || null,
         description: meta.description || '',
         author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
+        type: String(meta.type || 'plugin'),
+        group: meta.group || null,
+        entry: isComponent ? (meta.entry || 'index.html') : undefined,
         // 统一 npmDependencies：仅接收对象（非数组）；dependencies 为数组表示插件依赖
         npmDependencies: (() => {
           if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
@@ -154,9 +162,75 @@ module.exports.init = function init(paths) {
         version: detectedVersion,
         studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
         // 统一插件依赖为 dependencies（数组），兼容旧字段 pluginDepends
-        dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined)
+        dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined),
+        // 新增：插件变量声明（数组或对象{name: fnName}）
+        variables: (() => {
+          try {
+            if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
+            if (meta && typeof meta.variables === 'object' && meta.variables) return meta.variables;
+          } catch {}
+          return undefined;
+        })()
       });
       // 建立多路映射：name、原始id（可能含点号）、清洗id、规范id本身
+      try {
+        if (name) nameToId.set(String(name), id);
+        if (rawId) nameToId.set(String(rawId), id);
+        if (cleanId) nameToId.set(String(cleanId), id);
+        if (slugFromName) nameToId.set(String(slugFromName), id);
+        nameToId.set(String(id), id);
+      } catch {}
+    }
+  } catch {}
+  // 组件目录：%USER_DATA%/LessonPlugin/components
+  try {
+    const componentsRoot = path.resolve(pluginsRoot, '..', 'components');
+    const entries = fs.existsSync(componentsRoot) ? fs.readdirSync(componentsRoot) : [];
+    for (const entry of entries) {
+      const full = path.join(componentsRoot, entry);
+      if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) continue;
+      const metaPath = path.join(full, 'plugin.json');
+      if (!fs.existsSync(metaPath)) continue;
+      const meta = readJsonSafe(metaPath, {});
+      const entryHtml = meta?.entry || 'index.html';
+      const entryPath = path.join(full, entryHtml);
+      if (!fs.existsSync(entryPath)) continue;
+      const pkgPath = path.join(full, 'package.json');
+      let pkg = null;
+      if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+      let detectedVersion = meta.version || (pkg?.version || null);
+      const rel = path.relative(pluginsRoot, full).replace(/\\/g, '/');
+      let name = meta.name || entry;
+      const rawId = String(meta.id || '').trim();
+      const cleanId = rawId.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+      const slugFromName = String(name || '').toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+      let id = cleanId || slugFromName || String(entry).toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+      if (!id) id = `component_${Date.now()}`;
+      manifest.plugins.push({
+        id,
+        name,
+        npm: meta.npm || null,
+        local: rel,
+        enabled: meta.enabled !== undefined ? !!meta.enabled : true,
+        icon: meta.icon || null,
+        description: meta.description || '',
+        author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
+        type: 'component',
+        group: meta.group || null,
+        entry: meta.entry || 'index.html',
+        npmDependencies: (() => {
+          if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
+          if (pkg && typeof pkg.dependencies === 'object' && !Array.isArray(pkg.dependencies)) return pkg.dependencies;
+          return undefined;
+        })(),
+        actions: Array.isArray(meta.actions) ? meta.actions : [],
+        functions: typeof meta.functions === 'object' ? meta.functions : undefined,
+        packages: Array.isArray(meta.packages) ? meta.packages : undefined,
+        version: detectedVersion,
+        studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
+        dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined),
+        variables: undefined
+      });
       try {
         if (name) nameToId.set(String(name), id);
         if (rawId) nameToId.set(String(rawId), id);
@@ -210,6 +284,9 @@ module.exports.getPlugins = function getPlugins() {
     icon: p.icon || null,
     description: p.description || '',
     author: (p.author !== undefined ? p.author : null),
+    type: p.type || 'plugin',
+    group: p.group || null,
+    entry: p.entry || null,
     npmDependencies: (typeof p.npmDependencies === 'object' && !Array.isArray(p.npmDependencies) ? p.npmDependencies : undefined),
     actions: Array.isArray(p.actions) ? p.actions : [],
     version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
@@ -553,11 +630,12 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
   progressReporter = typeof onProgress === 'function' ? onProgress : null;
   const statuses = [];
   for (const p of manifest.plugins) {
+    const isComponent = String(p.type || '').toLowerCase() === 'component';
     const status = { name: p.name, stage: 'checking', message: '检查插件...' };
     statuses.push(status);
     onProgress && onProgress(status);
 
-    if (p.npm) {
+    if (!isComponent && p.npm) {
       status.stage = 'npm';
       status.message = `检测并准备安装NPM包: ${p.npm}`;
       onProgress && onProgress({ ...status });
@@ -576,6 +654,8 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
       if (fs.existsSync(localPath)) {
         status.stage = 'local';
         status.message = '本地插件就绪';
+        // 组件不注册后端函数与自动化事件
+        if (isComponent) { onProgress && onProgress({ ...status }); continue; }
         // 注册后端函数（如存在），使插件无需打开窗口即可被调用
         try {
           const modPath = path.resolve(localPath, 'index.js');
@@ -1186,7 +1266,15 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       version: detectedVersion,
       studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
       // 统一插件依赖为 dependencies（数组），兼容旧字段 pluginDepends
-      dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined)
+      dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined),
+      // 新增：变量声明
+      variables: (() => {
+        try {
+          if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
+          if (meta && typeof meta.variables === 'object' && meta.variables) return meta.variables;
+        } catch {}
+        return undefined;
+      })()
     };
     if (existingIdx >= 0) {
       manifest.plugins[existingIdx] = updated;
@@ -1311,6 +1399,14 @@ function createPluginApi(pluginId) {
     call: (targetPluginId, fnName, args) => module.exports.callFunction(targetPluginId, fnName, args),
     emit: (eventName, payload) => module.exports.emitEvent(eventName, payload),
     registerAutomationEvents: (events) => module.exports.registerAutomationEvents(pluginId, events),
+    components: {
+      list: (group) => {
+        try { return module.exports.listComponents(group); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+      },
+      entryUrl: (idOrName) => {
+        try { return module.exports.getComponentEntryUrl(idOrName); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+      }
+    },
     // 为插件提供自动化计时器接口（减少插件自行创建定时器）
     automation: {
       // 新增：注册“分钟触发器”（仅 HH:MM 列表与回调）
@@ -1435,6 +1531,14 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
         }
         if (Array.isArray(meta.pluginDepends)) return meta.pluginDepends;
         return undefined;
+      })(),
+      // 变量声明（仅预览用途）
+      variables: (() => {
+        try {
+          if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
+          if (meta && typeof meta.variables === 'object' && meta.variables) return Object.keys(meta.variables);
+        } catch {}
+        return undefined;
       })()
     };
     try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
@@ -1478,4 +1582,94 @@ module.exports.listDependents = function listDependents(idOrName) {
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
+};
+
+// -------- 插件变量：列表与取值 --------
+module.exports.listVariables = async function listVariables(idOrName) {
+  try {
+    const p = findPluginByIdOrName(idOrName);
+    if (!p) return { ok: false, error: 'plugin_not_found' };
+    let names = [];
+    try {
+      if (Array.isArray(p.variables)) {
+        names = p.variables.map((x) => String(x));
+      } else if (p.variables && typeof p.variables === 'object') {
+        names = Object.keys(p.variables);
+      }
+    } catch {}
+    if (names.length) return { ok: true, variables: names };
+    // 回退：调用插件的 listVariables 函数（若实现）
+    try {
+      const res = await module.exports.callFunction(p.id || p.name, 'listVariables', []);
+      const payload = res?.result ?? res;
+      if (res?.ok) {
+        if (Array.isArray(payload)) return { ok: true, variables: payload.map((x) => String(x)) };
+        if (payload && typeof payload === 'object') return { ok: true, variables: Object.keys(payload) };
+      }
+    } catch {}
+    return { ok: true, variables: [] };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.getVariable = async function getVariable(idOrName, varName) {
+  try {
+    const p = findPluginByIdOrName(idOrName);
+    if (!p) return { ok: false, error: 'plugin_not_found' };
+    const name = String(varName || '').trim();
+    if (!name) return { ok: false, error: 'variable_required' };
+    // 若 plugin.json.variables 为对象 { key: fnName }，优先按映射调用
+    try {
+      if (p.variables && typeof p.variables === 'object' && !Array.isArray(p.variables)) {
+        const fn = p.variables[name];
+        if (fn && typeof fn === 'string') {
+          return module.exports.callFunction(p.id || p.name, fn, []);
+        }
+      }
+    } catch {}
+    // 标准函数：getVariable(name)
+    return module.exports.callFunction(p.id || p.name, 'getVariable', [name]);
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+// -------- 组件：按组列出与入口URL --------
+module.exports.listComponents = function listComponents(group) {
+  try {
+    const items = (manifest.plugins || []).filter((p) => String(p.type || '').toLowerCase() === 'component');
+    const baseDir = path.dirname(manifestPath);
+    const out = [];
+    for (const p of items) {
+      if (group && String(p.group || '').trim() && String(p.group).trim() !== String(group).trim()) continue;
+      const entryRel = p.entry || 'index.html';
+      const fullDir = p.local ? path.join(baseDir, p.local) : null;
+      const entryPath = fullDir ? path.join(fullDir, entryRel) : null;
+      let url = null;
+      try {
+        if (entryPath && fs.existsSync(entryPath)) {
+          const u = require('url').pathToFileURL(entryPath.replace(/\\/g, '/')).href;
+          url = u;
+        }
+      } catch {}
+      out.push({ id: p.id, name: p.name, group: p.group || null, entry: entryRel, url });
+    }
+    return { ok: true, components: out };
+  } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+};
+
+module.exports.getComponentEntryUrl = function getComponentEntryUrl(idOrName) {
+  try {
+    const p = findPluginByIdOrName(idOrName);
+    if (!p || String(p.type || '').toLowerCase() !== 'component') return null;
+    const baseDir = path.dirname(manifestPath);
+    const fullDir = p.local ? path.join(baseDir, p.local) : null;
+    if (!fullDir || !fs.existsSync(fullDir)) return null;
+    const entryRel = p.entry || 'index.html';
+    const entryPath = path.join(fullDir, entryRel);
+    if (!fs.existsSync(entryPath)) return null;
+    const u = require('url').pathToFileURL(entryPath.replace(/\\/g, '/')).href;
+    return u;
+  } catch { return null; }
 };

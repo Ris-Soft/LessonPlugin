@@ -97,27 +97,34 @@ async function initProfilesSettings() {
           td.className = 'col-index';
         } else if (col.key === 'name') {
           const inp = document.createElement('input'); inp.type='text'; inp.value = stu.name || '';
-          inp.addEventListener('change', () => { students[idx].name = inp.value; });
+          inp.addEventListener('change', () => { stu.name = inp.value; });
           td.appendChild(inp);
           td.className = 'col-name';
         } else if (col.key === 'gender') {
           const sel = document.createElement('select');
           [['','未选择'],['男','男'],['女','女']].forEach(([v,l])=>{const o=document.createElement('option'); o.value=v; o.textContent=l; sel.appendChild(o);});
           sel.value = stu.gender || '';
-          sel.addEventListener('change', () => { students[idx].gender = sel.value || '未选择'; });
+          sel.addEventListener('change', () => { stu.gender = sel.value || '未选择'; });
           td.appendChild(sel);
           td.className = 'col-gender';
         } else if (col.key === 'actions') {
           const delBtn = document.createElement('button'); delBtn.className = 'btn secondary'; delBtn.innerHTML = '<i class="ri-delete-bin-line"></i> 删除';
           delBtn.addEventListener('click', async () => {
             const ok = await showConfirm?.('确定删除该学生吗？');
-            if (ok) { students.splice(idx, 1); renderBody(); }
+            if (ok) {
+              const origIndex = students.indexOf(stu);
+              if (origIndex >= 0) {
+                students.splice(origIndex, 1);
+                try { await window.settingsAPI?.configSet('profiles', 'students', students); } catch {}
+              }
+              renderBody();
+            }
           });
           td.appendChild(delBtn);
           td.className = 'col-actions';
         } else {
           const inp = document.createElement('input'); inp.type='text'; inp.value = stu[col.key] || '';
-          inp.addEventListener('change', () => { students[idx][col.key] = inp.value; });
+          inp.addEventListener('change', () => { stu[col.key] = inp.value; });
           td.appendChild(inp);
         }
         tr.appendChild(td);

@@ -55,11 +55,12 @@
               <div class="setting-icon"><i class="ri-cpu-line"></i></div>
               <div class="setting-main">
                 <div class="setting-title">播报引擎</div>
-                <div class="setting-desc">当前仅支持系统语音。</div>
+                <div class="setting-desc">支持系统语音与本地 EdgeTTS。</div>
               </div>
               <div class="setting-action">
                 <select id="ttsEngine">
                   <option value="system">系统语音（Web Speech）</option>
+                  <option value="edge.local">本地 EdgeTTS（Node）</option>
                 </select>
               </div>
             </div>
@@ -75,9 +76,16 @@
               </div>
             </div>
 
-            <!-- 暂时隐藏 EdgeTTS 相关设置 -->
-
-            <!-- 暂时隐藏 EdgeTTS 相关设置 -->
+            <div class="setting-item">
+              <div class="setting-icon"><i class="ri-mic-line"></i></div>
+              <div class="setting-main">
+                <div class="setting-title">音色（EdgeTTS 本地）</div>
+                <div class="setting-desc">选择 EdgeTTS 的音色。</div>
+              </div>
+              <div class="setting-action">
+                <select id="ttsEdgeVoice"></select>
+              </div>
+            </div>
 
             <div class="setting-item">
               <div class="setting-icon"><i class="ri-sound-module-line"></i></div>
@@ -112,6 +120,17 @@
                   <button class="btn secondary" id="btnPlayIn"><i class="ri-play-line"></i> 试听入场</button>
                   <button class="btn secondary" id="btnPlayOut"><i class="ri-play-line"></i> 试听退场</button>
                 </div>
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-icon"><i class="ri-volume-down-line"></i></div>
+              <div class="setting-main">
+                <div class="setting-title">TTS播报音量</div>
+                <div class="setting-desc">仅影响 TTS 播报，不改变系统主音量。</div>
+              </div>
+              <div class="setting-action">
+                <input id="ttsVolume" type="range" min="0" max="100" step="1" />
               </div>
             </div>
 

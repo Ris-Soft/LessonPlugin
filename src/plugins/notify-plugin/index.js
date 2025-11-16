@@ -11,9 +11,48 @@ let settingsWin = null;
 let edgeTts = null;
 let pendingQueue = [];
 try {
-  // 可选依赖：本地 EdgeTTS（若未安装则保持为 null）
-  edgeTts = require('edge-tts');
-} catch {}
+  edgeTts = require('edge-tts-nodejs');
+  log('edge-tts-nodejs:require');
+} catch {
+  try {
+    edgeTts = require('edge-tts-node');
+    log('edge-tts-node:require');
+  } catch {
+    try {
+      edgeTts = require('msedge-tts');
+      log('msedge-tts:require');
+    } catch {}
+  }
+}
+
+async function ensureEdgeTts() {
+  if (edgeTts) return edgeTts;
+  try {
+    const m1 = await import('edge-tts-nodejs');
+    edgeTts = m1?.default || m1;
+    log('edge-tts-nodejs:esm');
+    return edgeTts;
+  } catch (e1) {
+    log('edge-tts-nodejs:error', e1?.message || String(e1));
+  }
+  try {
+    const m2 = await import('edge-tts-node');
+    edgeTts = m2?.default || m2;
+    log('edge-tts-node:esm');
+    return edgeTts;
+  } catch (e2) {
+    log('edge-tts-node:error', e2?.message || String(e2));
+  }
+  try {
+    const m3 = await import('msedge-tts');
+    edgeTts = m3?.default || m3;
+    log('msedge-tts:esm');
+    return edgeTts;
+  } catch (e3) {
+    log('msedge-tts:error', e3?.message || String(e3));
+    return null;
+  }
+}
 
 // 可选依赖：系统音量控制（未安装时静默降级）
 let volumeLib = null;
@@ -297,6 +336,20 @@ module.exports = {
         return true;
       } catch { return false; }
     },
+    // 新增：组件化遮罩入口（统一遮罩通知，按组件渲染）
+    overlayComponent: (group, componentId, props, duration, showClose, closeDelay) => {
+      const win = createRuntimeWindow();
+      if (!win || win.isDestroyed()) return false;
+      const payload = { mode: 'overlay.component', group, componentId, props, duration, showClose, closeDelay };
+      try {
+        if (win.webContents.isLoadingMainFrame()) {
+          pendingQueue.push(payload);
+          return true;
+        }
+        win.webContents.send('notify:enqueue', payload);
+        return true;
+      } catch { return false; }
+    },
     // 兼容自动化事件的细分入口：overlay.text（纯文本遮罩）
     ['overlay.text'](text, duration, animate) {
       const win = createRuntimeWindow();
@@ -345,6 +398,18 @@ module.exports = {
       } catch { return false; }
     },
 
+    getVariable: async (name) => {
+      const key = String(name || '').trim();
+      if (key === 'timeISO') return new Date().toISOString();
+      if (key === 'queueSize') return String(pendingQueue.length || 0);
+      if (key === 'systemVolume') {
+        try { if (volumeLib && typeof volumeLib.getVolume === 'function') { const v = await volumeLib.getVolume(); return String(v); } } catch {}
+        return '';
+      }
+      return '';
+    },
+    listVariables: () => ['timeISO', 'queueSize', 'systemVolume'],
+
     // 插件生命周期函数：禁用时清理（统一结构）
     disabled: (payload) => cleanup(payload),
 
@@ -361,6 +426,8 @@ module.exports = {
     { id: 'notify.overlay', name: 'overlay', desc: '全屏遮罩卡片', params: [ { name: 'title', type: 'string' }, { name: 'subText', type: 'string' }, { name: 'autoClose', type: 'boolean' }, { name: 'duration', type: 'number' }, { name: 'showClose', type: 'boolean' }, { name: 'closeDelay', type: 'number' } ] },
     // 细分入口：纯文本遮罩
     { id: 'notify.overlayText', name: 'overlay.text', desc: '全屏纯文本提示', params: [ { name: 'text', type: 'string' }, { name: 'duration', type: 'number' }, { name: 'animate', type: 'string', hint: 'fade/zoom' } ] },
+    // 统一遮罩：组件化遮罩
+    { id: 'notify.overlayComponent', name: 'overlayComponent', desc: '组件化全屏遮罩', params: [ { name: 'group', type: 'string' }, { name: 'componentId', type: 'string' }, { name: 'props', type: 'object' }, { name: 'duration', type: 'number' }, { name: 'showClose', type: 'boolean' }, { name: 'closeDelay', type: 'number' } ] },
     // 细分入口：音效
     { id: 'notify.sound', name: 'sound', desc: '播放通知音效', params: [ { name: 'which', type: 'string', hint: 'in/out' } ] }
     // EdgeTTS 入口暂时隐藏
@@ -399,36 +466,80 @@ function openSettingsWindow() {
 
 // 辅助：使用本地 EdgeTTS 合成并返回音频文件路径（file:///）
 async function synthEdgeTtsToFile(text, voiceName) {
-  if (!edgeTts) return { ok: false, error: 'edge-tts_not_installed' };
+  const lib = await ensureEdgeTts();
+  if (!lib) return { ok: false, error: 'edge-tts_node_not_installed' };
   try {
     const safeText = String(text || '').trim();
     if (!safeText) return { ok: false, error: 'empty_text' };
     const voice = String(voiceName || 'zh-CN-XiaoxiaoNeural');
+  const MsEdgeTTS = lib?.MsEdgeTTS || lib?.default?.MsEdgeTTS || lib?.MsEdgeTTS || lib;
+  const OUTPUT_FORMAT = lib?.OUTPUT_FORMAT || lib?.default?.OUTPUT_FORMAT;
+  if (!MsEdgeTTS) return { ok: false, error: 'MsEdgeTTS_unavailable' };
+
+  const tts = new MsEdgeTTS();
+    // 优先 MP3，兼容枚举或原始字符串
+    let format = 'audio-24khz-48kbitrate-mono-mp3';
+    try {
+      if (OUTPUT_FORMAT?.AUDIO_24KHZ_48KBITRATE_MONO_MP3) format = OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3;
+      await tts.setMetadata(voice, format);
+    } catch (eMp3) {
+      log('edge-tts-node:setMetadata:mp3:error', eMp3?.message || String(eMp3));
+      try {
+        const alt = OUTPUT_FORMAT?.WEBM_24KHZ_16BIT_MONO_OPUS || 'WEBM_24KHZ_16BIT_MONO_OPUS';
+        format = alt;
+        await tts.setMetadata(voice, alt);
+      } catch (eWebm) {
+        log('edge-tts-node:setMetadata:webm:error', eWebm?.message || String(eWebm));
+      }
+    }
+
     const outDir = path.join(os.tmpdir(), 'lesson_notify_tts');
     try { if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true }); } catch {}
-    const fileName = `edge_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`;
+    const ext = (String(format).includes('webm') ? 'webm' : 'mp3');
+    const fileName = `edge_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     const outPath = path.join(outDir, fileName);
-    // 常见 edge-tts 用法：生成可读流并写入文件
-    // 不同版本 API 可能差异，这里尽量兼容常见调用方式
-    let stream = null;
-    if (typeof edgeTts?.Synthesize === 'function') {
-      stream = await edgeTts.Synthesize(safeText, { voice });
-    } else if (typeof edgeTts?.synthesize === 'function') {
-      stream = await edgeTts.synthesize(safeText, { voice });
-    } else if (typeof edgeTts?.tts === 'function') {
-      stream = await edgeTts.tts({ text: safeText, voice });
+
+    try {
+      if (typeof tts.toFile === 'function') {
+        // 尝试直接写入指定文件路径
+        try {
+          const res = await tts.toFile(outPath, safeText);
+          const fileUrl = 'file:///' + outPath.replace(/\\/g, '/');
+          log('edge-tts-node:toFile:ok', outPath);
+          return { ok: true, path: fileUrl };
+        } catch (eDirect) {
+          log('edge-tts-node:toFile:direct:error', eDirect?.message || String(eDirect));
+          // 某些库（msedge-tts）要求传入目录，返回 audioFilePath
+          const res2 = await tts.toFile(outDir, safeText);
+          const finalPath = (res2?.audioFilePath || res2?.filePath || res2?.path || null);
+          const pick = finalPath || outPath;
+          const fileUrl = 'file:///' + pick.replace(/\\/g, '/');
+          log('edge-tts-node:toFile:dir:ok', pick);
+          return { ok: true, path: fileUrl };
+        }
+      }
+    } catch (e) {
+      log('edge-tts-node:toFile:error', e?.message || String(e));
     }
-    if (!stream) return { ok: false, error: 'edge_tts_api_unavailable' };
-    await new Promise((resolve, reject) => {
-      try {
-        const ws = fs.createWriteStream(outPath);
-        stream.pipe(ws);
-        ws.on('finish', resolve);
-        ws.on('error', reject);
-      } catch (e) { reject(e); }
-    });
-    const fileUrl = 'file:///' + outPath.replace(/\\/g, '/');
-    return { ok: true, path: fileUrl };
+
+    // 回退到流写入
+    try {
+      const readable = await tts.toStream(safeText);
+      await new Promise((resolve, reject) => {
+        try {
+          const ws = fs.createWriteStream(outPath);
+          readable.on('error', reject);
+          ws.on('error', reject);
+          ws.on('finish', resolve);
+          readable.pipe(ws);
+        } catch (e) { reject(e); }
+      });
+      const fileUrl = 'file:///' + outPath.replace(/\\/g, '/');
+      return { ok: true, path: fileUrl };
+    } catch (e) {
+      log('edge-tts-node:toStream:error', e?.message || String(e));
+      return { ok: false, error: e?.message || String(e) };
+    }
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>值日预览</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../../renderer/settings.css" />
+    <style>
+      :root { --panel: rgba(255,255,255,0.06); }
+      body { margin: 0; }
+      .section { padding: 16px; background: transparent !important; border: none !important; }
+      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+      .card { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 14px; background: linear-gradient(180deg, rgba(40,80,120,0.25), rgba(20,30,50,0.25)); box-shadow: 0 6px 18px rgba(0,0,0,0.25); transform: translateY(0); transition: transform .2s ease, box-shadow .2s ease; }
+      .card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.35); }
+      .card h4 { margin: 0 0 8px 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); font-size: 12px; }
+      .role { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+      .role .name { font-weight: 600; width: 88px; flex: 0 0 88px; color: var(--muted); }
+      .role .list { display: flex; flex-wrap: wrap; gap: 6px; }
+      .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+      .muted { color: var(--muted); }
+      .today { outline: 2px solid rgba(72,207,173,0.5); }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <div class="section-title"><i class="ri-calendar-check-line"></i> 值日信息</div>
+      <div class="muted">展示今天和后三天的值日安排。</div>
+      <div id="preview" class="grid"></div>
+    </div>
+    <script>
+      let channel = '';
+      let caller = '';
+      function el(t,c){const e=document.createElement(t);if(c)e.className=c;return e}
+      function dowStr(s){ try{ const d=new Date(s); const n=d.getDay(); return ['周日','周一','周二','周三','周四','周五','周六'][n] }catch{ return '' } }
+      function todayISO(){ const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}` }
+      async function load(){
+        let r=null; if(window.lowbarAPI?.pluginCall){ r=await window.lowbarAPI.pluginCall(caller,'getPreview'); r=r?.result||r; }
+        const list=Array.isArray(r?.list)?r.list:[]; const wrap=document.getElementById('preview'); wrap.innerHTML='';
+        const today=todayISO();
+        list.forEach(item=>{ const card=el('div','card'); if(item.dateISO===today) card.classList.add('today'); const h=el('h4'); const b=el('span','badge'); b.innerHTML=`<i class="ri-calendar-line"></i> ${dowStr(item.dateISO)}`; const g=el('span','badge'); g.innerHTML=`<i class="ri-group-line"></i> ${item.groupName||'未设置组'}`; const t=document.createTextNode(item.dateISO); h.appendChild(t); h.appendChild(b); h.appendChild(g); card.appendChild(h);
+          item.roles.forEach(r=>{ const row=el('div','role'); const name=el('div','name'); name.textContent=r; const lst=el('div','list');
+            const arr=Array.isArray(item.members?.[r])?item.members[r]:[]; if(arr.length===0){const t=el('span','muted'); t.textContent='未设置'; lst.appendChild(t)}
+            arr.forEach(n=>{ const t=el('span','tag'); t.innerHTML=`<i class="ri-user-line"></i> ${n||''}`; lst.appendChild(t)});
+            row.appendChild(name); row.appendChild(lst); card.appendChild(row);
+          }); wrap.appendChild(card);
+        });
+      }
+      (function(){ try{const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'');}catch{}
+        if(window.lowbarAPI){ window.lowbarAPI.subscribe?.(channel); window.lowbarAPI.onEvent?.((n,p)=>{ if(n!==channel)return; if(p?.type==='update'){ if(p.target==='refresh') load(); }}); }
+        load();
+      })();
+    </script>
+  </body>
+  </html>

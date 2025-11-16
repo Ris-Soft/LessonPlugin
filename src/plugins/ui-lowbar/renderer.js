@@ -206,6 +206,7 @@
   function applyInit(payload) {
     $('#top-title').textContent = payload.title || 'UI模板-低栏应用';
     $('#bottom-title').textContent = payload.title || 'UI模板-低栏应用';
+    document.title = payload.title || 'UI模板-低栏应用';
     $('#top-icon').className = payload.icon || 'ri-layout-bottom-line';
     $('#bottom-icon').className = payload.icon || 'ri-layout-bottom-line';
 
@@ -386,7 +387,7 @@
     };
 
     // 在 WebView 中注入 iframe 满高样式（适配第三方页面）
-    const iframeCSS = `
+  const iframeCSS = `
       html, body { height: 100% !important; }
       iframe { width: 100% !important; height: 100% !important; border: 0 !important; display: block !important; }
     `;
@@ -398,6 +399,44 @@
     };
     hookInsertCSS(bg);
     hookInsertCSS(fv);
+
+    const mapLevel = (lvl) => {
+      if (typeof lvl === 'number') { if (lvl >= 2) return 'error'; if (lvl === 1) return 'warn'; return 'log'; }
+      if (lvl === 'error' || lvl === 'warn' || lvl === 'info' || lvl === 'debug') return lvl;
+      return 'log';
+    };
+    const joinArgs = (args) => {
+      try {
+        return (Array.isArray(args) ? args : [args]).map((a) => {
+          if (a == null) return 'null';
+          if (typeof a === 'string') return a;
+          if (typeof a === 'object') { if (a.stack) return String(a.stack); try { return JSON.stringify(a); } catch { return String(a); } }
+          return String(a);
+        }).join(' ');
+      } catch { return String(args); }
+    };
+    const attachWebviewConsole = (wv, tag) => {
+      if (!wv) return;
+      try {
+        wv.addEventListener('console-message', (e) => {
+          const level = mapLevel(e.level);
+          const fn = console[level] || console.log;
+          fn('[' + tag + ']', e.message);
+        });
+      } catch {}
+      try {
+        wv.addEventListener('ipc-message', (e) => {
+          if (e && e.channel === 'webview-console') {
+            const p = e.args && e.args[0];
+            const level = mapLevel(p && p.level);
+            const fn = console[level] || console.log;
+            fn('[' + tag + ']', joinArgs(p && p.args));
+          }
+        });
+      } catch {}
+    };
+    attachWebviewConsole(bg, 'bgView');
+    attachWebviewConsole(fv, 'floatView');
 
     // 直接操作 WebView 的 Shadow DOM，将内部 iframe 设为满高
     const forceIframeFullSize = (wv) => {

@@ -734,6 +734,19 @@
     
     await showAlertWithLogs('插件安装完成', pluginInfo, mergedLogs);
 
+    try {
+      const list = await window.settingsAPI?.getPlugins?.();
+      const cur = Array.isArray(list) ? list.find(p => (p.id === pluginIdentifier) || (p.name === pluginIdentifier)) : null;
+      if (cur && cur.enabled) {
+        await window.settingsAPI?.togglePlugin?.(pluginIdentifier, false);
+        const restarted = await window.settingsAPI?.togglePlugin?.(pluginIdentifier, true);
+        if (Array.isArray(restarted?.logs) && restarted.logs.length) {
+          await showLogModal('插件重启日志', restarted.logs);
+        }
+        showToast(`已重启插件：${pluginInfo.name}`, { type: 'success', duration: 2000 });
+      }
+    } catch {}
+
     // 刷新插件列表
     await refreshPluginsList();
   }

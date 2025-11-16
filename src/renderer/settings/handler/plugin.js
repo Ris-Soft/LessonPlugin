@@ -258,6 +258,18 @@ function renderPlugin(item) {
       await showAlert(`依赖安装/链接失败：${ensure?.error || '未知错误'}`);
     } else {
       await showAlertWithLogs('依赖处理完成', `已确保并链接插件依赖：${item.name}`, Array.isArray(ensure.logs) ? ensure.logs : []);
+      try {
+        const list = await fetchPlugins();
+        const cur = Array.isArray(list) ? list.find(p => (p.id === key) || (p.name === key)) : null;
+        if (cur && cur.enabled) {
+          await window.settingsAPI?.togglePlugin?.(key, false);
+          const restarted = await window.settingsAPI?.togglePlugin?.(key, true);
+          if (Array.isArray(restarted?.logs) && restarted.logs.length) {
+            await showLogModal('插件重启日志', restarted.logs);
+          }
+          showToast(`已重启插件：${item.name}`, { type: 'success', duration: 2000 });
+        }
+      } catch {}
     }
     btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装依赖`;
   }

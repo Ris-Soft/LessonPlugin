@@ -231,5 +231,9 @@ module.exports = {
   name: '低栏模板调用示例',
   version: '0.1.0',
   init,
-  functions
+  functions: {
+    ...functions,
+    getVariable: async (name) => { const k=String(name||''); if (k==='timeISO') return new Date().toISOString(); if (k==='currentMode') return String(state.currentMode || 'clock'); return ''; },
+    listVariables: () => ['timeISO','currentMode']
+  }
 };

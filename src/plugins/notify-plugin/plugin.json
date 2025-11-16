@@ -6,9 +6,11 @@
   "id": "notify.plugin",
   "actions": [
     { "id": "openSettings", "text": "通知设置", "target": "openSettings", "icon": "ri-settings-3-line" }
+    ,{ "id": "installNpm", "text": "安装通知插件依赖", "icon": "ri-download-2-line" }
   ],
   "npmDependencies": {
-    "edge-tts": "^1.5.0",
+    "edge-tts-nodejs": "^1.5.7",
     "loudness": "^0.4.2"
-  }
+  },
+  "variables": ["timeISO", "queueSize", "systemVolume"]
 }

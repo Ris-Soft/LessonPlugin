@@ -503,15 +503,59 @@ class AutomationManager {
   }
 
   async executeActions(actions, ctx) {
+    // 变量展开：支持字符串中的 ${插件:变量}
+    const expandString = async (s) => {
+      try {
+        const str = String(s ?? '');
+        const re = /\$\{([^}]+)\}/g;
+        let out = str;
+        let m;
+        const seen = new Set();
+        while ((m = re.exec(str)) != null) {
+          const token = String(m[1] || '').trim();
+          if (!token) continue;
+          if (seen.has(m.index)) continue;
+          seen.add(m.index);
+          const parts = token.split(':');
+          const pluginKey = String(parts[0] || '').trim();
+          const varName = String(parts.slice(1).join(':') || '').trim();
+          if (!pluginKey || !varName) continue;
+          try {
+            const res = await this.pluginManager.getVariable(pluginKey, varName);
+            const val = (res && res.ok) ? (res.result ?? '') : '';
+            out = out.replace(m[0], String(val ?? ''));
+          } catch {}
+        }
+        return out;
+      } catch { return String(s ?? ''); }
+    };
+    const expandValue = async (v) => {
+      try {
+        if (typeof v === 'string') return expandString(v);
+        if (Array.isArray(v)) {
+          const arr = [];
+          for (const it of v) arr.push(await expandValue(it));
+          return arr;
+        }
+        if (v && typeof v === 'object') {
+          const obj = {};
+          for (const [k, val] of Object.entries(v)) obj[k] = await expandValue(val);
+          return obj;
+        }
+        return v;
+      } catch { return v; }
+    };
     for (const act of actions) {
       try {
         // console.log(act);
         if (act.type === 'pluginEvent') {
-          await this.pluginManager.callFunction(act.pluginId, act.event, act.params || []);
+          const params = Array.isArray(act.params) ? await Promise.all(act.params.map((x) => expandValue(x))) : [];
+          await this.pluginManager.callFunction(act.pluginId, act.event, params);
         } else if (act.type === 'pluginAction') {
           const fn = String(act.target || act.action || '').trim();
           if (fn) {
-            await this.pluginManager.callFunction(act.pluginId, fn, act.params || []);
+            const params = Array.isArray(act.params) ? await Promise.all(act.params.map((x) => expandValue(x))) : [];
+            await this.pluginManager.callFunction(act.pluginId, fn, params);
           }
         } else if (act.type === 'power') {
           const platform = process.platform;
@@ -551,26 +595,30 @@ class AutomationManager {
             }
           }
         } else if (act.type === 'openApp') {
-          if (act.path) shell.openPath(act.path);
+          if (act.path) {
+            try { const p = await expandString(act.path); shell.openPath(p); } catch { shell.openPath(act.path); }
+          }
         } else if (act.type === 'cmd') {
           const cmdStr = String(act.command || '').trim();
           if (cmdStr) {
+            let expanded = cmdStr;
+            try { expanded = await expandString(cmdStr); } catch {}
             const platform = process.platform;
             if (platform === 'win32') {
               // Windows: 使用 cmd.exe /d /s /c
               const comspec = process.env.ComSpec || path.join(process.env.SystemRoot || 'C\\Windows', 'System32', 'cmd.exe');
               try {
-                spawn(comspec, ['/d', '/s', '/c', cmdStr], { windowsHide: true });
+                spawn(comspec, ['/d', '/s', '/c', expanded], { windowsHide: true });
               } catch (e) {
-                try { spawn(cmdStr, { shell: true, windowsHide: true }); } catch {}
+                try { spawn(expanded, { shell: true, windowsHide: true }); } catch {}
               }
             } else {
               // macOS/Linux: 使用登录 Shell 执行命令，支持别名与 PATH
               const shellPath = process.env.SHELL || '/bin/sh';
               try {
-                spawn(shellPath, ['-lc', cmdStr], { windowsHide: true });
+                spawn(shellPath, ['-lc', expanded], { windowsHide: true });
               } catch (e) {
-                try { spawn(cmdStr, { shell: true, windowsHide: true }); } catch {}
+                try { spawn(expanded, { shell: true, windowsHide: true }); } catch {}
               }
             }
           }

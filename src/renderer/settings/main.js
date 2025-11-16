@@ -12,8 +12,8 @@ async function main() {
   const pages = {
     plugins: document.getElementById('page-plugins'),
     market: document.getElementById('page-market'),
+    components: document.getElementById('page-components'),
     general: document.getElementById('page-general'),
-    profiles: document.getElementById('page-profiles'),
     automation: document.getElementById('page-automation'),
     npm: document.getElementById('page-npm'),
     debug: document.getElementById('page-debug'),
@@ -43,8 +43,6 @@ async function main() {
         renderInstalled();
       } else if (page === 'general') {
         initGeneralSettings();
-      } else if (page === 'profiles') {
-        initProfilesSettings();
       } else if (page === 'automation') {
         initAutomationSettings();
       } else if (page === 'debug') {
@@ -59,6 +57,48 @@ async function main() {
             container.innerHTML = '';
             const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
             filtered.forEach((p) => container.appendChild(renderPlugin(p)));
+          } catch {}
+        })();
+      } else if (page === 'components') {
+        (async () => {
+          try {
+            const container = document.getElementById('components-list');
+            container.innerHTML = '';
+            const res = await window.settingsAPI?.componentsList?.('');
+            const list = (res?.ok && Array.isArray(res.components)) ? res.components : [];
+            list.forEach((c) => {
+              const el = document.createElement('div');
+              el.className = 'plugin-card';
+              el.innerHTML = `
+                <div class="card-header">
+                  <i class="ri-layout-3-line"></i>
+                  <div>
+                    <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
+                    <div class="card-desc">入口：${c.entry || 'index.html'}</div>
+                  </div>
+                  <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                </div>
+              `;
+              const btn = el.querySelector('.preview-btn');
+              btn.addEventListener('click', async () => {
+                try {
+                  const url = c.url || (await window.settingsAPI?.componentEntryUrl?.(c.id));
+                  if (!url) { await showAlert('未找到组件入口'); return; }
+                  const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+                  const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
+                  const title = document.createElement('div'); title.className = 'modal-title';
+                  title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${c.name || c.id}</span>`;
+                  const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
+                  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+                  title.appendChild(closeBtn);
+                  const body = document.createElement('div'); body.className = 'modal-body';
+                  const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
+                  body.appendChild(frame);
+                  box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+                } catch {}
+              });
+              container.appendChild(el);
+            });
           } catch {}
         })();
       } else if (page === 'about') {
@@ -81,8 +121,6 @@ async function main() {
       renderInstalled();
     } else if (page === 'general') {
       initGeneralSettings();
-    } else if (page === 'profiles') {
-      initProfilesSettings();
     } else if (page === 'automation') {
       initAutomationSettings();
     } else if (page === 'debug') {
@@ -97,6 +135,48 @@ async function main() {
           container.innerHTML = '';
           const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
           filtered.forEach((p) => container.appendChild(renderPlugin(p)));
+        } catch {}
+      })();
+    } else if (page === 'components') {
+      (async () => {
+        try {
+          const container = document.getElementById('components-list');
+          container.innerHTML = '';
+          const res = await window.settingsAPI?.componentsList?.('');
+          const list = (res?.ok && Array.isArray(res.components)) ? res.components : [];
+          list.forEach((c) => {
+            const el = document.createElement('div');
+            el.className = 'plugin-card';
+            el.innerHTML = `
+              <div class="card-header">
+                <i class="ri-layout-3-line"></i>
+                <div>
+                  <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
+                  <div class="card-desc">入口：${c.entry || 'index.html'}</div>
+                </div>
+                <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+              </div>
+            `;
+            const btn = el.querySelector('.preview-btn');
+            btn.addEventListener('click', async () => {
+              try {
+                const url = c.url || (await window.settingsAPI?.componentEntryUrl?.(c.id));
+                if (!url) { await showAlert('未找到组件入口'); return; }
+                const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+                const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
+                const title = document.createElement('div'); title.className = 'modal-title';
+                title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${c.name || c.id}</span>`;
+                const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
+                closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+                title.appendChild(closeBtn);
+                const body = document.createElement('div'); body.className = 'modal-body';
+                const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
+                body.appendChild(frame);
+                box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+              } catch {}
+            });
+            container.appendChild(el);
+          });
         } catch {}
       })();
     } else if (page === 'about') {
@@ -116,6 +196,36 @@ async function main() {
       } else {
         await showAlert(`未找到插件：${pluginKey}`);
       }
+    } catch {}
+  });
+
+  window.settingsAPI?.onOpenStoreItem?.(async (payload) => {
+    try {
+      navigateToPage('market');
+      const base = await getMarketBase();
+      const catlog = await fetchMarket('/api/market/catalog');
+      const type = String(payload?.type || 'plugin');
+      const id = String(payload?.id || '').trim();
+      const arr = type === 'automation' ? (catlog.automation || []) : (type === 'component' || type === 'components' ? (catlog.components || []) : (catlog.plugins || []));
+      const item = arr.find((x) => String(x.id || x.name) === id);
+      if (item) {
+        showStorePluginModal(item);
+      } else {
+        await showAlert(`未找到：${id}`);
+      }
+    } catch {}
+  });
+
+  window.settingsAPI?.onMarketInstall?.(async (payload) => {
+    try {
+      navigateToPage('market');
+      const catlog = await fetchMarket('/api/market/catalog');
+      const type = String(payload?.type || 'plugin');
+      const id = String(payload?.id || '').trim();
+      const arr = type === 'automation' ? (catlog.automation || []) : (type === 'component' || type === 'components' ? (catlog.components || []) : (catlog.plugins || []));
+      const item = arr.find((x) => String(x.id || x.name) === id);
+      if (!item) { await showAlert(`未找到：${id}`); return; }
+      showStorePluginModal(item);
     } catch {}
   });
 
@@ -328,10 +438,7 @@ async function main() {
     });
   }
 
-  // 如果初次进入为档案管理，初始化
-  if (activeNav?.dataset.page === 'profiles') {
-    initProfilesSettings();
-  }
+  
 
   // 拖拽安装ZIP
   const drop = document.getElementById('drop-install');

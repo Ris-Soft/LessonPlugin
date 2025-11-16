@@ -11,5 +11,6 @@
       "text": "打开窗口",
       "target": "openWindow"
     }
-  ]
+  ],
+  "variables": ["timeISO","pluginName"]
 }

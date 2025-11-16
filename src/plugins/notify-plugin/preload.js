@@ -19,7 +19,10 @@
       setSystemVolume: (level) => ipcRenderer.invoke('notify:setSystemVolume', Number(level)),
       restoreSystemVolume: () => ipcRenderer.invoke('notify:restoreSystemVolume'),
       // 运行窗口可调用主进程插件函数（用于本地 EdgeTTS 等）
-      pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args)
+      pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
+      // 组件：列表与入口URL（供遮罩组件加载）
+      componentsList: (group) => ipcRenderer.invoke('components:list', group),
+      componentsGetEntryUrl: (idOrName) => ipcRenderer.invoke('components:entryUrl', idOrName)
     });
   } catch (e) {
     // 非 Electron 环境（例如浏览器预览）下静默降级

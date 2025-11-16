@@ -151,6 +151,8 @@ module.exports = {
         if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
         return await pluginApi.call('notify.plugin', 'enqueueBatch', [payloads]);
       } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-    }
+    },
+    getVariable: async (name) => { const k=String(name||''); if (k==='timeISO') return new Date().toISOString(); if (k==='pluginName') return '早读助手'; return ''; },
+    listVariables: () => ['timeISO','pluginName']
   }
 };

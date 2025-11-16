@@ -6,5 +6,6 @@
   "description": "示例调用者：通过动作调用 UI模板-低栏应用 打开窗口并传递事件通道。",
   "actions": [
     { "id": "openTemplate", "icon": "ri-window-line", "text": "打开模板窗口", "target": "openLowbarTemplate" }
-  ]
+  ],
+  "variables": ["timeISO","currentMode"]
 }

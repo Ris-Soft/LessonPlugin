@@ -14,8 +14,10 @@ const store = require('./store');
 pluginManager._ipcMain = ipcMain;
 
 // 供各处使用的全局路径（在 app.whenReady 后赋值）
-let userPluginsRoot = '';
-let shippedPluginsRoot = '';
+  let userPluginsRoot = '';
+  let shippedPluginsRoot = '';
+  let userComponentsRoot = '';
+  let shippedComponentsRoot = '';
 
 // 进程锁：防止重复运行（单实例）
 const gotLock = app.requestSingleInstanceLock();
@@ -32,6 +34,37 @@ let splashQueue = [];
 let automationManager = null;
 // 判断是否通过协议参数启动（LessonPlugin://...），用于控制是否创建主窗口
 const hasProtocolArgAtBoot = Array.isArray(process.argv) && process.argv.some((s) => /^LessonPlugin:\/\//i.test(String(s || '')));
+
+let __lastProtoTask = { text: '', ts: 0 };
+let __lastProtoStore = { key: '', ts: 0 };
+function __shouldSkipStore(key) {
+  const now = Date.now();
+  if (__lastProtoStore.key === key && (now - __lastProtoStore.ts) < 1500) return true;
+  __lastProtoStore = { key, ts: now };
+  return false;
+}
+function __shouldSkipTask(text) {
+  const now = Date.now();
+  if (__lastProtoTask.text === text && (now - __lastProtoTask.ts) < 1500) return true;
+  __lastProtoTask = { text, ts: now };
+  return false;
+}
+function __openStore(install, type, id) {
+  const key = `${install ? '1' : '0'}:${type}:${id}`;
+  if (__shouldSkipStore(key)) return;
+  if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
+  if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+  settingsWindow.show();
+  settingsWindow.focus();
+  const send = () => {
+    try {
+      settingsWindow.webContents.send('settings:navigate', 'market');
+      if (install) settingsWindow.webContents.send('settings:marketInstall', { type, id });
+      else settingsWindow.webContents.send('settings:openStoreItem', { type, id });
+    } catch {}
+  };
+  if (settingsWindow.webContents.isLoading()) settingsWindow.webContents.once('did-finish-load', send); else send();
+}
 
 function createSplashWindow() {
   // 读取配置以决定窗口尺寸与是否显示名言
@@ -186,7 +219,6 @@ function createTray() {
     { label: '功能市场', icon: resolveMenuIcon('ri-store-2-line'), click: () => openSettingsTo('market') },
     { label: '插件管理', icon: resolveMenuIcon('ri-puzzle-line'), click: () => openSettingsTo('plugins') },
     { label: '自动化', icon: resolveMenuIcon('ri-robot-line'), click: () => openSettingsTo('automation') },
-    { label: '档案', icon: resolveMenuIcon('ri-file-user-line'), click: () => openSettingsTo('profiles') },
     { label: '关于', icon: resolveMenuIcon('ri-information-line'), click: () => openSettingsTo('about') },
     { type: 'separator' },
     { label: '插件动作', icon: resolveMenuIcon('ri-play-line'), submenu: buildPluginActionsMenu() },
@@ -247,15 +279,18 @@ app.whenReady().then(async () => {
   // 将插件根目录迁移到用户数据目录，避免升级或安装覆盖应用资源导致用户插件与配置丢失
   const userRoot = path.join(app.getPath('userData'), 'LessonPlugin');
   userPluginsRoot = path.join(userRoot, 'plugins');
+  userComponentsRoot = path.join(userRoot, 'components');
   const userRendererRoot = path.join(userRoot, 'renderer');
   shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
+  shippedComponentsRoot = path.join(app.getAppPath(), 'src', 'components');
   const shippedRendererRoot = path.join(app.getAppPath(), 'src', 'renderer');
   try { fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch {}
+  try { fs.mkdirSync(userComponentsRoot, { recursive: true }); } catch {}
   try { fs.mkdirSync(userRendererRoot, { recursive: true }); } catch {}
   // 可选：强制同步内置插件到用户目录（用于开发或修复用户目录旧版本）
   try {
     const forceSyncEnv = String(process.env.LP_FORCE_PLUGIN_SYNC || '').toLowerCase();
-    const shouldForceSync = forceSyncEnv === '1' || forceSyncEnv === 'true';
+    const shouldForceSync = true;
     if (shouldForceSync) {
       const shippedEntries = fs.readdirSync(shippedPluginsRoot).filter((n) => {
         const p = path.join(shippedPluginsRoot, n);
@@ -282,6 +317,34 @@ app.whenReady().then(async () => {
           }
         }
       }
+      // 同步内置组件到用户组件目录
+      try {
+        const shippedCompEntries = fs.existsSync(shippedComponentsRoot) ? fs.readdirSync(shippedComponentsRoot).filter((n) => {
+          const p = path.join(shippedComponentsRoot, n);
+          return fs.existsSync(p) && fs.statSync(p).isDirectory();
+        }) : [];
+        for (const entry of shippedCompEntries) {
+          const src = path.join(shippedComponentsRoot, entry);
+          const dest = path.join(userComponentsRoot, entry);
+          if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+          const stack = [{ s: src, d: dest }];
+          while (stack.length) {
+            const { s, d } = stack.pop();
+            const items = fs.readdirSync(s);
+            for (const it of items) {
+              const sp = path.join(s, it);
+              const dp = path.join(d, it);
+              const stat = fs.statSync(sp);
+              if (stat.isDirectory()) {
+                if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
+                stack.push({ s: sp, d: dp });
+              } else {
+                try { fs.copyFileSync(sp, dp); } catch {}
+              }
+            }
+          }
+        }
+      } catch {}
       // 配置文件也覆盖更新
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
@@ -321,6 +384,32 @@ app.whenReady().then(async () => {
           }
         }
       }
+      // 复制内置组件到用户组件目录（首次运行）
+      try {
+        const shippedCompEntries = fs.existsSync(shippedComponentsRoot) ? fs.readdirSync(shippedComponentsRoot) : [];
+        for (const entry of shippedCompEntries) {
+          const src = path.join(shippedComponentsRoot, entry);
+          const dest = path.join(userComponentsRoot, entry);
+          if (!fs.existsSync(src) || !fs.statSync(src).isDirectory()) continue;
+          if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+          const stack = [ { s: src, d: dest } ];
+          while (stack.length) {
+            const { s, d } = stack.pop();
+            const items = fs.readdirSync(s);
+            for (const it of items) {
+              const sp = path.join(s, it);
+              const dp = path.join(d, it);
+              const stat = fs.statSync(sp);
+              if (stat.isDirectory()) {
+                if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
+                stack.push({ s: sp, d: dp });
+              } else {
+                try { fs.copyFileSync(sp, dp); } catch {}
+              }
+            }
+          }
+        }
+      } catch {}
       // 复制默认插件配置
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
@@ -355,6 +444,38 @@ app.whenReady().then(async () => {
           }
         }
       }
+      // 增量复制内置组件到用户组件目录（缺失时补齐）
+      try {
+        if (fs.existsSync(shippedComponentsRoot)) {
+          const shippedCompEntries = fs.readdirSync(shippedComponentsRoot).filter((n) => {
+            const p = path.join(shippedComponentsRoot, n);
+            return fs.existsSync(p) && fs.statSync(p).isDirectory();
+          });
+          for (const entry of shippedCompEntries) {
+            const dest = path.join(userComponentsRoot, entry);
+            const src = path.join(shippedComponentsRoot, entry);
+            if (!fs.existsSync(dest)) {
+              fs.mkdirSync(dest, { recursive: true });
+              const stack = [ { s: src, d: dest } ];
+              while (stack.length) {
+                const { s, d } = stack.pop();
+                const items = fs.readdirSync(s);
+                for (const it of items) {
+                  const sp = path.join(s, it);
+                  const dp = path.join(d, it);
+                  const stat = fs.statSync(sp);
+                  if (stat.isDirectory()) {
+                    if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
+                    stack.push({ s: sp, d: dp });
+                  } else {
+                    try { fs.copyFileSync(sp, dp); } catch {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {}
       // 若缺少配置文件，复制默认配置；若存在则保持用户选择
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
@@ -418,13 +539,28 @@ app.whenReady().then(async () => {
   automationManager.init();
 
   // 注册协议处理（LessonPlugin://task/<text>）
-  try { app.setAsDefaultProtocolClient('LessonPlugin'); } catch {}
+  try {
+    if (process.defaultApp) {
+      app.setAsDefaultProtocolClient('LessonPlugin', process.execPath, [app.getAppPath()]);
+    } else {
+      app.setAsDefaultProtocolClient('LessonPlugin');
+    }
+  } catch {}
   app.on('second-instance', (_e, argv) => {
     // 处理自定义协议（LessonPlugin://task/<text>）
     const arg = argv.find((s) => /^LessonPlugin:\/\//i.test(s));
     if (arg) {
-      const m = arg.match(/^LessonPlugin:\/\/task\/(.+)$/i);
-      if (m) automationManager?.invokeProtocol(decodeURIComponent(m[1]));
+      const mTask = arg.match(/^LessonPlugin:\/\/task\/(.+)$/i);
+      const mStore = arg.match(/^LessonPlugin:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      if (mTask) {
+        const text = decodeURIComponent(mTask[1]);
+        if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
+      } else if (mStore) {
+        const install = !!mStore[1];
+        const type = mStore[2];
+        const id = decodeURIComponent(mStore[3]);
+        __openStore(install, type, id);
+      }
     }
     // 若为普通重复启动（非协议调用），打开设置页面；协议调用不创建主窗口
     try {
@@ -436,10 +572,22 @@ app.whenReady().then(async () => {
       }
     } catch {}
   });
-  app.on('open-url', (_e, url) => {
-    const m = String(url || '').match(/^LessonPlugin:\/\/task\/(.+)$/i);
-    if (m) automationManager?.invokeProtocol(decodeURIComponent(m[1]));
-  });
+  if (process.platform === 'darwin') {
+    app.on('open-url', (_e, url) => {
+      const u = String(url || '');
+      const mTask = u.match(/^LessonPlugin:\/\/task\/(.+)$/i);
+      const mStore = u.match(/^LessonPlugin:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      if (mTask) {
+        const text = decodeURIComponent(mTask[1]);
+        if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
+      } else if (mStore) {
+        const install = !!mStore[1];
+        const type = mStore[2];
+        const id = decodeURIComponent(mStore[3]);
+        __openStore(install, type, id);
+      }
+    });
+  }
 
   createTray();
   // 常规启动才创建主设置窗口；通过协议启动时不创建主窗口
@@ -679,6 +827,22 @@ ipcMain.on('plugin:event:subscribe', (event, evName) => {
 });
 ipcMain.handle('plugin:event:emit', async (_event, evName, payload) => {
   return pluginManager.emitEvent(evName, payload);
+});
+
+// 插件变量：列表与取值
+ipcMain.handle('plugin:variables:list', async (_e, pluginId) => {
+  return pluginManager.listVariables(pluginId);
+});
+ipcMain.handle('plugin:variables:get', async (_e, pluginId, varName) => {
+  return pluginManager.getVariable(pluginId, varName);
+});
+
+// 组件：列表与入口URL
+ipcMain.handle('components:list', async (_e, group) => {
+  return pluginManager.listComponents(group);
+});
+ipcMain.handle('components:entryUrl', async (_e, idOrName) => {
+  return pluginManager.getComponentEntryUrl(idOrName);
 });
 
 // 插件自动化事件注册与查询 IPC

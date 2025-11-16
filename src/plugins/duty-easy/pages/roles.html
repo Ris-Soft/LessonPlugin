@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>分工与规则</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../../renderer/settings.css" />
+    <style>
+      :root { --panel: rgba(255,255,255,0.06); }
+      body { margin: 0; }
+      .section { padding: 16px; background: transparent !important; border: none !important; }
+      .muted { color: var(--muted); }
+      .editor { margin-top: 8px; }
+      .row { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+      label { width: 96px; flex: 0 0 96px; color: var(--muted); }
+      input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); }
+      .actions { display: flex; gap: 8px; margin-top: 8px; }
+      .btn { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); cursor: pointer; }
+      .btn.primary { background: rgba(72, 207, 173, 0.2); border-color: rgba(72, 207, 173, 0.4); }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <div class="section-title"><i class="ri-list-check"></i> 分工与规则</div>
+      <div class="editor">
+        <div class="row">
+          <label>分工列表</label>
+          <textarea id="roles" rows="3" placeholder="每行一个分工"></textarea>
+        </div>
+        <div class="row">
+          <label>组别列表</label>
+          <input id="groupNames" placeholder="用逗号分隔组名" />
+        </div>
+        <div class="row">
+          <label>值日规则</label>
+          <select id="ruleMode">
+            <option value="list">按照列表顺序</option>
+            <option value="weekday">按照星期对应组别</option>
+          </select>
+        </div>
+        <div class="row" id="weekdayRow" style="display:none">
+          <label>星期映射</label>
+          <input id="weekdayMap" placeholder="如 0:一组,1:二组" />
+        </div>
+        <div class="actions">
+          <button id="btn-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      let channel=''; let caller=''; let cfg={ roles:[], groups:[], rule:{mode:'list',weekdayMap:{},currentGroupIndex:0,currentRotationIndex:0} };
+      function parseList(s,sep){ return String(s||'').split(sep).map(x=>x.trim()).filter(x=>x) }
+      async function load(){ await window.lowbarAPI.configEnsureDefaults('duty.easy',{}); const all=await window.lowbarAPI.configGetAll('duty.easy'); cfg=all||{}; if(!Array.isArray(cfg.roles)) cfg.roles=[]; if(!Array.isArray(cfg.groups)) cfg.groups=[]; if(!cfg.rule) cfg.rule={mode:'list',weekdayMap:{},currentGroupIndex:0,currentRotationIndex:0};
+        document.getElementById('roles').value=(cfg.roles||[]).join('\n');
+        document.getElementById('groupNames').value=(cfg.groups||[]).map(g=>g.name||'').join(',');
+        document.getElementById('ruleMode').value=String(cfg.rule.mode||'list');
+        document.getElementById('weekdayRow').style.display=(String(cfg.rule.mode||'list')==='weekday')?'':'none';
+        const names=(cfg.groups||[]).map(g=>g.name||''); const map=cfg.rule.weekdayMap||{}; const parts=[0,1,2,3,4,5,6].map(i=>`${i}:${names[Number(map[i])||0]||''}`); document.getElementById('weekdayMap').value=parts.join(',');
+      }
+      function save(){ const roles=parseList(document.getElementById('roles').value,'\n'); const names=parseList(document.getElementById('groupNames').value,',');
+        const old=Array.isArray(cfg.groups)?cfg.groups:[]; const nextGroups=names.map((nm,i)=>{ const g=old[i]||{name:nm,roles:{}}; const obj={name:nm,roles:{}}; roles.forEach(r=>{ obj.roles[r]=Array.isArray(g.roles?.[r])?g.roles[r]:[] }); return obj });
+        cfg.roles=roles; cfg.groups=nextGroups; cfg.rule=cfg.rule||{}; const mode=document.getElementById('ruleMode').value; cfg.rule.mode=mode; if(mode==='weekday'){ const pairs=parseList(document.getElementById('weekdayMap').value,','); const map={}; pairs.forEach(p=>{ const kv=p.split(':'); const k=parseInt(kv[0],10); const v=(kv[1]||'').trim(); const idx=names.indexOf(v); if(Number.isFinite(k)&&idx>=0) map[k]=idx }); cfg.rule.weekdayMap=map }
+        window.lowbarAPI.configSet('duty.easy','roles',cfg.roles); window.lowbarAPI.configSet('duty.easy','groups',cfg.groups); window.lowbarAPI.configSet('duty.easy','rule',cfg.rule);
+      }
+      (function(){ try{const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'');}catch{}
+        if(window.lowbarAPI){ window.lowbarAPI.subscribe?.(channel); window.lowbarAPI.onEvent?.((n,p)=>{ if(n!==channel)return; if(p?.type==='update'){ if(p.target==='duty.save'){ save() } }}); }
+        load(); document.getElementById('ruleMode').addEventListener('change',()=>{ document.getElementById('weekdayRow').style.display=(document.getElementById('ruleMode').value==='weekday')?'':'none' }); document.getElementById('btn-save').addEventListener('click',save);
+      })();
+    </script>
+  </body>
+  </html>

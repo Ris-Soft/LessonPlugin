@@ -8,6 +8,7 @@
     ttsRate: document.getElementById('ttsRate'),
     ttsEndpoint: document.getElementById('ttsEndpoint'),
     ttsEdgeVoice: document.getElementById('ttsEdgeVoice'),
+    ttsVolume: document.getElementById('ttsVolume'),
     systemSoundVolume: document.getElementById('systemSoundVolume'),
     btnPlayIn: document.getElementById('btnPlayIn'),
     btnPlayOut: document.getElementById('btnPlayOut'),
@@ -25,10 +26,10 @@
       if (el.ttsRate) el.ttsRate.value = (cfg?.ttsRate ?? 1);
       if (el.ttsEndpoint) el.ttsEndpoint.value = (cfg?.ttsEndpoint ?? '');
       if (el.ttsEdgeVoice) el.ttsEdgeVoice.value = (cfg?.ttsEdgeVoice ?? '');
+      if (el.ttsVolume) el.ttsVolume.value = Math.round((cfg?.ttsVolume ?? 100));
       if (el.systemSoundVolume) el.systemSoundVolume.value = Math.round((cfg?.systemSoundVolume ?? 80));
-      // 加载语音列表
       initVoices(cfg?.ttsVoiceURI);
-      // 音频存在性无需展示，运行窗口会直接使用配置中的 dataURL
+      initEdgeVoices(cfg?.ttsEdgeVoice);
     } catch {}
   })();
 
@@ -113,11 +114,10 @@
     });
   }
 
-  // 引擎选择（暂时仅 system）
+  // 引擎选择（支持 system 与 edge.local）
   if (el.ttsEngine) {
-    el.ttsEngine.value = 'system';
     el.ttsEngine.addEventListener('change', () => {
-      const val = 'system';
+      const val = el.ttsEngine.value || 'system';
       (async () => {
         try {
           await window.settingsAPI?.configSet?.('notify', 'ttsEngine', val);
@@ -127,9 +127,39 @@
     });
   }
 
-  // 暂时隐藏 EdgeTTS 服务地址（无需绑定）
-
-  // 暂时隐藏 EdgeTTS 音色名称（无需绑定）
+  const initEdgeVoices = (current) => {
+    try {
+      if (!el.ttsEdgeVoice) return;
+      const voices = [
+        'zh-CN-XiaoxiaoNeural',
+        'zh-CN-XiaoyiNeural',
+        'zh-CN-YunjianNeural',
+        'zh-CN-YunxiNeural',
+        'zh-CN-YunyangNeural',
+        'zh-HK-HiuMaanNeural',
+        'zh-HK-WanLungNeural',
+        'zh-TW-HsiaoChenNeural',
+        'zh-TW-HsiaoYuNeural',
+        'en-US-AriaNeural',
+        'en-US-GuyNeural'
+      ];
+      el.ttsEdgeVoice.innerHTML = '';
+      const def = document.createElement('option');
+      def.value = '';
+      def.textContent = '默认';
+      el.ttsEdgeVoice.appendChild(def);
+      voices.forEach((v) => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        el.ttsEdgeVoice.appendChild(opt);
+      });
+      if (current != null) {
+        el.ttsEdgeVoice.value = current;
+        if (el.ttsEdgeVoice.value !== current) el.ttsEdgeVoice.value = '';
+      }
+    } catch {}
+  };
 
   // 音色设置：voice, pitch, rate
   if (el.ttsVoice) {
@@ -194,4 +224,31 @@
       b.addEventListener('click', () => window.settingsAPI?.windowControl(b.dataset.act));
     });
   } catch {}
+  if (el.ttsEdgeVoice) {
+    const handler = () => {
+      const val = (el.ttsEdgeVoice.value || '').trim();
+      (async () => {
+        try {
+          await window.settingsAPI?.configSet?.('notify', 'ttsEdgeVoice', val);
+          await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
+        } catch {}
+      })();
+    };
+    el.ttsEdgeVoice.addEventListener('change', handler);
+  }
+
+  if (el.ttsVolume) {
+    const handler = () => {
+      const v = Math.max(0, Math.min(100, Number(el.ttsVolume.value || 100)));
+      const norm = Math.round(v);
+      (async () => {
+        try {
+          await window.settingsAPI?.configSet?.('notify', 'ttsVolume', norm);
+          await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
+        } catch {}
+      })();
+    };
+    el.ttsVolume.addEventListener('input', handler);
+    el.ttsVolume.addEventListener('change', handler);
+  }
 })();

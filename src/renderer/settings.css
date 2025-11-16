@@ -78,6 +78,22 @@ textarea::-webkit-scrollbar-thumb {
 textarea::-webkit-scrollbar-thumb:hover {
   background: rgba(69, 83, 90, 0.5);
 }
+body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 1px solid var(--border);
+}
+body::-webkit-scrollbar-thumb {
+  background: rgba(64, 75, 88, 0.685);
+  border: 1px solid rgba(72, 87, 107, 0.45);
+  border-radius: 999px;
+}
+body::-webkit-scrollbar-thumb:hover {
+  background: rgba(69, 83, 90, 0.5);
+}
 
 /* 布局 */
 .layout {
@@ -246,6 +262,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-color: transparent;
   color: var(--fg);
 }
+a.btn { text-decoration: none; }
 
 .btn.primary {
   background: #15803d;
@@ -1507,144 +1524,6 @@ label {
   white-space: nowrap;
 }
 
-/* 档案管理样式 */
-.profiles-toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.profiles-import {
-  margin: 8px 0;
-}
-
-.profiles-import textarea {
-  width: 100%;
-  min-height: 120px;
-  resize: vertical;
-}
-
-.profiles-import .import-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-.profiles-filters {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 8px 0;
-  flex-wrap: wrap;
-}
-
-.profiles-table-wrap {
-  max-width: calc(100vw - 350px);
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.profiles-table {
-  width: max-content;
-  min-width: 720px;
-  border-collapse: collapse;
-}
-
-.profiles-table th,
-.profiles-table td {
-  border-bottom: 1px solid #eeeeee1e;
-  padding: 8px;
-  border-left: none;
-  border-right: none;
-}
-
-.profiles-table thead th {
-  text-align: left;
-  color: #555;
-  font-weight: 600;
-}
-
-.profiles-table .col-required {
-  width: 64px;
-  text-align: center;
-}
-
-.profiles-table .col-gender {
-  width: 120px;
-}
-
-.profiles-table .col-index {
-  width: 64px;
-  text-align: right;
-  color: #666;
-}
-
-.profiles-table .col-actions {
-  width: 100px;
-}
-
-.profiles-table .col-name {
-  min-width: 180px;
-}
-
-.profiles-table input[type="text"] {
-  width: 160px;
-  max-width: 220px;
-}
-
-.profiles-table select {
-  width: 120px;
-}
-
-.profiles-table .col-actions .btn {
-  min-width: 72px;
-}
-
-/* 固定/置顶列：序号固定左侧，操作固定右侧 */
-.profiles-table th.col-index,
-.profiles-table td.col-index {
-  position: sticky;
-  left: 0;
-  background: var(--panel);
-  z-index: 2;
-}
-
-.profiles-table th.col-actions,
-.profiles-table td.col-actions {
-  position: sticky;
-  right: 0;
-  background: var(--panel);
-  z-index: 2;
-}
-
-/* 滚动条样式统一至全局规则（见上方全局滚动条样式） */
-
-/* 限制档案管理页整体不出现页面级横向滚动，仅表格容器滚动 */
-#page-profiles .panel {
-  overflow: hidden;
-}
-
-/* 框选焦点统一（移除黄色/高亮边框），并与通用输入样式保持一致 */
-#page-profiles input:focus,
-#page-profiles select:focus,
-#page-profiles textarea:focus {
-  outline: none;
-  box-shadow: none;
-  border-color: var(--border);
-}
-
-#page-profiles input[type="text"],
-#page-profiles select,
-#page-profiles textarea {
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fg);
-  padding: 6px 8px;
-}
 
 /* 全局移除输入框选中后的黄色边框（不影响键盘 focus-visible 样式） */
 input:focus,
@@ -2006,3 +1885,31 @@ select:focus {
   border: 1px solid var(--border);
 }
 .plugin-card .card-actions .icon-btn.more-btn.text i { font-size: 16px; }
+.site-topbar {
+  position: sticky;
+  top: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: #121621;
+  border-bottom: 1px solid #2a2f3a;
+  z-index: 10;
+}
+.site-logo img { width: 28px; height: 28px; }
+.site-title { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.site-nav { display: flex; gap: 12px; margin-left: 12px; }
+.topnav-item { background: transparent; border: none; color: var(--fg); padding: 6px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.topnav-item i { color: var(--fg); font-size: 16px; }
+.topnav-item.active { color: var(--accent); }
+.topnav-item.active i { color: var(--accent); }
+a.topnav-item { text-decoration: none; }
+.site-actions { margin-left: auto; display: flex; gap: 8px; }
+.status { color: var(--muted); font-size: 12px; }
+.about-logo { width: 36px; height: 36px; }
+.store-tabs .sub-item { background: transparent; border: 1px solid var(--border); color: var(--fg); }
+.store-tabs .sub-item.active { background: transparent; color: var(--accent); border-color: rgba(34, 197, 94, 0.45); }
+.store-tabs .sub-item:hover { background: transparent; border-color: var(--border); }
+.plugin-card { border: 1px solid var(--border); background: var(--panel); border-radius: 10px; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+.plugin-card:hover { border-color: rgba(34, 197, 94, 0.45); background: rgba(34, 197, 94, 0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }

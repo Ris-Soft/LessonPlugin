@@ -1,8 +1,9 @@
 (() => {
-  const state = { queue: [], active: false, enabled: true, audio: { info: null, warn: null, error: null }, systemSoundVolume: 80, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '' };
+  const state = { queue: [], active: false, enabled: true, audio: { info: null, warn: null, error: null }, systemSoundVolume: 80, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '', ttsVolume: 100 };
   const el = {
     toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovCountdown: document.getElementById('ovCountdown'),
-    overlayText: document.getElementById('overlayText'), overlayTextContent: document.getElementById('overlayTextContent')
+    overlayText: document.getElementById('overlayText'), overlayTextContent: document.getElementById('overlayTextContent'),
+    overlayComponent: document.getElementById('overlayComponent'), ovCompFrame: document.getElementById('ovCompFrame'), ovCompClose: document.getElementById('ovCompClose'), ovCompCountdown: document.getElementById('ovCompCountdown')
   };
 
   // 初始启用穿透（左上角通知与空闲时）
@@ -21,6 +22,7 @@
         state.ttsEdgeVoice = cfg?.ttsEdgeVoice || '';
         state.enabled = (cfg?.enabled ?? true);
         state.systemSoundVolume = Math.max(0, Math.min(100, Number(cfg?.systemSoundVolume ?? state.systemSoundVolume)));
+        state.ttsVolume = Math.max(0, Math.min(100, Number(cfg?.ttsVolume ?? state.ttsVolume)));
         const audio = cfg?.audio || {};
         ['info','warn','error'].forEach((k) => { state.audio[k] = audio?.[k] || null; });
       } catch {}
@@ -28,7 +30,7 @@
   } catch {}
 
   // 基础工具
-  const playSoundBuiltin = (which = 'in') => {
+  const playSoundBuiltin = (which = 'in', after) => {
     try {
       const file = which === 'out' ? 'out.mp3' : 'in.mp3';
       const a = new Audio(`./sounds/${file}`);
@@ -40,10 +42,12 @@
       } catch {}
       a.addEventListener('ended', () => {
         try { window.notifyAPI?.restoreSystemVolume?.(); } catch {}
+        try { if (typeof after === 'function') after(); } catch {}
       });
       a.play().catch(() => {
         // 播放失败也尝试恢复
         try { window.notifyAPI?.restoreSystemVolume?.(); } catch {}
+        try { if (typeof after === 'function') after(); } catch {}
       });
     } catch {}
   };
@@ -51,12 +55,15 @@
   const speak = async (text) => {
     if (!state.ttsEnabled) return;
     try {
-      if (state.ttsEngine === 'edge.local') {
+      const vol = Math.max(0, Math.min(1, Number(state.ttsVolume || 100) / 100));
+      // 优先尝试本地 EdgeTTS（除非明确选择远程 edge）
+      if (state.ttsEngine !== 'edge') {
         try {
           const voice = state.ttsEdgeVoice || 'zh-CN-XiaoxiaoNeural';
           const res = await window.notifyAPI?.pluginCall?.('notify.plugin', 'edgeSpeakLocal', [text, voice]);
           if (res?.ok && res?.path) {
             const a = new Audio(res.path);
+            a.volume = vol;
             a.play().catch(() => {});
             return;
           }
@@ -74,6 +81,7 @@
             const blob = await res.blob();
             const objUrl = URL.createObjectURL(blob);
             const a = new Audio(objUrl);
+            a.volume = vol;
             a.play().catch(() => {});
             setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
             return;
@@ -85,6 +93,7 @@
       const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v || 0)));
       utter.pitch = clamp(state.ttsPitch, 0.5, 2);
       utter.rate = clamp(state.ttsRate, 0.5, 2);
+      utter.volume = vol;
       if (state.ttsVoiceURI && window.speechSynthesis) {
         const voices = window.speechSynthesis.getVoices();
         const found = voices.find((v) => (v.voiceURI === state.ttsVoiceURI));
@@ -121,7 +130,7 @@
 
     // 声音：按模式控制避免重叠；TTS 按 speak 开关播报
     const sound = (n.which === 'out') ? 'out' : (n.which === 'none' ? null : 'in');
-    if (speakEnabled) speak(speakText);
+    const afterSoundSpeak = () => { if (speakEnabled) speak(speakText); };
 
     if (n.mode === 'sound') {
       // 仅播放音效，不显示任何 UI
@@ -129,16 +138,25 @@
       resolve();
       return;
     } else if (n.mode === 'overlay') {
-      if (sound) playSoundBuiltin(sound);
+      if (sound) playSoundBuiltin(sound, afterSoundSpeak); else afterSoundSpeak();
       showOverlay({ title, sub, autoClose: !!n.autoClose, duration: n.duration || 3000, showClose: !!n.showClose, closeDelay: n.closeDelay || 0 }, resolve);
     } else if (n.mode === 'overlay.text') {
       const text = n.text || speakText;
       const animate = n.animate || 'fade';
       const duration = n.duration || 3000;
-      if (sound) playSoundBuiltin(sound);
+      if (sound) playSoundBuiltin(sound, afterSoundSpeak); else afterSoundSpeak();
       showOverlayText({ text, animate, duration }, resolve);
+    } else if (n.mode === 'overlay.component') {
+      if (sound) playSoundBuiltin(sound, afterSoundSpeak); else afterSoundSpeak();
+      const group = n.group || '';
+      const compId = n.componentId || n.component || '';
+      const props = (typeof n.props === 'object' && n.props) ? n.props : {};
+      const duration = n.duration || 3000;
+      const showClose = !!n.showClose;
+      const closeDelay = n.closeDelay || 0;
+      showOverlayComponent({ group, compId, props, duration, showClose, closeDelay }, resolve);
     } else {
-      if (sound) playSoundBuiltin(sound);
+      if (sound) playSoundBuiltin(sound, afterSoundSpeak); else afterSoundSpeak();
       showToast({ title, sub, type, duration: n.duration || 3000 }, resolve);
     }
   });
@@ -272,6 +290,91 @@
         done();
       }, 260);
     }, dur);
+  };
+
+  const showOverlayComponent = async ({ group, compId, props, duration, showClose, closeDelay }, done) => {
+    try { window.notifyAPI?.setClickThrough(false); } catch {}
+    // 解析组件入口URL：优先指定ID，其次取组内首个
+    let entryUrl = null;
+    try {
+      if (compId) {
+        entryUrl = await window.notifyAPI?.componentsGetEntryUrl?.(compId);
+      }
+      if (!entryUrl) {
+        const res = await window.notifyAPI?.componentsList?.(group);
+        const list = (res?.ok && Array.isArray(res.components)) ? res.components : [];
+        entryUrl = list[0]?.url || null;
+      }
+    } catch {}
+    // 构造带查询参数的URL以传递属性（可选）
+    try {
+      if (entryUrl) {
+        const u = new URL(entryUrl);
+        Object.keys(props || {}).forEach((k) => {
+          const v = props[k];
+          if (v === undefined || v === null) return;
+          u.searchParams.set(k, String(v));
+        });
+        el.ovCompFrame.src = u.toString();
+      } else {
+        // 无组件时显示占位
+        const html = '<html><body style="margin:0;padding:0;display:flex;align-items:center;justify-content:center;font-family:sans-serif;">未找到组件</body></html>';
+        const blob = new Blob([html], { type: 'text/html' });
+        const objUrl = URL.createObjectURL(blob);
+        el.ovCompFrame.src = objUrl;
+        setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
+      }
+    } catch {}
+
+    el.overlayComponent.style.display = 'block';
+    let closable = !showClose;
+    let countdown = closeDelay || 0;
+    let timerId = null;
+    let autoId = null;
+
+    const updateCountdown = () => {
+      if (countdown > 0) {
+        el.ovCompCountdown.style.display = 'inline';
+        el.ovCompCountdown.textContent = `按钮将在 ${Math.ceil(countdown/1000)}s 后可用`;
+      } else {
+        el.ovCompCountdown.style.display = 'none';
+      }
+    };
+    const enableCloseButton = () => {
+      el.ovCompClose.disabled = true;
+      el.ovCompClose.style.display = showClose ? 'inline-block' : 'none';
+      updateCountdown();
+      if (countdown > 0) {
+        timerId = setInterval(() => {
+          countdown -= 250;
+          if (countdown <= 0) {
+            clearInterval(timerId);
+            el.ovCompClose.disabled = false;
+            updateCountdown();
+          } else {
+            updateCountdown();
+          }
+        }, 250);
+      } else {
+        el.ovCompClose.disabled = false;
+      }
+    };
+    if (showClose) enableCloseButton();
+    if (duration && duration > 0) {
+      autoId = setTimeout(() => close(), Math.max(800, duration));
+    }
+    const close = () => {
+      if (timerId) clearInterval(timerId);
+      if (autoId) clearTimeout(autoId);
+      el.overlayComponent.style.display = 'none';
+      el.ovCompFrame.src = 'about:blank';
+      try { window.notifyAPI?.setClickThrough(true); } catch {}
+      done();
+    };
+    el.ovCompClose.onclick = () => {
+      if (el.ovCompClose.disabled) return;
+      close();
+    };
   };
 
   // 跨窗口消息 API
