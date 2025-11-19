@@ -140,7 +140,10 @@ async function initProfilesSettings() {
   btnImpApply.onclick = () => {
     const text = String(impText.value || '');
     const lines = text.split(/\r?\n/).map(s => s.trim()).filter(s => s.length);
-    const newItems = lines.map(name => ({ required: true, name, gender: '未选择' }));
+    const existing = new Set(students.map(s => String(s.name||'').trim()).filter(Boolean));
+    const unique = [];
+    for (const name of lines) { if (!existing.has(name)) { existing.add(name); unique.push(name); } }
+    const newItems = unique.map(name => ({ required: true, name, gender: '未选择' }));
     students = students.concat(newItems);
     impText.value = '';
     impBox.hidden = true;

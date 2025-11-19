@@ -2,6 +2,7 @@
   "id": "multi.word",
   "name": "多维单词",
   "version": "0.1.0",
+  "author": "LessonPlugin",
   "icon": "ri-book-2-line",
   "description": "多维单词：听力、自测、检查、外部词库、在线词典、偏好设置、关于",
   "actions": [

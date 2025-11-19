@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>随机点名</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      :root { --fg: #e6f0ff; --muted: #88a; }
+      html, body { height: 100%; }
+      body { margin: 0; display: flex; align-items: center; justify-content: center; background: transparent; color: var(--fg); }
+      .name { font-size: 96px; font-weight: 800; letter-spacing: 6px; text-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+      .placeholder { font-size: 24px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+      .placeholder i { font-size: 24px; }
+    </style>
+  </head>
+  <body>
+    <div id="content"></div>
+    <script>
+      function getName() { try { const u = new URL(window.location.href); return String(u.searchParams.get('name') || '').trim(); } catch { return ''; } }
+      function render() {
+        const n = getName();
+        const el = document.getElementById('content');
+        if (n) { el.innerHTML = '<div class="name">'+n+'</div>'; }
+        else { el.innerHTML = '<div class="placeholder"><i class="ri-shuffle-line"></i><span>未开始抽选</span></div>'; }
+      }
+      render();
+    </script>
+  </body>
+  </html>

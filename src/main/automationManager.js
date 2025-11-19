@@ -196,12 +196,16 @@ class AutomationManager {
       const iconsDir = path.join(this.app.getPath('userData'), 'icons');
       try { if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true }); } catch {}
       const icoPath = path.join(iconsDir, `${item.id}.ico`);
+      const pngPath = path.join(iconsDir, `${item.id}.png`);
       let icoOk = false;
+      let pngOk = false;
       try {
         // 优先使用设置页预览生成的 PNG（避免在无字体环境下渲染失败）
         if (iconDataUrl && iconDataUrl.startsWith('data:image/png;base64,')) {
           const pngBuf = Buffer.from(iconDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
           if (pngBuf?.length) {
+            fs.writeFileSync(pngPath, pngBuf);
+            pngOk = true;
             const icoBuf = this._pngToIco(pngBuf, 256);
             fs.writeFileSync(icoPath, icoBuf);
             icoOk = true;
@@ -212,17 +216,36 @@ class AutomationManager {
         // 回退到主进程生成（离屏渲染 + 字体）
         icoOk = await this._generateRemixIconIco(iconName, icoPath, bgColor, fgColor);
       }
+      if (!pngOk) {
+        pngOk = await this._generateRemixIconPng(iconName, pngPath, bgColor, fgColor);
+      }
 
-      // 3) 在桌面创建 .url 快捷方式，指向协议
       const desktop = this.app.getPath('desktop');
-      const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
-      const shortcutPath = path.join(desktop, safeFile);
-      const urlLine = `URL=LessonPlugin://task/${encodeURIComponent(protoText)}`;
-      const iconLines = icoOk ? `IconFile=${icoPath}\r\nIconIndex=0` : '';
-      const content = `[InternetShortcut]\r\n${urlLine}\r\n${iconLines}\r\n`;
-      try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+      let shortcutPath = '';
+      if (process.platform === 'win32') {
+        const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
+        shortcutPath = path.join(desktop, safeFile);
+        const urlLine = `URL=LessonPlugin://task/${encodeURIComponent(protoText)}`;
+        const iconLines = icoOk ? `IconFile=${icoPath}\r\nIconIndex=0` : '';
+        const content = `[InternetShortcut]\r\n${urlLine}\r\n${iconLines}\r\n`;
+        try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+      } else if (process.platform === 'darwin') {
+        const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.command';
+        shortcutPath = path.join(desktop, safeFile);
+        const content = `#!/bin/bash\nopen \"LessonPlugin://task/${encodeURIComponent(protoText)}\"\n`;
+        try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+        try { fs.chmodSync(shortcutPath, 0o755); } catch {}
+      } else {
+        const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.desktop';
+        shortcutPath = path.join(desktop, safeFile);
+        const execLine = `Exec=xdg-open \"LessonPlugin://task/${encodeURIComponent(protoText)}\"`;
+        const iconLine = pngOk ? `Icon=${pngPath}` : '';
+        const content = `[Desktop Entry]\nType=Application\nName=${name}\n${execLine}\n${iconLine}\nTerminal=false\nCategories=Utility;\n`;
+        try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+        try { fs.chmodSync(shortcutPath, 0o755); } catch {}
+      }
 
-      return { ok: true, shortcutPath, iconPath: icoOk ? icoPath : null, itemId: item.id, protocolText: protoText };
+      return { ok: true, shortcutPath, iconPath: (process.platform === 'win32' ? (icoOk ? icoPath : null) : (pngOk ? pngPath : null)), itemId: item.id, protocolText: protoText };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -302,6 +325,78 @@ class AutomationManager {
       if (!pngBuf?.length) return false;
       const icoBuf = this._pngToIco(pngBuf, size);
       fs.writeFileSync(icoPath, icoBuf);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async _generateRemixIconPng(iconClassName, pngPath, bgColor, fgColor) {
+    try {
+      const size = 256;
+      const rendererDir = path.join(__dirname, '..', 'renderer');
+      const remixCssPath = path.join(rendererDir, 'remixicon-local.css');
+      let remixCss = '';
+      try { remixCss = fs.readFileSync(remixCssPath, 'utf8'); } catch {}
+      const woffUrl = `file://${rendererDir.replace(/\\/g, '/')}/remixicon.woff2`;
+      if (remixCss) {
+        remixCss = remixCss.replace(/url\(\s*['"]?remixicon\.woff2['"]?\s*\)/g, `url('${woffUrl}')`);
+      }
+      const cssBlock = remixCss
+        ? `<style>${remixCss}\nhtml,body{margin:0;padding:0;background:transparent;}</style>`
+        : `<link rel=\"stylesheet\" href=\"file://${rendererDir.replace(/\\/g, '/')}/remixicon-local.css\" />\n<style>@font-face { font-family: 'remixicon'; src: url('${woffUrl}') format('woff2'); font-display: block; } html,body{margin:0;padding:0;background:transparent;}</style>`;
+      const html = `<!DOCTYPE html><html><head><meta charset=\"utf-8\" />${cssBlock}</head><body></body></html>`;
+      const win = new BrowserWindow({ show: false, width: size, height: size, webPreferences: { offscreen: true } });
+      await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+      const js = `(() => new Promise(async (resolve) => {
+        const size = ${size};
+        const bg = ${JSON.stringify(bgColor)};
+        const fg = ${JSON.stringify(fgColor)};
+        const icon = ${JSON.stringify(iconClassName)};
+        const i = document.createElement('i');
+        i.className = icon;
+        i.style.fontFamily = 'remixicon';
+        i.style.fontStyle = 'normal';
+        i.style.fontWeight = 'normal';
+        document.body.appendChild(i);
+        try { await document.fonts.ready; } catch {}
+        function getCharFromComputed(el) {
+          const content = getComputedStyle(el, '::before').content || '';
+          const raw = String(content).replace(/^\s*[^\w\\]*|[^\w\\]*\s*$/g, '');
+          if (/^\\[0-9a-fA-F]+$/.test(raw)) {
+            const hex = raw.replace(/\\+/g, '');
+            const code = parseInt(hex || '0', 16);
+            return String.fromCharCode(code || 0);
+          }
+          return raw;
+        }
+        let ch = getCharFromComputed(i);
+        for (let t = 0; t < 30 && (!ch || ch === 'none' || ch === '""' || ch === "''"); t++) {
+          await new Promise(r => setTimeout(r, 50));
+          ch = getCharFromComputed(i);
+        }
+        if (!ch || ch === '""' || ch === "''" || ch === 'none') {
+          i.className = 'ri-flashlight-fill';
+          ch = getCharFromComputed(i) || '';
+        }
+        const c = document.createElement('canvas'); c.width = size; c.height = size; document.body.appendChild(c);
+        const ctx = c.getContext('2d');
+        function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+        ctx.fillStyle = bg; roundRect(0,0,size,size, Math.floor(size*0.18)); ctx.fill();
+        ctx.fillStyle = fg;
+        const fontSize = Math.floor(size*0.56);
+        ctx.font = fontSize + 'px remixicon';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText(ch || '', size/2, size/2);
+        const data = c.toDataURL('image/png');
+        resolve(data);
+      }))()`;
+      const dataUrl = await win.webContents.executeJavaScript(js, true);
+      try { if (!win.isDestroyed()) win.destroy(); } catch {}
+      const pngBuf = Buffer.from(String(dataUrl || '').replace(/^data:image\/png;base64,/, ''), 'base64');
+      if (!pngBuf?.length) return false;
+      fs.writeFileSync(pngPath, pngBuf);
       return true;
     } catch {
       return false;

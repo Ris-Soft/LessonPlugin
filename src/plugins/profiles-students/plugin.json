@@ -2,6 +2,7 @@
   "id": "profiles.students",
   "name": "档案-学生列表",
   "version": "1.0.0",
+  "author": "LessonPlugin",
   "icon": "ri-file-user-line",
   "description": "使用底栏模板统一样式的学生档案编辑界面",
   "actions": [

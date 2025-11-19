@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>屏幕罗盘</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      html, body { height: 100%; overflow: hidden; }
+      body { margin: 0; background: transparent; display:flex; align-items:center; justify-content:center; overflow: hidden; }
+      .root { width: 100%; height: 100%; position: relative; display:flex; align-items:center; justify-content:center; overflow: hidden; }
+      .center-btn { width: 50px; height: 50px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.26); cursor: pointer; }
+      .center-btn i { font-size: 22px; color: #e6f0ff; }
+      .center-btn:active { transform: scale(0.96); }
+      .ring { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+      .item { width: 36px; height: 36px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); pointer-events:auto; cursor:pointer; transition: opacity .18s ease, transform .18s ease; }
+      .item i { font-size:18px; color:#e6f0ff; }
+      .item:hover { transform: scale(1.06); }
+      .hidden { opacity:0; transform: scale(0.6); pointer-events:none; }
+      
+    </style>
+  </head>
+  <body>
+    <div class="root" id="root">
+      <div class="ring" id="ring"></div>
+      <div class="center-btn" id="center"><i class="ri-compass-3-line"></i></div>
+      
+    </div>
+    <script>
+      const center = document.getElementById('center');
+      const ring = document.getElementById('ring');
+      
+      let expanded = false;
+      let items = [];
+      const scope = 'screen.compass';
+      let toggleLock = false;
+
+      async function ensureDefaults() {
+        const defaults = {
+          buttons: [
+            { id: 'rollcall', label: '随机点名', icon: 'ri-shuffle-line', actionType: 'plugin', actionPayload: { pluginId: 'rollcall.random', fn: 'openRollcallTemplate', args: [] } }
+          ]
+        };
+        try { await window.compassAPI.configEnsureDefaults(scope, defaults); } catch {}
+      }
+
+      async function loadItems() {
+        try {
+          const raw = await window.compassAPI.configGet(scope, 'buttons');
+          const list = (raw && raw.result) ? raw.result : raw;
+          items = Array.isArray(list) ? list : [];
+        } catch { items = []; }
+      }
+
+      function placeItems() {
+        ring.innerHTML = '';
+        const rootRect = (document.getElementById('root')?.getBoundingClientRect?.()) || { width: 0, height: 0 };
+        const W = Math.max(180, Math.floor(rootRect.width || window.innerWidth || document.documentElement.clientWidth || 220));
+        const H = Math.max(180, Math.floor(rootRect.height || window.innerHeight || document.documentElement.clientHeight || 220));
+        if (W < 40 || H < 40) { try { setTimeout(placeItems, 50); } catch {} return; }
+        const cx = Math.floor(W / 2), cy = Math.floor(H / 2);
+        let R = Math.min(cx, cy) - 32; if (R < 24) R = 24;
+        const N = items.length;
+        for (let i = 0; i < N; i++) {
+          const it = items[i];
+          const a = (Math.PI * 2) * (i / Math.max(N, 1));
+          let x = Math.round(cx + R * Math.cos(a));
+          let y = Math.round(cy + R * Math.sin(a));
+          const div = document.createElement('div');
+          div.className = 'item';
+          div.style.position = 'absolute';
+          x = Math.max(18, Math.min(W - 18, x));
+          y = Math.max(18, Math.min(H - 18, y));
+          div.style.left = (x - 18) + 'px';
+          div.style.top = (y - 18) + 'px';
+          div.title = it.label || '';
+          div.innerHTML = `<i class="${it.icon || 'ri-circle-line'}"></i>`;
+          div.addEventListener('click', async () => {
+            if (!expanded) return;
+            try { await window.compassAPI.pluginCall('screen.compass', 'performAction', [it]); } catch {}
+          });
+          ring.appendChild(div);
+        }
+      }
+
+      function setExpanded(on) {
+        expanded = !!on;
+        const nodes = Array.from(ring.children);
+        nodes.forEach(n => {
+          if (expanded) { n.classList.remove('hidden'); }
+          else { n.classList.add('hidden'); }
+        });
+      }
+
+      center.addEventListener('click', () => { if (dragging || justDragged || toggleLock) return; toggleLock = true; setExpanded(!expanded); setTimeout(() => { toggleLock = false; }, 160); });
+
+      let dragging = false; let startScreenX = 0; let startScreenY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false;
+      function onPointerDown(e){
+        dragging = true; moved = false; startScreenX = e.screenX; startScreenY = e.screenY;
+        window.compassAPI.getBounds().then((raw)=>{
+          const b = (raw && raw.result) ? raw.result : raw;
+          startWinX = (b && typeof b.x==='number')? b.x:0; startWinY = (b && typeof b.y==='number')? b.y:0;
+          try { center.setPointerCapture(e.pointerId); } catch {}
+        });
+      }
+      function onPointerMove(e){ if (!dragging) return; const dx=e.screenX-startScreenX, dy=e.screenY-startScreenY; if (Math.abs(dx)>2 || Math.abs(dy)>2) moved = true; window.compassAPI.moveTo(startWinX+dx, startWinY+dy); }
+      function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); }
+      center.addEventListener('pointerdown', onPointerDown);
+      center.addEventListener('pointermove', onPointerMove);
+      center.addEventListener('pointerup', onPointerUp);
+
+      const iconEl = center.querySelector('i');
+      function updateCenterIcon(){ try { iconEl.className = expanded ? 'ri-close-line' : 'ri-compass-3-line'; } catch {} }
+      const __origSetExpanded = setExpanded;
+      setExpanded = (on) => {
+        if (window.__compassToggleTs && Date.now() - window.__compassToggleTs < 140) return; window.__compassToggleTs = Date.now();
+        try { window.compassAPI.pluginCall('screen.compass','setExpandedWindow',[!!on]); } catch {}
+        let done = false;
+        const run = () => { if (done) return; done = true; try { placeItems(); __origSetExpanded(on); updateCenterIcon(); } catch {} };
+        const onResize = () => { try { window.removeEventListener('resize', onResize); } catch {} run(); };
+        try { window.addEventListener('resize', onResize); } catch {}
+        setTimeout(() => { if (!done) { try { window.removeEventListener('resize', onResize); } catch {} run(); } }, 140);
+      };
+
+      try { window.addEventListener('resize', () => { placeItems(); const nodes = Array.from(ring.children); nodes.forEach(n => { if (expanded) n.classList.remove('hidden'); else n.classList.add('hidden'); }); updateCenterIcon(); }); } catch {}
+      (async function init(){ await ensureDefaults(); await loadItems(); placeItems(); setExpanded(false); })();
+
+      // subscribe to updates from backend/settings
+      try { window.compassAPI.subscribe('screen.compass'); } catch {}
+      try {
+        window.compassAPI.onEvent(async (name, payload) => {
+          if (name !== 'screen.compass' || !payload) return;
+          if (payload.type === 'buttons.update') {
+            try {
+              if (Array.isArray(payload.buttons)) { items = payload.buttons; }
+              else { await loadItems(); }
+            } catch {}
+            placeItems(); setExpanded(expanded);
+          }
+        });
+      } catch {}
+      // 点击空白区域收起
+      const root = document.getElementById('root');
+      root.addEventListener('click', (e) => { if (!expanded) return; if (e.target === root) setExpanded(false); });
+    </script>
+  </body>
+  </html>

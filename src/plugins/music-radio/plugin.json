@@ -2,6 +2,7 @@
   "id": "radio.music",
   "name": "音乐电台",
   "version": "0.1.0",
+  "author": "LessonPlugin",
   "icon": "ri-radio-line",
   "description": "底栏应用：背景为 AMLL DOM 歌词播放器，中央提供 推荐/搜索/设置/关于 悬浮层。",
   "actions": [

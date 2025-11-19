@@ -39,6 +39,15 @@
       <div id="actions" class="actions" style="display:none; gap:8px; margin:8px 0;">
         <button id="btn-add" class="btn secondary"><i class="ri-user-add-line"></i> 新增学生</button>
         <button id="btn-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
+        <button id="btn-import" class="btn secondary"><i class="ri-file-text-line"></i> 文本导入</button>
+      </div>
+      <div id="import-box" class="import-box" style="display:none; margin:8px 0;">
+        <textarea id="import-text" rows="6" placeholder="每行一个姓名"></textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="btn-import-apply" class="btn primary"><i class="ri-checkbox-circle-line"></i> 追加</button>
+          <button id="btn-import-cancel" class="btn secondary"><i class="ri-close-line"></i> 取消</button>
+        </div>
+        <div class="muted" style="margin-top:4px;">按行拆分，忽略重复姓名</div>
       </div>
       <div class="list-wrap">
         <table>
@@ -179,6 +188,28 @@
         await loadStudents();
       }
 
+      function openImportBox() {
+        const box = document.getElementById('import-box'); if (box) box.style.display = 'block';
+      }
+      function closeImportBox() {
+        const box = document.getElementById('import-box'); if (box) box.style.display = 'none';
+      }
+      function applyImportText() {
+        const ta = document.getElementById('import-text');
+        applyImportTextWith(String((ta?.value) || ''));
+        if (ta) ta.value = '';
+        closeImportBox();
+      }
+      function applyImportTextWith(text) {
+        const lines = String(text||'').split(/\r?\n/).map(s => s.trim()).filter(s => s.length);
+        const existing = new Set(students.map(s => String(s?.name||'').trim()).filter(Boolean));
+        const unique = [];
+        for (const name of lines) { if (!existing.has(name)) { existing.add(name); unique.push(name); } }
+        const newItems = unique.map(name => ({ name, gender: '' }));
+        students = students.concat(newItems);
+        renderBody();
+      }
+
       function collectStudentsFromDom() {
         const rows = Array.from(document.querySelectorAll('#tbody tr'));
         const out = [];
@@ -226,6 +257,13 @@
           channel = String(u.searchParams.get('channel') || '');
           caller = String(u.searchParams.get('caller') || '');
         } catch {}
+        const btnImport = document.getElementById('btn-import');
+        const btnImportCancel = document.getElementById('btn-import-cancel');
+        const btnImportApply = document.getElementById('btn-import-apply');
+        btnImport?.addEventListener('click', openImportBox);
+        btnImportCancel?.addEventListener('click', closeImportBox);
+        btnImportApply?.addEventListener('click', applyImportText);
+
         if (window.lowbarAPI) {
           window.lowbarAPI.subscribe?.(channel);
           window.lowbarAPI.onEvent?.((name, payload) => {
@@ -233,6 +271,8 @@
             if (payload?.type === 'update') {
               if (payload.target === 'refresh') loadStudents();
               if (payload.target === 'students.save') saveStudents();
+              if (payload.target === 'students.import.open') openImportBox();
+              if (payload.target === 'students.import.apply') applyImportTextWith(String(payload?.value?.text || ''));
             }
           });
         } else {

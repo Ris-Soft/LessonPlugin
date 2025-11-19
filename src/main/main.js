@@ -113,9 +113,12 @@ function createSettingsWindow() {
 }
 
 function createTray() {
-  const iconPath = path.join(app.getAppPath(), 'icon.ico');
-  // 托盘主图标保持原样，不做反色
-  tray = new Tray(nativeImage.createFromPath(iconPath));
+  const iconPath = process.platform === 'win32'
+    ? path.join(app.getAppPath(), 'icon.ico')
+    : path.join(app.getAppPath(), 'logo.png');
+  const baseImg = nativeImage.createFromPath(iconPath);
+  const trayImg = baseImg && baseImg.resize ? baseImg.resize({ width: 24, height: 24 }) : baseImg;
+  tray = new Tray(trayImg);
 
   const openSettingsTo = (page) => {
     if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();

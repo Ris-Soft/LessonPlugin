@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>抽选设置</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../../renderer/settings.css" />
+    <style>
+      :root { --fg:#e6f0ff; --muted:#88a; --panel: rgba(255,255,255,0.06); }
+      body { margin: 0; padding: 16px; color: var(--fg); background: radial-gradient(1000px 400px at 75% 85%, rgba(65,95,130,0.35), rgba(12,20,28,0.6) 45%, rgba(8,14,22,0.85) 70%); }
+      .title { font-size: 18px; font-weight: 600; display:flex; align-items:center; gap:8px; }
+      .card { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--panel); border: 1px solid rgba(255,255,255,0.08); }
+      .row { display:flex; align-items:center; justify-content: space-between; gap:12px; padding: 8px 0; }
+      .row label { display:flex; align-items:center; gap:8px; }
+      .row .hint { color: var(--muted); font-size: 12px; }
+      .btns { display:flex; gap:8px; margin-top: 12px; }
+      button { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.08); color: var(--fg); }
+      button.primary { background: rgba(125,200,255,0.25); border-color: rgba(125,200,255,0.35); }
+      button.danger { background: rgba(255,80,80,0.25); border-color: rgba(255,80,80,0.35); }
+      .muted { color: var(--muted); }
+      .bg-icon { position: fixed; right: 12px; bottom: 8px; font-size: 72px; color: rgba(255,255,255,0.08); pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div class="title"><i class="ri-settings-3-line"></i> 抽选设置</div>
+    <div class="card">
+      <div class="row">
+        <label><input id="chk-norepeat" type="checkbox" /> 抽选不重复</label>
+        <div class="hint">已抽到的姓名将暂不参与下一次抽选</div>
+      </div>
+      <div class="btns">
+        <button id="btn-save" class="primary"><i class="ri-save-3-line"></i> 保存设置</button>
+        <button id="btn-reset" class="danger"><i class="ri-restart-line"></i> 清空已抽名单</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">学生数据来源：档案-学生列表（profiles.students）</div>
+    </div>
+    <div class="bg-icon"><i class="ri-shuffle-line"></i></div>
+    <script>
+      let channel = ''; let caller = ''; let initNoRepeat = '1';
+      function readInit() { try { const u = new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||''); initNoRepeat=String(u.searchParams.get('noRepeat')||'1'); } catch {} }
+      function initUi() { const chk = document.getElementById('chk-norepeat'); chk.checked = (initNoRepeat==='1'); }
+      async function save() { const v = document.getElementById('chk-norepeat').checked ? '1' : '0'; try { await window.lowbarAPI?.emitEvent?.(channel, { type:'float.settings', noRepeat: v }); } catch {} }
+      async function resetPicked() { try { await window.lowbarAPI?.emitEvent?.(channel, { type:'float.settings', resetPicked: true }); } catch {} }
+      document.getElementById('btn-save').addEventListener('click', save);
+      document.getElementById('btn-reset').addEventListener('click', resetPicked);
+      readInit(); initUi();
+    </script>
+  </body>
+  </html>

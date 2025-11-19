@@ -4,19 +4,36 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
+    "run": "electron .",
     "dev": "node scripts/dev-server.js",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "build:linux": "electron-builder --linux"
   },
   "keywords": [],
-  "author": "",
+  "author": {
+    "name": "LessonPlugin",
+    "email": "753307914@qq.com"
+  },
   "license": "ISC",
+ 
   "description": "基于Electron的以JavaScript为核心的插件化大屏课堂辅助工具",
   "build": {
     "asar": false,
     "appId": "com.lesson.plugin",
     "productName": "LessonPlugin",
+    "icon": "logo.png",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "win": {
       "icon": "icon.ico"
+    },
+    "linux": {
+      "maintainer": "LessonPlugin <753307914@qq.com>",
+      "icon": "logo.png",
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Utility"
     },
     "nsis": {
       "oneClick": false,

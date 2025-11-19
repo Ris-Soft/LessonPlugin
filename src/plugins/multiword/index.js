@@ -8,12 +8,12 @@ const state = {
   floatPages: {},
   backgroundHome: '',
   defaultCenterItems: [
-    { id: 'listen', text: '单词听力', icon: 'ri-headphone-line' },
-    { id: 'selftest', text: '单词自测', icon: 'ri-edit-2-line' },
-    { id: 'check', text: '单词检查', icon: 'ri-search-eye-line' },
+    // { id: 'listen', text: '单词听力', icon: 'ri-headphone-line' },
+    // { id: 'selftest', text: '单词自测', icon: 'ri-edit-2-line' },
+    // { id: 'check', text: '单词检查', icon: 'ri-search-eye-line' },
     { id: 'externallib', text: '外部词库', icon: 'ri-database-2-line' },
     { id: 'dict', text: '在线词典', icon: 'ri-book-open-line' },
-    { id: 'prefs', text: '偏好设置', icon: 'ri-settings-5-line' },
+    // { id: 'prefs', text: '偏好设置', icon: 'ri-settings-5-line' },
     { id: 'about', text: '关于插件', icon: 'ri-information-line' }
   ],
   prefs: {

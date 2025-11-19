@@ -2,6 +2,7 @@
   "id": "ui.lowbar",
   "name": "UI模板-低栏应用",
   "version": "0.1.0",
+  "author": "LessonPlugin",
   "icon": "ri-layout-bottom-line",
   "description": "提供底栏应用模板，支持窗口模式与双层WebView（背景+悬浮）",
   "actions": [

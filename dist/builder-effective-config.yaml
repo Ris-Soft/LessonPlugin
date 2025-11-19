@@ -4,8 +4,17 @@ directories:
 asar: false
 appId: com.lesson.plugin
 productName: LessonPlugin
+icon: logo.png
+artifactName: ${productName}-${version}-${os}-${arch}
 win:
   icon: icon.ico
+linux:
+  maintainer: LessonPlugin <753307914@qq.com>
+  icon: logo.png
+  target:
+    - deb
+    - AppImage
+  category: Utility
 nsis:
   oneClick: false
   perMachine: true

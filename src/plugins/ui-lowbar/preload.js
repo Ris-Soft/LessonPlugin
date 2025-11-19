@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('lowbarAPI', {
   },
   // 直接调用其他插件后端函数（可选）
   pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
+  
   // 统一配置存储（供模板直接读写配置）
   configGetAll: (scope) => ipcRenderer.invoke('config:getAll', scope),
   configGet: (scope, key) => ipcRenderer.invoke('config:get', scope, key),

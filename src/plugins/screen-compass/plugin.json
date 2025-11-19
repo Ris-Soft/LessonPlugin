@@ -1,0 +1,11 @@
+{
+  "id": "screen.compass",
+  "name": "屏幕罗盘",
+  "version": "0.1.0",
+  "author": "LessonPlugin",
+  "icon": "ri-compass-3-line",
+  "description": "在屏幕上展开的罗盘式快捷操作面板，支持自定义按钮与动作",
+  "actions": [
+    { "id": "openCompassSettings", "text": "罗盘设置", "icon": "ri-settings-3-line", "target": "openCompassSettings" }
+  ]
+}

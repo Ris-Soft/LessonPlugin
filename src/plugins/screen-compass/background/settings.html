@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>屏幕罗盘设置</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      :root { --fg: #e6f0ff; --muted: #88a; }
+      html, body { height: 100%; }
+      body { margin: 0; background: transparent; color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Microsoft YaHei', sans-serif; }
+      .wrap { padding: 16px; }
+      .title { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+      .row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+      input, select { height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color:#e6f0ff; padding:0 8px; }
+      select, .sel { appearance: none; -webkit-appearance: none; -moz-appearance: none; background: rgba(255,255,255,0.06) !important; color:#e6f0ff !important; border:1px solid rgba(255,255,255,0.2) !important; }
+      option { background: #182030; color: #e6f0ff; }
+      .del { margin-left:auto; height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color:#e6f0ff; cursor:pointer; }
+      .actions { display:flex; gap:8px; margin-top:10px; }
+      .btn { height:32px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color:#e6f0ff; cursor:pointer; padding: 0 10px; display:flex; align-items:center; gap:6px; }
+      .btn.primary { border-color: rgba(64,224,128,0.4); background: rgba(64,224,128,0.18); }
+      .arg-list { display:flex; flex-direction:column; gap:6px; }
+      .arg-item { display:flex; gap:6px; align-items:center; }
+      .arg-item input { flex:1; }
+      .arg-item .del { height:30px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="title">罗盘按钮设置</div>
+      <div id="list"></div>
+      <div class="actions">
+        <button class="btn" id="openCompass"><i class="ri-compass-3-line"></i><span>打开罗盘</span></button>
+        <button class="btn" id="add"><i class="ri-add-line"></i><span>新增按钮</span></button>
+        <button class="btn primary" id="save"><i class="ri-check-line"></i><span>保存</span></button>
+      </div>
+    </div>
+    <script>
+      const scope = 'screen.compass';
+      let items = [];
+      let pluginIcons = [];
+      const remixShort = ['ri-compass-3-line','ri-close-line','ri-shuffle-line','ri-settings-3-line','ri-terminal-line','ri-apps-2-line','ri-focus-3-line','ri-play-line','ri-stop-line','ri-puzzle-line','ri-presentation-line','ri-slideshow-line','ri-pencil-line','ri-brush-line','ri-quill-pen-line','ri-eraser-line'];
+      let plugins = [];
+      let pluginMap = {};
+      async function ensureDefaults(){
+        const defaults = {
+          buttons: [
+            { id: 'rollcall', label: '随机点名', icon: 'ri-shuffle-line', actionType: 'plugin', actionPayload: { pluginId: 'rollcall.random', fn: 'openRollcallTemplate', args: [] } }
+          ]
+        };
+        try { await window.lowbarAPI.configEnsureDefaults(scope, defaults); } catch {}
+      }
+      async function load(){
+        try {
+          const raw = await window.lowbarAPI.configGet(scope, 'buttons');
+          const list = (raw && raw.result) ? raw.result : raw;
+          items = Array.isArray(list) ? list : [];
+          items.forEach(it => { if (it && typeof it==='object') { if (it.actionType==='program') it.actionType='openApp'; if (it.actionType==='command') it.actionType='cmd'; } });
+        } catch { items = []; }
+      }
+      function render(){
+        const root = document.getElementById('list');
+        root.innerHTML = '';
+        const frag = document.createDocumentFragment();
+        items.forEach((it, idx) => {
+          const row = document.createElement('div'); row.className = 'row';
+          const label = document.createElement('input'); label.placeholder='名称'; label.value = it.label || '';
+          const icon = document.createElement('input'); icon.placeholder='图标类名'; icon.value = it.icon || '';
+          const pick = document.createElement('button'); pick.className='btn'; pick.innerHTML = '<i class="ri-pantone-line"></i><span>选择图标</span>';
+          const type = document.createElement('select'); type.className = 'sel';
+          ['plugin','pluginEvent','openApp','cmd','power','wait'].forEach(t=>{ const opt=document.createElement('option'); opt.value=t; opt.textContent=t; type.appendChild(opt); });
+          type.value = (it.actionType==='program')? 'openApp' : (it.actionType==='command'? 'cmd' : (it.actionType || 'plugin'));
+          const payloadBox = document.createElement('div'); payloadBox.style.flex = '1';
+          const del = document.createElement('button'); del.className='del'; del.textContent='删除'; del.onclick=()=>{ items.splice(idx,1); render(); };
+          row.appendChild(label); row.appendChild(icon); row.appendChild(pick); row.appendChild(type); row.appendChild(payloadBox); row.appendChild(del);
+          frag.appendChild(row);
+          function syncBase(){ it.label = label.value; it.icon = icon.value; it.actionType = type.value; }
+          label.onchange=syncBase; icon.onchange=syncBase; type.onchange=()=>{ syncBase(); renderActionFields(it, payloadBox); };
+          pick.onclick = () => openIconPicker(icon);
+          renderActionFields(it, payloadBox);
+        });
+        root.appendChild(frag);
+      }
+      document.getElementById('openCompass').onclick = async () => { try { await window.lowbarAPI.pluginCall('screen.compass','openCompass',[]); } catch {} };
+      document.getElementById('add').onclick = () => { items.push({ id: 'btn_'+Date.now(), label:'新按钮', icon:'ri-focus-3-line', actionType:'cmd', actionPayload:{ cmd: '' } }); render(); };
+      document.getElementById('save').onclick = async () => { try { await window.lowbarAPI.configSet(scope, 'buttons', items); await window.lowbarAPI.emitEvent(scope, { type: 'buttons.update', buttons: items }); } catch {} };
+      function renderActionFields(it, box){
+        box.innerHTML = '';
+        const type = it.actionType || 'plugin';
+        if (type === 'plugin'){
+          const pidSel = document.createElement('select'); pidSel.className = 'sel';
+          const emptyOpt = document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='选择插件'; pidSel.appendChild(emptyOpt);
+          plugins.forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.name || p.id; pidSel.appendChild(opt); });
+          pidSel.value = (it.actionPayload && it.actionPayload.pluginId) || '';
+          const actSel = document.createElement('select'); actSel.className = 'sel';
+          const emptyAct = document.createElement('option'); emptyAct.value=''; emptyAct.textContent='选择动作(函数)'; actSel.appendChild(emptyAct);
+          const argsList = document.createElement('div'); argsList.className='arg-list';
+          const addArg = document.createElement('button'); addArg.className='btn'; addArg.innerHTML = '<i class="ri-add-line"></i><span>添加参数</span>';
+          const syncAll = () => { const args = Array.from(argsList.querySelectorAll('input')).map(i=>i.value.trim()).filter(s=>s.length); it.actionPayload = { pluginId: pidSel.value.trim(), fn: actSel.value.trim(), args }; };
+          const buildArgs = () => {
+            argsList.innerHTML = '';
+            const src = Array.isArray(it.actionPayload?.args)? it.actionPayload.args : [];
+            src.forEach((val, index)=>{ const row=document.createElement('div'); row.className='arg-item'; const inp=document.createElement('input'); inp.placeholder='参数'+(index+1); inp.value=String(val||''); const rm=document.createElement('button'); rm.className='del'; rm.textContent='删除'; rm.onclick=()=>{ row.remove(); syncAll(); }; inp.onchange=syncAll; row.appendChild(inp); row.appendChild(rm); argsList.appendChild(row); });
+          };
+          addArg.onclick = () => { const row=document.createElement('div'); row.className='arg-item'; const inp=document.createElement('input'); inp.placeholder='参数'; const rm=document.createElement('button'); rm.className='del'; rm.textContent='删除'; rm.onclick=()=>{ row.remove(); syncAll(); }; inp.onchange=syncAll; row.appendChild(inp); row.appendChild(rm); argsList.appendChild(row); };
+          const updateActions = () => {
+            actSel.innerHTML = ''; const emptyAct2=document.createElement('option'); emptyAct2.value=''; emptyAct2.textContent='选择动作(函数)'; actSel.appendChild(emptyAct2);
+            const pid = pidSel.value.trim(); const info = pluginMap[pid]; const acts = Array.isArray(info?.actions)? info.actions : [];
+            acts.forEach(a=>{ const opt=document.createElement('option'); opt.value = a.target || a.id || ''; opt.textContent = a.text || a.id || (a.target||''); actSel.appendChild(opt); });
+            // 若原有 fn 不在列表，保留为选中项
+            const currentFn = (it.actionPayload && it.actionPayload.fn) || '';
+            if (currentFn && !Array.from(actSel.options).some(o=>o.value===currentFn)){
+              const opt=document.createElement('option'); opt.value=currentFn; opt.textContent=currentFn+' (自定义)'; actSel.appendChild(opt);
+            }
+            actSel.value = currentFn || '';
+          };
+          pidSel.onchange = () => { updateActions(); syncAll(); };
+          actSel.onchange = () => { syncAll(); };
+          updateActions();
+          buildArgs();
+          box.appendChild(pidSel); box.appendChild(actSel); box.appendChild(argsList); box.appendChild(addArg);
+          syncAll();
+        } else if (type === 'pluginEvent'){
+          const pidSel = document.createElement('select'); pidSel.className = 'sel';
+          const emptyOpt = document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='选择插件'; pidSel.appendChild(emptyOpt);
+          plugins.forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.name || p.id; pidSel.appendChild(opt); });
+          pidSel.value = (it.actionPayload && it.actionPayload.pluginId) || '';
+          const evtSel = document.createElement('select'); evtSel.className = 'sel';
+          const emptyEvt = document.createElement('option'); emptyEvt.value=''; emptyEvt.textContent='选择事件'; evtSel.appendChild(emptyEvt);
+          const argsList = document.createElement('div'); argsList.className='arg-list';
+          const addArg = document.createElement('button'); addArg.className='btn'; addArg.innerHTML = '<i class="ri-add-line"></i><span>添加参数</span>';
+          const syncAll = () => { const args = Array.from(argsList.querySelectorAll('input')).map(i=>i.value.trim()).filter(s=>s.length); it.actionPayload = { pluginId: pidSel.value.trim(), event: evtSel.value.trim(), args }; };
+          const buildArgs = () => { argsList.innerHTML=''; const src=Array.isArray(it.actionPayload?.args)? it.actionPayload.args:[]; src.forEach((val,index)=>{ const row=document.createElement('div'); row.className='arg-item'; const inp=document.createElement('input'); inp.placeholder='参数'+(index+1); inp.value=String(val||''); const rm=document.createElement('button'); rm.className='del'; rm.textContent='删除'; rm.onclick=()=>{ row.remove(); syncAll(); }; inp.onchange=syncAll; row.appendChild(inp); row.appendChild(rm); argsList.appendChild(row); }); };
+          addArg.onclick = () => { const row=document.createElement('div'); row.className='arg-item'; const inp=document.createElement('input'); inp.placeholder='参数'; const rm=document.createElement('button'); rm.className='del'; rm.textContent='删除'; rm.onclick=()=>{ row.remove(); syncAll(); }; inp.onchange=syncAll; row.appendChild(inp); row.appendChild(rm); argsList.appendChild(row); };
+          const updateEvents = async () => {
+            evtSel.innerHTML = ''; const emptyEvt2=document.createElement('option'); emptyEvt2.value=''; emptyEvt2.textContent='选择事件'; evtSel.appendChild(emptyEvt2);
+            const pid = pidSel.value.trim();
+            try { const res = await window.lowbarAPI.pluginCall('screen.compass','listAutomationEvents',[pid]); const payload = (res && res.result) ? res.result : res; const events = Array.isArray(payload)? payload : []; events.forEach(e=>{ const opt=document.createElement('option'); opt.value=e.id || e.name; opt.textContent=e.name || e.id; evtSel.appendChild(opt); }); } catch {}
+            const currentEvt = (it.actionPayload && it.actionPayload.event) || '';
+            if (currentEvt && !Array.from(evtSel.options).some(o=>o.value===currentEvt)){
+              const opt=document.createElement('option'); opt.value=currentEvt; opt.textContent=currentEvt+' (自定义)'; evtSel.appendChild(opt);
+            }
+            evtSel.value = currentEvt || '';
+          };
+          pidSel.onchange = () => { updateEvents(); syncAll(); };
+          evtSel.onchange = () => { syncAll(); };
+          buildArgs();
+          box.appendChild(pidSel); box.appendChild(evtSel); box.appendChild(argsList); box.appendChild(addArg);
+          updateEvents(); syncAll();
+        } else if (type === 'openApp'){
+          const p = document.createElement('input'); p.placeholder='程序路径'; p.value = (it.actionPayload && it.actionPayload.path) || '';
+          const argsList = document.createElement('div'); argsList.className='arg-list';
+          const addArg = document.createElement('button'); addArg.className='btn'; addArg.innerHTML = '<i class="ri-add-line"></i><span>添加参数</span>';
+          const sync = () => { const args = Array.from(argsList.querySelectorAll('input')).map(i=>i.value.trim()).filter(s=>s.length); it.actionPayload = { path: p.value.trim(), args }; };
+          const buildArgs = () => { argsList.innerHTML=''; const src=Array.isArray(it.actionPayload?.args)? it.actionPayload.args:[]; src.forEach((val,index)=>{ const row=document.createElement('div'); row.className='arg-item'; const inp=document.createElement('input'); inp.placeholder='参数'+(index+1); inp.value=String(val||''); const rm=document.createElement('button'); rm.className='del'; rm.textContent='删除'; rm.onclick=()=>{ row.remove(); sync(); }; inp.onchange=sync; row.appendChild(inp); row.appendChild(rm); argsList.appendChild(row); }); };
+          addArg.onclick = () => { const row=document.createElement('div'); row.className='arg-item'; const inp=document.createElement('input'); inp.placeholder='参数'; const rm=document.createElement('button'); rm.className='del'; rm.textContent='删除'; rm.onclick=()=>{ row.remove(); sync(); }; inp.onchange=sync; row.appendChild(inp); row.appendChild(rm); argsList.appendChild(row); };
+          box.appendChild(p); box.appendChild(argsList); box.appendChild(addArg);
+          p.onchange=sync; buildArgs(); sync();
+        } else if (type === 'cmd'){
+          const c = document.createElement('input'); c.placeholder='命令'; c.value = (it.actionPayload && it.actionPayload.cmd) || '';
+          box.appendChild(c);
+          const sync = () => { it.actionPayload = { cmd: c.value }; };
+          c.onchange=sync;
+        } else if (type === 'power'){
+          const opSel = document.createElement('select'); opSel.className = 'sel';
+          ['shutdown','restart','logoff'].forEach(t=>{ const opt=document.createElement('option'); opt.value=t; opt.textContent=t; opSel.appendChild(opt); });
+          opSel.value = (it.actionPayload && it.actionPayload.op) || 'shutdown';
+          const sync = () => { it.actionPayload = { op: opSel.value }; };
+          opSel.onchange = sync;
+          box.appendChild(opSel);
+        } else if (type === 'wait'){
+          const sec = document.createElement('input'); sec.placeholder='秒数'; sec.value = (it.actionPayload && (it.actionPayload.seconds || it.actionPayload.sec || it.actionPayload.ms)) || '';
+          const sync = () => { it.actionPayload = { seconds: Number(sec.value) || 0 }; };
+          sec.onchange = sync; box.appendChild(sec);
+        }
+      }
+
+      function openIconPicker(targetInput){
+        const overlay = document.createElement('div');
+        overlay.style.position='fixed'; overlay.style.inset='0'; overlay.style.background='rgba(6,12,24,0.6)'; overlay.style.backdropFilter='blur(6px)'; overlay.style.zIndex='9999'; overlay.style.padding='12px';
+        const panel = document.createElement('div'); panel.style.maxHeight='80vh'; panel.style.overflow='auto'; panel.style.border='1px solid rgba(255,255,255,0.2)'; panel.style.borderRadius='8px'; panel.style.background='rgba(16,24,36,0.8)'; panel.style.padding='12px';
+        const close = document.createElement('div'); close.style.textAlign='right'; close.innerHTML='<button class="btn"><i class="ri-close-line"></i><span>关闭</span></button>';
+        const grid = document.createElement('div'); grid.style.display='grid'; grid.style.gridTemplateColumns='repeat(auto-fill, 120px)'; grid.style.gap='8px';
+        const allIcons = Array.from(new Set([...(pluginIcons||[]), ...remixShort]));
+        allIcons.forEach(ic => { const cell=document.createElement('div'); cell.style.display='flex'; cell.style.alignItems='center'; cell.style.gap='8px'; cell.style.cursor='pointer'; cell.style.padding='6px'; cell.style.border='1px solid rgba(255,255,255,0.12)'; cell.style.borderRadius='6px'; cell.innerHTML = `<i class="${ic}"></i><span style="color:#e6f0ff;font-size:12px;">${ic}</span>`; cell.onclick=()=>{ try { targetInput.value = ic; targetInput.dispatchEvent(new Event('change')); } catch {} document.body.removeChild(overlay); }; grid.appendChild(cell); });
+        panel.appendChild(close); panel.appendChild(grid);
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+        close.onclick = () => { try { document.body.removeChild(overlay); } catch {} };
+      }
+
+      (async function init(){
+        await ensureDefaults();
+        await load();
+        try {
+          let list = [];
+          try {
+            const res = await window.lowbarAPI.pluginCall('screen.compass','listPlugins',[]);
+            list = (res && res.result) ? res.result : res;
+          } catch {}
+          if (!Array.isArray(list) || !list.length) {
+            try { const p = await window.lowbarAPI.getPlugins?.(); list = (p && p.result) ? p.result : p; } catch {}
+          }
+          plugins = Array.isArray(list) ? list : [];
+          pluginMap = {};
+          plugins.forEach(p => { pluginMap[p.id] = p; });
+          pluginIcons = plugins.map(p => String(p.icon || '').trim()).filter(Boolean);
+        } catch { pluginIcons = []; plugins = []; pluginMap = {}; }
+        render();
+      })();
+    </script>
+  </body>
+  </html>

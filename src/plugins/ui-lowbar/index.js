@@ -43,9 +43,10 @@ const functions = {
     const height = parseInt(params.height, 10) || 800;
     const title = params.title || 'UI模板-低栏应用';
     const windowMode = params.windowMode || WindowModes.ALL_MODES;
-    const customKey = String(params.id || params.windowId || '').trim();
+    const unique = params.unique !== false;
+    const customKey = unique ? String(params.id || params.windowId || params.callerPluginId || '').trim() : '';
 
-    // 若调用方提供了窗口标识，则尝试复用现有窗口（避免重复创建同类窗口）
+    // 若启用防重复且存在窗口标识，则尝试复用现有窗口（避免重复创建同类窗口）
     if (customKey) {
       const existing = namedWinMap.get(customKey);
       if (existing && !existing.isDestroyed()) {
@@ -71,7 +72,7 @@ const functions = {
               maximizable: typeof existing.isMaximizable === 'function' ? !!existing.isMaximizable() : true,
               fullscreenable: typeof existing.isFullScreenable === 'function' ? !!existing.isFullScreenable() : true
             },
-            windowId: existing.id
+          windowId: existing.id
           });
           applyInitialMode(existing, windowMode);
           existing.show();

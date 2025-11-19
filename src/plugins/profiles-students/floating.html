@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>文本导入</title>
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../renderer/settings.css" />
+    <style>
+      body { margin: 0; padding: 12px; }
+      textarea { width: 100%; box-sizing: border-box; padding: 8px; border-radius: 6px; }
+      .row { display:flex; gap:8px; margin-top:8px; }
+      .muted { color: var(--muted); margin-top:4px; }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <div class="section-title"><i class="ri-file-text-line"></i> 文本导入</div>
+      <textarea id="txt" rows="8" placeholder="每行一个姓名"></textarea>
+      <div class="row">
+        <button id="apply" class="btn primary"><i class="ri-checkbox-circle-line"></i> 追加</button>
+        <button id="clear" class="btn secondary"><i class="ri-close-line"></i> 清空</button>
+      </div>
+      <div class="muted">按行拆分，忽略重复姓名</div>
+    </div>
+    <script>
+      let channel = '';
+      (function init(){
+        try { const u = new URL(window.location.href); channel = String(u.searchParams.get('channel')||''); } catch {}
+        document.getElementById('apply')?.addEventListener('click', () => {
+          const t = document.getElementById('txt');
+          const text = String((t?.value)||'');
+          try { window.lowbarAPI?.emitEvent?.(channel, { type:'update', target:'students.import.apply', value:{ text } }); } catch {}
+        });
+        document.getElementById('clear')?.addEventListener('click', () => { const t = document.getElementById('txt'); if (t) t.value = ''; });
+      })();
+    </script>
+  </body>
+</html>

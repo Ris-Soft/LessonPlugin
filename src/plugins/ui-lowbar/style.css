@@ -19,7 +19,7 @@ body.mode-fullscreen .bg-view { top: 0; bottom: 0; }
 /* 悬浮窗口（内嵌 webview） */
 .float-win { position: absolute; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; overflow: hidden; backdrop-filter: blur(3px); box-shadow: 0 10px 26px rgba(0,0,0,0.35); opacity: 0; transform: translateY(8px); transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
 .float-win { z-index: 10; }
-.float-titlebar { height: 32px; display: flex; align-items: center; background: rgba(28,28,28,0.95); color: #ddd; -webkit-app-region: no-drag; }
+.float-titlebar { height: 32px; display: flex; align-items: center; background: rgba(28,28,28,0.95); color: #ddd; -webkit-app-region: no-drag; touch-action: none; }
 .float-titlebar .drag-area { flex: 1; }
 .float-titlebar .icon-btn { -webkit-app-region: no-drag; border: none; background: transparent; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #ddd; margin: 0 4px; transition: background 160ms ease, color 160ms ease; }
 .float-titlebar .icon-btn:hover { background: rgba(255,255,255,0.08); }

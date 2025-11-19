@@ -748,16 +748,21 @@
     const fw = $('#floatWin');
     const bar = fw.querySelector('.float-titlebar');
     let dragging = false; let sx=0, sy=0, ox=0, oy=0;
-    bar.addEventListener('mousedown', (e) => { if (e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; });
-    window.addEventListener('mousemove', (e) => { if (!dragging) return; const dx=e.clientX-sx; const dy=e.clientY-sy; fw.style.left = (ox+dx)+'px'; fw.style.top=(oy+dy)+'px'; });
-    window.addEventListener('mouseup', () => { dragging=false; });
-
-    // 支持拖动边框（点击浮窗容器本身，避免拖动整个应用窗口）
-    fw.addEventListener('mousedown', (e) => {
-      if (e.button!==0) return;
-      if (e.target !== fw) return; // 只在边框区域触发
-      dragging = true; sx = e.clientX; sy = e.clientY; const r = fw.getBoundingClientRect(); ox=r.left; oy=r.top;
-    });
+    if (window.PointerEvent) {
+      if (bar && bar.style) bar.style.touchAction = 'none';
+      const onDown = (e) => { if (e.pointerType==='mouse' && e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; e.preventDefault(); };
+      const onMove = (e) => { if (!dragging) return; const dx=e.clientX-sx; const dy=e.clientY-sy; fw.style.left=(ox+dx)+'px'; fw.style.top=(oy+dy)+'px'; };
+      const onUp = () => { dragging=false; };
+      bar.addEventListener('pointerdown', onDown);
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      fw.addEventListener('pointerdown', (e) => { if (e.pointerType==='mouse' && e.button!==0) return; if (e.target!==fw) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; e.preventDefault(); });
+    } else {
+      bar.addEventListener('mousedown', (e) => { if (e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; });
+      window.addEventListener('mousemove', (e) => { if (!dragging) return; const dx=e.clientX-sx; const dy=e.clientY-sy; fw.style.left = (ox+dx)+'px'; fw.style.top=(oy+dy)+'px'; });
+      window.addEventListener('mouseup', () => { dragging=false; });
+      fw.addEventListener('mousedown', (e) => { if (e.button!==0) return; if (e.target !== fw) return; dragging = true; sx = e.clientX; sy = e.clientY; const r = fw.getBoundingClientRect(); ox=r.left; oy=r.top; });
+    }
   })();
 
   // 标题栏缩放按钮已移除（保留拖拽与固定/关闭）。

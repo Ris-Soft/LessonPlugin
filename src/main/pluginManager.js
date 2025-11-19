@@ -762,13 +762,51 @@ module.exports.closeAllWindows = function closeAllWindows() {
 // --------- NPM 管理 ---------
 function runNpm(args, cwd) {
   return new Promise((resolve) => {
-    const child = spawn('npm', args, { cwd, shell: true });
+    const trySpawn = (cmd, argv) => {
+      try {
+        const p = spawn(cmd, argv, { cwd, shell: true });
+        return p;
+      } catch {
+        return null;
+      }
+    };
+    let child = trySpawn('npm', args);
+    if (!child) {
+      child = trySpawn('corepack', ['npm', ...args]);
+    }
+    if (!child) {
+      child = trySpawn('pnpm', mapToPnpmArgs(args));
+    }
     let out = '';
     let err = '';
+    if (!child) return resolve({ code: 127, out, err: 'no_package_manager' });
     child.stdout.on('data', (d) => (out += String(d)));
     child.stderr.on('data', (d) => (err += String(d)));
     child.on('close', (code) => resolve({ code, out, err }));
   });
+}
+
+function mapToPnpmArgs(npmArgs) {
+  const a = Array.isArray(npmArgs) ? npmArgs.slice() : [];
+  if (!a.length) return [];
+  if (a[0] === 'view') {
+    const rest = a.slice(1);
+    return ['view', ...rest];
+  }
+  if (a[0] === 'install') {
+    const rest = a.slice(1);
+    const idxPrefix = rest.indexOf('--prefix');
+    let prefixDir = null;
+    if (idxPrefix >= 0 && rest[idxPrefix + 1]) prefixDir = rest[idxPrefix + 1];
+    const pkg = rest.find((x) => /@/.test(String(x)) && !/^--/.test(String(x)));
+    const args = ['add'];
+    if (pkg) args.push(pkg);
+    if (prefixDir) args.push('--prefix', prefixDir);
+    const idxReg = rest.indexOf('--registry');
+    if (idxReg >= 0 && rest[idxReg + 1]) args.push('--registry', rest[idxReg + 1]);
+    return args;
+  }
+  return a;
 }
 
 module.exports.getPackageVersions = async function getPackageVersions(name) {

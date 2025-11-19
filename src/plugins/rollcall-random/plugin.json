@@ -1,0 +1,12 @@
+{
+  "id": "rollcall.random",
+  "name": "随机点名",
+  "version": "0.1.0",
+  "author": "LessonPlugin",
+  "icon": "ri-shuffle-line",
+  "description": "使用 UI模板-底栏应用 的随机点名插件，支持悬浮窗设置与快速调起",
+  "actions": [
+    { "id": "openRollcall", "icon": "ri-shuffle-line", "text": "随机点名", "target": "openRollcallTemplate" }
+  ],
+  "variables": ["currentName"]
+}

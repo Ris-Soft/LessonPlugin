@@ -2,6 +2,7 @@
   "id": "duty.easy",
   "name": "轻松值日",
   "version": "1.0.0",
+  "author": "LessonPlugin",
   "icon": "ri-calendar-check-line",
   "description": "使用底栏模板的值日安排与分工管理",
   "actions": [
