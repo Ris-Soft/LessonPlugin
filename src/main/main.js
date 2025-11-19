@@ -1078,6 +1078,20 @@ ipcMain.handle('system:getAppInfo', async () => {
 });
 ipcMain.handle('system:getAutostart', async () => {
   try {
+    if (process.platform === 'linux') {
+      const configDir = process.env.XDG_CONFIG_HOME || path.join(require('os').homedir(), '.config');
+      const autoDir = path.join(configDir, 'autostart');
+      const filePath = path.join(autoDir, 'LessonPlugin.desktop');
+      let enabled = false;
+      if (fs.existsSync(filePath)) {
+        try {
+          const text = fs.readFileSync(filePath, 'utf-8');
+          const m = text.match(/X-GNOME-Autostart-enabled\s*=\s*(true|false)/i);
+          if (m) enabled = String(m[1]).toLowerCase() === 'true'; else enabled = true;
+        } catch { enabled = true; }
+      }
+      return { ok: true, openAtLogin: enabled };
+    }
     const settings = app.getLoginItemSettings();
     return { ok: true, openAtLogin: !!settings.openAtLogin };
   } catch (e) {
@@ -1086,6 +1100,34 @@ ipcMain.handle('system:getAutostart', async () => {
 });
 ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
   try {
+    if (process.platform === 'linux') {
+      const configDir = process.env.XDG_CONFIG_HOME || path.join(require('os').homedir(), '.config');
+      const autoDir = path.join(configDir, 'autostart');
+      try { fs.mkdirSync(autoDir, { recursive: true }); } catch {}
+      const filePath = path.join(autoDir, 'LessonPlugin.desktop');
+      if (enabled) {
+        const execPath = process.env.APPIMAGE || process.execPath;
+        const iconPng = path.join(app.getAppPath(), 'logo.png');
+        const lines = [
+          '[Desktop Entry]',
+          'Type=Application',
+          'Name=LessonPlugin',
+          `Exec="${execPath}"`,
+          fs.existsSync(iconPng) ? `Icon=${iconPng}` : '',
+          'Terminal=false',
+          'Categories=Utility;',
+          'X-GNOME-Autostart-enabled=true',
+          'Hidden=false'
+        ].filter(Boolean).join('\n');
+        fs.writeFileSync(filePath, lines, 'utf-8');
+        try { fs.chmodSync(filePath, 0o644); } catch {}
+      } else {
+        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+      }
+      store.set('system', 'autostartEnabled', !!enabled);
+      store.set('system', 'autostartHigh', !!highPriority);
+      return { ok: true };
+    }
     app.setLoginItemSettings({ openAtLogin: !!enabled });
     store.set('system', 'autostartEnabled', !!enabled);
     store.set('system', 'autostartHigh', !!highPriority);
