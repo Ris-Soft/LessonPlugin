@@ -1,9 +1,12 @@
 const path = require('path');
-const { BrowserWindow, app } = require('electron');
+const { BrowserWindow, app, screen } = require('electron');
 const store = require(path.join(app.getAppPath(), 'src', 'main', 'store.js'));
 
 let settingsWin = null;
 let pluginApi = null;
+let boardWin = null;
+let buttonWin = null;
+let activeBoard = null;
 // 轻日志开关：跟随 system.debugLog 或 LP_DEBUG
 const log = (...args) => { try { const enabled = (store.get('system','debugLog') || process.env.LP_DEBUG); if (enabled) console.log('[MorningReading]', ...args); } catch {} };
 
@@ -47,6 +50,7 @@ function handleMinuteTrigger(curHHMM) {
     const weekday = d.getDay() === 0 ? 7 : d.getDay(); // 1..7
     const cfg = store.getAll('morningReading') || {};
     const periods = Array.isArray(cfg.periods) ? cfg.periods : [];
+    const boardPeriods = Array.isArray(cfg.boardPeriods) ? cfg.boardPeriods : [];
     log('trigger', curHHMM, { weekday });
 
     // 读取单双周基准
@@ -93,6 +97,20 @@ function handleMinuteTrigger(curHHMM) {
         payloads.push({ mode: 'toast', title, subText, type: 'info', duration: 4000, speak: speakEnd, which });
       }
     }
+    for (const p of boardPeriods) {
+      if (p?.enabled === false) continue;
+      const onWeekday = Array.isArray(p?.weekdays) ? p.weekdays.includes(weekday) : true;
+      const biweekOk = matchBiweek(p?.biweek);
+      const start = String(p?.start || '').slice(0,5);
+      const end = String(p?.end || '').slice(0,5);
+      if (!onWeekday || !biweekOk) continue;
+      if (start === curHHMM) {
+        try { openBoardWindow(p); } catch {}
+      }
+      if (end === curHHMM) {
+        try { if (buttonWin && !buttonWin.isDestroyed()) { buttonWin.close(); buttonWin = null; } } catch {}
+      }
+    }
     log('enqueueBatch:size', payloads.length);
     if (payloads.length && pluginApi) {
       try {
@@ -104,6 +122,101 @@ function handleMinuteTrigger(curHHMM) {
   } catch {}
 }
 
+function openBoardWindow(period) {
+  try {
+    const p = (period && typeof period === 'object') ? period : null;
+    activeBoard = p;
+    if (boardWin && !boardWin.isDestroyed()) { boardWin.focus(); return boardWin; }
+    const d = screen.getPrimaryDisplay();
+    const b = d.bounds;
+    const win = new BrowserWindow({
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+      frame: false,
+      backgroundColor: '#0b1520',
+      show: true,
+      resizable: true,
+      fullscreen: true,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
+    });
+    boardWin = win;
+    win.loadFile(path.join(__dirname, 'board.html'));
+    win.on('closed', () => { boardWin = null; try { if (isBoardPeriodActive()) openOpenButton(); } catch {} });
+    return win;
+  } catch { return null; }
+}
+
+function openOpenButton() {
+  try {
+    if (buttonWin && !buttonWin.isDestroyed()) return buttonWin;
+    const d = screen.getPrimaryDisplay();
+    const b = d.bounds;
+    const w = 140, h = 56;
+    const win = new BrowserWindow({
+      x: b.x + Math.floor((b.width - w) / 2),
+      y: b.y + b.height - h - 56,
+      width: w,
+      height: h,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      show: true,
+      resizable: false,
+      movable: true,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      hasShadow: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
+    });
+    buttonWin = win;
+    win.loadFile(path.join(__dirname, 'open-button.html'));
+    win.on('closed', () => { buttonWin = null; });
+    return win;
+  } catch { return null; }
+}
+
+function isBoardPeriodActive() {
+  try {
+    const now = new Date();
+    const weekday = now.getDay() === 0 ? 7 : now.getDay();
+    const cfg = store.getAll('morningReading') || {};
+    const boardPeriods = Array.isArray(cfg.boardPeriods) ? cfg.boardPeriods : [];
+    const base = store.get('system', 'semesterStart') || store.get('system', 'offsetBaseDate');
+    const biweekOff = !!store.get('system', 'biweekOffset');
+    let isEvenWeek = null;
+    if (base) {
+      try {
+        const baseDate = new Date(base + 'T00:00:00');
+        const diffDays = Math.floor((now - baseDate) / (24 * 3600 * 1000));
+        const weekIndex = Math.floor(diffDays / 7);
+        isEvenWeek = weekIndex % 2 === 0;
+        if (biweekOff) isEvenWeek = !isEvenWeek;
+      } catch {}
+    }
+    const matchBiweek = (rule) => { if (rule === 'any' || rule == null) return true; if (isEvenWeek == null) return false; return rule === 'even' ? isEvenWeek : !isEvenWeek; };
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    const cur = `${hh}:${mm}`;
+    for (const p of boardPeriods) {
+      if (p?.enabled === false) continue;
+      const onWeekday = Array.isArray(p?.weekdays) ? p.weekdays.includes(weekday) : true;
+      const biweekOk = matchBiweek(p?.biweek);
+      const start = String(p?.start || '').slice(0,5);
+      const end = String(p?.end || '').slice(0,5);
+      if (!onWeekday || !biweekOk) continue;
+      if (/^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+        if (start <= cur && cur < end) return true;
+      }
+    }
+    return false;
+  } catch { return false; }
+}
+
 module.exports = {
   name: '早读助手',
   version: '1.0.0',
@@ -111,10 +224,14 @@ module.exports = {
   init: (api) => {
     pluginApi = api;
     try {
-      store.ensureDefaults('morningReading', { periods: [] });
+      store.ensureDefaults('morningReading', { periods: [], boardPeriods: [] });
       const cfg = store.getAll('morningReading') || {};
-      const times = computeTimesFromPeriods(cfg.periods || []);
+      const times = Array.from(new Set([
+        ...computeTimesFromPeriods(cfg.periods || []),
+        ...computeTimesFromPeriods(cfg.boardPeriods || [])
+      ]));
       pluginApi.automation.registerMinuteTriggers(times, handleMinuteTrigger);
+      if (isBoardPeriodActive()) openBoardWindow(null);
     } catch {}
   },
   functions: {
@@ -123,7 +240,22 @@ module.exports = {
     setSchedule: (periods) => {
       try {
         if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
-        const times = computeTimesFromPeriods(Array.isArray(periods) ? periods : []);
+        const cfg = store.getAll('morningReading') || {};
+        const times = Array.from(new Set([
+          ...computeTimesFromPeriods(Array.isArray(periods) ? periods : []),
+          ...computeTimesFromPeriods(cfg.boardPeriods || [])
+        ]));
+        return pluginApi.automation.registerMinuteTriggers(times, handleMinuteTrigger);
+      } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    },
+    setBoardSchedule: (periods) => {
+      try {
+        if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
+        const cfg = store.getAll('morningReading') || {};
+        const times = Array.from(new Set([
+          ...computeTimesFromPeriods(cfg.periods || []),
+          ...computeTimesFromPeriods(Array.isArray(periods) ? periods : [])
+        ]));
         return pluginApi.automation.registerMinuteTriggers(times, handleMinuteTrigger);
       } catch (e) { return { ok: false, error: e?.message || String(e) }; }
     },
@@ -133,6 +265,38 @@ module.exports = {
     // 调试：查看当前注册的分钟触发器列表
     listScheduleTimes: () => {
       try { if (!pluginApi) return { ok: true, times: [] }; return pluginApi.automation.listMinuteTriggers(); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    },
+    openBoard: () => { try { openBoardWindow(null); return true; } catch (e) { return { ok: false, error: e?.message || String(e) }; } },
+    closeBoard: () => { try { if (boardWin && !boardWin.isDestroyed()) boardWin.close(); return true; } catch (e) { return { ok: false, error: e?.message || String(e) }; } },
+    ensureOpenButton: () => { try { if (isBoardPeriodActive()) openOpenButton(); return true; } catch (e) { return { ok: false, error: e?.message || String(e) }; } },
+    setOpenButtonDragging: (flag) => { try { return !!flag; } catch { return false; } },
+    getOpenButtonBounds: () => { try { if (!buttonWin || buttonWin.isDestroyed()) return null; return buttonWin.getBounds(); } catch { return null; } },
+    moveOpenButtonTo: (x, y) => {
+      try {
+        if (!buttonWin || buttonWin.isDestroyed()) return false;
+        const d = screen.getPrimaryDisplay();
+        const sb = d.bounds; const wb = buttonWin.getBounds();
+        const nx = Math.max(sb.x, Math.min(x, sb.x + sb.width - wb.width));
+        const ny = Math.max(sb.y, Math.min(y, sb.y + sb.height - wb.height));
+        buttonWin.setPosition(Math.floor(nx), Math.floor(ny));
+        return true;
+      } catch { return false; }
+    },
+    snapOpenButton: () => {
+      try {
+        if (!buttonWin || buttonWin.isDestroyed()) return false;
+        const d = screen.getPrimaryDisplay();
+        const wb = buttonWin.getBounds();
+        const b = d.bounds;
+        const th = 24;
+        let x = wb.x, y = wb.y;
+        if (Math.abs(wb.x - b.x) <= th) x = b.x;
+        if (Math.abs((wb.x + wb.width) - (b.x + b.width)) <= th) x = b.x + b.width - wb.width;
+        if (Math.abs(wb.y - b.y) <= th) y = b.y;
+        if (Math.abs((wb.y + wb.height) - (b.y + b.height)) <= th) y = b.y + b.height - wb.height;
+        if (x !== wb.x || y !== wb.y) buttonWin.setPosition(x, y);
+        return true;
+      } catch { return false; }
     },
     previewStart: async (period) => {
       try {

@@ -10,6 +10,12 @@
       "icon": "ri-settings-3-line",
       "text": "打开设置",
       "target": "openSettings"
+    },
+    {
+      "id": "openBoard",
+      "icon": "ri-dashboard-2-line",
+      "text": "打开早读看板",
+      "target": "openBoard"
     }
   ],
   "dependencies": [

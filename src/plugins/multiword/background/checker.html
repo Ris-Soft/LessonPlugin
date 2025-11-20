@@ -218,7 +218,7 @@
         } catch {}
       }
       function randomPick() {
-        // 预留按钮：不执行抽选逻辑
+        try { api().pluginCall('rollcall.random','openRollcallTemplate',[]); } catch {}
       }
       function endCheck() { finish(); }
 

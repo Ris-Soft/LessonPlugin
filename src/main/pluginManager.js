@@ -736,7 +736,13 @@ module.exports.installNpm = async function installNpm(idOrName, onProgress) {
   for (const job of jobs) {
     const res = await module.exports.downloadPackageVersion(job.name, job.version, onProgress);
     results.push({ pkg: `${job.name}@${job.version}`, ok: res.ok, error: res.error });
+    if (res.ok) {
+      if (!config.npmSelection[p.id]) config.npmSelection[p.id] = {};
+      config.npmSelection[p.id][job.name] = job.version;
+      writeJsonSafe(configPath, config);
+    }
   }
+  try { await module.exports.ensureDeps(p.id, { downloadIfMissing: false }); } catch {}
   return { ok: results.every((r) => r.ok), results };
 };
 
@@ -764,16 +770,20 @@ function runNpm(args, cwd) {
   return new Promise((resolve) => {
     const trySpawn = (cmd, argv) => {
       try {
-        const p = spawn(cmd, argv, { cwd, shell: true });
+        const env = { ...process.env };
+        if (process.platform === 'linux') {
+          const extra = ['/usr/bin', '/usr/local/bin', '/bin'];
+          const cur = String(env.PATH || '');
+          const paths = new Set(cur.split(':').filter(Boolean).concat(extra));
+          env.PATH = Array.from(paths).join(':');
+        }
+        const p = spawn(cmd, argv, { cwd, shell: true, env });
         return p;
       } catch {
         return null;
       }
     };
     let child = trySpawn('npm', args);
-    if (!child) {
-      child = trySpawn('corepack', ['npm', ...args]);
-    }
     if (!child) {
       child = trySpawn('pnpm', mapToPnpmArgs(args));
     }
@@ -795,13 +805,9 @@ function mapToPnpmArgs(npmArgs) {
   }
   if (a[0] === 'install') {
     const rest = a.slice(1);
-    const idxPrefix = rest.indexOf('--prefix');
-    let prefixDir = null;
-    if (idxPrefix >= 0 && rest[idxPrefix + 1]) prefixDir = rest[idxPrefix + 1];
     const pkg = rest.find((x) => /@/.test(String(x)) && !/^--/.test(String(x)));
     const args = ['add'];
     if (pkg) args.push(pkg);
-    if (prefixDir) args.push('--prefix', prefixDir);
     const idxReg = rest.indexOf('--registry');
     if (idxReg >= 0 && rest[idxReg + 1]) args.push('--registry', rest[idxReg + 1]);
     return args;
@@ -825,14 +831,35 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   const segs = String(name).split('/').filter(Boolean);
   const dest = path.join(storeRoot, ...segs, version);
   if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-  const args = ['install', `${name}@${version}`, '--prefix', dest, '--registry', config.registry];
+  const args = ['install', `${name}@${version}`, '--registry', config.registry];
   onProgress && onProgress({ stage: 'npm', message: `下载 ${name}@${version} ...` });
-  const result = await runNpm(args, path.dirname(manifestPath));
+  const result = await runNpm(args, dest);
   if (result.code !== 0) return { ok: false, error: result.err || 'npm install 失败' };
   onProgress && onProgress({ stage: 'npm', message: `完成 ${name}@${version}` });
   const nm = path.join(dest, 'node_modules');
   try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch {}
-  return { ok: true, path: path.join(dest, 'node_modules', ...segs) };
+  const directPath = path.join(dest, 'node_modules', ...segs);
+  if (!fs.existsSync(directPath)) {
+    try {
+      const pnpmRoot = path.join(dest, 'node_modules', '.pnpm');
+      if (fs.existsSync(pnpmRoot)) {
+        const entries = fs.readdirSync(pnpmRoot).filter((e) => {
+          try { return fs.statSync(path.join(pnpmRoot, e)).isDirectory(); } catch { return false; }
+        });
+        let nested = null;
+        for (const e of entries) {
+          const base = path.join(pnpmRoot, e, 'node_modules', ...segs);
+          if (fs.existsSync(base)) { nested = base; break; }
+        }
+        if (nested) {
+          try { fs.mkdirSync(path.dirname(directPath), { recursive: true }); } catch {}
+          const type = process.platform === 'win32' ? 'junction' : 'dir';
+          try { fs.symlinkSync(nested, directPath, type); } catch {}
+        }
+      }
+    } catch {}
+  }
+  return { ok: fs.existsSync(directPath), path: directPath };
 };
 
 module.exports.switchPluginVersion = async function switchPluginVersion(pluginName, sel) {

@@ -7,7 +7,8 @@ let pluginApi = null;
 let compassWin = null;
 
 const state = {
-  eventChannel: 'screen.compass'
+  eventChannel: 'screen.compass',
+  dragging: false
 };
 
 function createCompassWindow() {
@@ -16,10 +17,10 @@ function createCompassWindow() {
     const pt = screen.getCursorScreenPoint ? screen.getCursorScreenPoint() : { x: 0, y: 0 };
     const d = screen.getDisplayNearestPoint ? screen.getDisplayNearestPoint(pt) : screen.getPrimaryDisplay();
     const b = d.bounds;
-    const w = 96, h = 96, m = 16;
+    const w = 96, h = 96, mr = 16, mb = 32;
     compassWin = new BrowserWindow({
-      x: b.x + b.width - w - m,
-      y: b.y + b.height - h - m,
+      x: b.x + b.width - w - mr,
+      y: b.y + b.height - h - mb,
       width: w,
       height: h,
       frame: false,
@@ -41,6 +42,9 @@ function createCompassWindow() {
       }
     });
     compassWin.loadFile(path.join(__dirname, 'float', 'compass.html'));
+    try { compassWin.setAlwaysOnTop(true); } catch {}
+    try { compassWin.setAlwaysOnTop(true, 'screen-saver'); } catch {}
+    try { compassWin.setVisibleOnAllWorkspaces(true); } catch {}
     compassWin.on('closed', () => { compassWin = null; });
     let snapTimer = null;
     const snap = () => {
@@ -58,7 +62,7 @@ function createCompassWindow() {
         if (x !== wb.x || y !== wb.y) compassWin.setPosition(x, y);
       } catch {}
     };
-    const scheduleSnap = () => { try { if (snapTimer) clearTimeout(snapTimer); snapTimer = setTimeout(snap, 120); } catch {} };
+    const scheduleSnap = () => { try { if (state.dragging) return; if (snapTimer) clearTimeout(snapTimer); snapTimer = setTimeout(snap, 120); } catch {} };
     try { compassWin.on('move', scheduleSnap); } catch {}
     try { compassWin.on('moved', scheduleSnap); } catch {}
     return compassWin;
@@ -240,7 +244,7 @@ const functions = {
       const cx = wb.x + Math.floor(wb.width / 2);
       const cy = wb.y + Math.floor(wb.height / 2);
       const expanded = !!on;
-      const size = expanded ? { width: 220, height: 220 } : { width: 96, height: 96 };
+      const size = expanded ? { width: 240, height: 240 } : { width: 60, height: 60 };
       let nx = cx - Math.floor(size.width / 2);
       let ny = cy - Math.floor(size.height / 2);
       if (nx < sb.x) nx = sb.x;
@@ -251,6 +255,7 @@ const functions = {
       return true;
     } catch { return false; }
   },
+  setDragging: (flag) => { try { state.dragging = !!flag; return true; } catch { return false; } },
   getBounds: () => { try { if (!compassWin || compassWin.isDestroyed()) return null; return compassWin.getBounds(); } catch { return null; } },
   moveTo: (x, y) => {
     try {

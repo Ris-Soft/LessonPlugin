@@ -23,7 +23,7 @@ const functions = {
       subscribeTopics: [EVENT_CHANNEL],
       callerPluginId: 'profiles.students',
       backgroundUrl: bg,
-      floatingUrl: fileUrl(path.join(__dirname, 'floating.html')) + `?channel=${encodeURIComponent(EVENT_CHANNEL)}&caller=${encodeURIComponent('profiles.students')}`,
+      floatingUrl: null,
       leftItems: [
         { id: 'add', text: '新增学生', icon: 'ri-user-add-line' },
         { id: 'save', text: '保存', icon: 'ri-save-3-line' },
@@ -45,7 +45,10 @@ const functions = {
         } else if (payload.id === 'save') {
           emitUpdate(EVENT_CHANNEL, 'students.save', true);
         } else if (payload.id === 'importText') {
-          emitUpdate(EVENT_CHANNEL, 'students.import.open', true);
+          emitUpdate(EVENT_CHANNEL, 'floatingBounds', 'center');
+          emitUpdate(EVENT_CHANNEL, 'floatingBounds', { width: 620, height: 420 });
+          const floatUrl = fileUrl(path.join(__dirname, 'floating.html')) + `?channel=${encodeURIComponent(EVENT_CHANNEL)}&caller=${encodeURIComponent('profiles.students')}`;
+          emitUpdate(EVENT_CHANNEL, 'floatingUrl', floatUrl);
         }
       }
       return true;

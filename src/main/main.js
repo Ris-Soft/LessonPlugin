@@ -545,10 +545,13 @@ app.whenReady().then(async () => {
   try {
     if (process.defaultApp) {
       app.setAsDefaultProtocolClient('LessonPlugin', process.execPath, [app.getAppPath()]);
+      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('lessonplugin', process.execPath, [app.getAppPath()]); } catch {}
     } else {
       app.setAsDefaultProtocolClient('LessonPlugin');
+      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('lessonplugin'); } catch {}
     }
   } catch {}
+  try { ensureLinuxProtocolRegistration(); } catch {}
   app.on('second-instance', (_e, argv) => {
     // 处理自定义协议（LessonPlugin://task/<text>）
     const arg = argv.find((s) => /^LessonPlugin:\/\//i.test(s));
@@ -777,6 +780,13 @@ ipcMain.handle('window:control', async (event, action) => {
     case 'hide':
       win.hide();
       break;
+    case 'blur':
+      try {
+        try { win.setFocusable(false); } catch {}
+        try { win.blur(); } catch {}
+        try { setTimeout(() => { try { win.setFocusable(true); } catch {} }, 500); } catch {}
+      } catch {}
+      break;
     case 'close':
       win.close();
       break;
@@ -852,9 +862,23 @@ ipcMain.handle('components:entryUrl', async (_e, idOrName) => {
 ipcMain.on('plugin:automation:register', (event, pluginId, events) => {
   pluginManager.registerAutomationEvents(pluginId, events);
 });
-  ipcMain.handle('plugin:automation:listEvents', async (_e, pluginId) => {
-    return pluginManager.listAutomationEvents(pluginId);
-  });
+ipcMain.handle('plugin:automation:listEvents', async (_e, pluginId) => {
+  return pluginManager.listAutomationEvents(pluginId);
+});
+
+// 窗口状态查询：是否全屏
+ipcMain.handle('window:isFullscreen', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+  if (!win) return false;
+  try { return !!win.isFullScreen(); } catch { return false; }
+});
+
+// 窗口位置与大小：用于拖动区域触发恢复
+ipcMain.handle('window:getBounds', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+  if (!win) return null;
+  try { return win.getBounds(); } catch { return null; }
+});
   // 从设置页直接请求为插件动作创建桌面快捷方式
   ipcMain.handle('plugin:automation:createShortcut', async (_e, pluginId, options) => {
     try {
@@ -1112,11 +1136,12 @@ ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
           '[Desktop Entry]',
           'Type=Application',
           'Name=LessonPlugin',
-          `Exec="${execPath}"`,
+          `Exec=${execPath}`,
           fs.existsSync(iconPng) ? `Icon=${iconPng}` : '',
           'Terminal=false',
           'Categories=Utility;',
           'X-GNOME-Autostart-enabled=true',
+          'OnlyShowIn=Deepin;GNOME;KDE;',
           'Hidden=false'
         ].filter(Boolean).join('\n');
         fs.writeFileSync(filePath, lines, 'utf-8');
@@ -1180,6 +1205,34 @@ function applyUserDataOverride() {
 }
 
 applyUserDataOverride();
+
+function ensureLinuxProtocolRegistration() {
+  try {
+    if (process.platform !== 'linux') return;
+    const appsDir = path.join(require('os').homedir(), '.local', 'share', 'applications');
+    try { fs.mkdirSync(appsDir, { recursive: true }); } catch {}
+    const execPath = process.env.APPIMAGE || process.execPath;
+    const iconPng = path.join(app.getAppPath(), 'logo.png');
+    const desktopName = 'lessonplugin.desktop';
+    const filePath = path.join(appsDir, desktopName);
+    const lines = [
+      '[Desktop Entry]',
+      'Type=Application',
+      'Name=LessonPlugin',
+      `Exec="${execPath}" %u`,
+      fs.existsSync(iconPng) ? `Icon=${iconPng}` : '',
+      'Terminal=false',
+      'Categories=Utility;',
+      'MimeType=x-scheme-handler/lessonplugin;x-scheme-handler/LessonPlugin;'
+    ].filter(Boolean).join('\n');
+    fs.writeFileSync(filePath, lines, 'utf-8');
+    try {
+      const spawn = require('child_process').spawn;
+      spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/lessonplugin'], { shell: true });
+      spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/LessonPlugin'], { shell: true });
+    } catch {}
+  } catch {}
+}
 
 // 图标目录与释放（将Canvas生成的PNG写入用户数据 renderer/icons）
 ipcMain.handle('icons:dir', async () => {

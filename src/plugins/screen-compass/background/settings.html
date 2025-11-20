@@ -28,6 +28,10 @@
   <body>
     <div class="wrap">
       <div class="title">罗盘按钮设置</div>
+      <div class="row">
+        <label style="min-width:80px;color:#e6f0ff;">主题</label>
+        <select id="themeSel" class="sel"><option value="classic">经典</option><option value="sector">扇形</option></select>
+      </div>
       <div id="list"></div>
       <div class="actions">
         <button class="btn" id="openCompass"><i class="ri-compass-3-line"></i><span>打开罗盘</span></button>
@@ -83,7 +87,7 @@
       }
       document.getElementById('openCompass').onclick = async () => { try { await window.lowbarAPI.pluginCall('screen.compass','openCompass',[]); } catch {} };
       document.getElementById('add').onclick = () => { items.push({ id: 'btn_'+Date.now(), label:'新按钮', icon:'ri-focus-3-line', actionType:'cmd', actionPayload:{ cmd: '' } }); render(); };
-      document.getElementById('save').onclick = async () => { try { await window.lowbarAPI.configSet(scope, 'buttons', items); await window.lowbarAPI.emitEvent(scope, { type: 'buttons.update', buttons: items }); } catch {} };
+      document.getElementById('save').onclick = async () => { try { const theme = document.getElementById('themeSel').value; await window.lowbarAPI.configSet(scope, 'theme', theme); await window.lowbarAPI.configSet(scope, 'buttons', items); await window.lowbarAPI.emitEvent(scope, { type: 'buttons.update', buttons: items, theme }); } catch {} };
       function renderActionFields(it, box){
         box.innerHTML = '';
         const type = it.actionType || 'plugin';
@@ -207,6 +211,7 @@
           pluginIcons = plugins.map(p => String(p.icon || '').trim()).filter(Boolean);
         } catch { pluginIcons = []; plugins = []; pluginMap = {}; }
         render();
+        try { const t = await window.lowbarAPI.configGet(scope, 'theme'); const v = (t && t.result) ? t.result : t; document.getElementById('themeSel').value = (v === 'sector') ? 'sector' : 'classic'; } catch {}
       })();
     </script>
   </body>

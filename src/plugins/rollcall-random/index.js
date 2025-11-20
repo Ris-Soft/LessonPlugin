@@ -47,7 +47,7 @@ const functions = {
       const floatFile = path.join(__dirname, 'float', 'settings.html');
       state.backgroundBase = url.pathToFileURL(bgFile).href;
       state.floatSettingsBase = url.pathToFileURL(floatFile).href;
-      const initBg = state.backgroundBase + '?name=';
+      const initBg = state.backgroundBase + '?channel=' + encodeURIComponent(state.eventChannel) + '&caller=rollcall.random&name=';
       const params = {
         title: '随机点名',
         eventChannel: state.eventChannel,
@@ -73,10 +73,12 @@ const functions = {
       if (payload.type === 'click') {
         if (payload.id === 'start-roll') {
           await ensureStudents();
-          const name = pickOne();
-          const u = new URL(state.backgroundBase);
-          u.searchParams.set('name', String(name || ''));
-          emitUpdate('backgroundUrl', u.href);
+          const names = state.students.map((s) => String(s.name || '').trim()).filter((n) => !!n);
+          const finalName = pickOne();
+          const seq = [];
+          const steps = names.length ? 5 : 0;
+          for (let i = 0; i < steps; i++) { const j = Math.floor(Math.random() * names.length); seq.push(names[j] || finalName || ''); }
+          try { pluginApi.emit(state.eventChannel, { type: 'animate.pick', names: seq, final: finalName, stepMs: 40 }); } catch {}
         }
       } else if (payload.type === 'left.click') {
         if (payload.id === 'openSettings') {

@@ -48,6 +48,7 @@
           <div class="row">
             <input id="url" placeholder="http://localhost:6100" style="min-width: 340px;" />
             <button id="save"><i class="ri-link"></i> 连接服务器</button>
+            <button id="showQRBind" title="生成二维码"><i class="ri-qr-code-line"></i></button>
           </div>
           <div id="status" style="margin-top:10px; opacity:.9">未连接</div>
           <div class="subtle" style="margin-top:6px;">支持 http(s)；连接后可在下方直接开启轮播或全部展示。</div>
@@ -61,6 +62,7 @@
             <span id="connectedUrl" style="font-weight:600;"></span>
           </div>
           <div style="display:flex; gap:8px;">
+            <button id="showQR" title="显示二维码"><i class="ri-qr-code-line"></i></button>
             <button id="disconnect"><i class="ri-shut-down-line"></i> 断开</button>
           </div>
         </div>
@@ -194,6 +196,36 @@
           } catch {}
           // 保持首页为四个正方形卡片入口
         } catch {}
+        try {
+          const btnQR = document.getElementById('showQR');
+          if (btnQR) {
+            btnQR.addEventListener('click', () => {
+              const text = String(u||'').trim();
+              if (!text) return;
+              const overlay = document.createElement('div');
+              overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:9999;';
+              const box = document.createElement('div');
+              box.style.cssText = 'background:#1f1f1f;border:1px solid #2c2c2c;border-radius:12px;padding:16px;min-width:280px;display:flex;flex-direction:column;gap:10px;align-items:center;';
+              const title = document.createElement('div');
+              title.textContent = '服务器地址二维码';
+              title.style.cssText = 'font-weight:600;';
+              const img = document.createElement('img');
+              img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(text);
+              img.alt = text;
+              const link = document.createElement('div');
+              link.textContent = text;
+              link.style.cssText = 'font-size:12px;opacity:.85;word-break:break-all;';
+              const close = document.createElement('button');
+              close.innerHTML = '<i class="ri-close-line"></i> 关闭';
+              close.style.cssText = 'margin-top:6px;';
+              close.onclick = () => { try { document.body.removeChild(overlay); } catch {} };
+              box.appendChild(title); box.appendChild(img); box.appendChild(link); box.appendChild(close);
+              overlay.appendChild(box);
+              overlay.addEventListener('click', (e) => { if (e.target === overlay) close.click(); });
+              document.body.appendChild(overlay);
+            });
+          }
+        } catch {}
       };
 
       const fetchHealth = async (base) => {
@@ -237,6 +269,36 @@
           }
         } catch (e) { alert('连接失败：' + (e?.message||e)); }
       });
+      try {
+        const btnQRBind = document.getElementById('showQRBind');
+        if (btnQRBind) {
+          btnQRBind.addEventListener('click', () => {
+            const text = String(urlEl.value||'').trim();
+            if (!text) return;
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:9999;';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#1f1f1f;border:1px solid #2c2c2c;border-radius:12px;padding:16px;min-width:280px;display:flex;flex-direction:column;gap:10px;align-items:center;';
+            const title = document.createElement('div');
+            title.textContent = '服务器地址二维码';
+            title.style.cssText = 'font-weight:600;';
+            const img = document.createElement('img');
+            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(text);
+            img.alt = text;
+            const link = document.createElement('div');
+            link.textContent = text;
+            link.style.cssText = 'font-size:12px;opacity:.85;word-break:break-all;';
+            const close = document.createElement('button');
+            close.innerHTML = '<i class="ri-close-line"></i> 关闭';
+            close.style.cssText = 'margin-top:6px;';
+            close.onclick = () => { try { document.body.removeChild(overlay); } catch {} };
+            box.appendChild(title); box.appendChild(img); box.appendChild(link); box.appendChild(close);
+            overlay.appendChild(box);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) close.click(); });
+            document.body.appendChild(overlay);
+          });
+        }
+      } catch {}
       document.getElementById('disconnect').addEventListener('click', async () => {
         try {
           await api().pluginCall('multi.word', 'setWordbankUrl', ['']);

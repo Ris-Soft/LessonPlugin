@@ -1,0 +1,14 @@
+{
+  "id": "clock.timer",
+  "name": "时间展示工具",
+  "version": "1.0.0",
+  "author": "LessonPlugin",
+  "icon": "ri-time-line",
+  "description": "提供时钟、秒表、倒计时等时间展示功能。",
+  "actions": [
+    { "id": "openWindow", "icon": "ri-window-line", "text": "打开窗口", "target": "openWindow" },
+    { "id": "openClock", "icon": "ri-time-line", "text": "打开时钟", "target": "openClock" },
+    { "id": "openStopwatch", "icon": "ri-speed-line", "text": "打开秒表", "target": "openStopwatch" },
+    { "id": "openCountdown", "icon": "ri-timer-line", "text": "打开倒计时", "target": "openCountdown" }
+  ]
+}

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>早读看板</title>
+  <style>
+    body{margin:0;background:#0b1520;color:#e6f1ff;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+    .wrap{padding:16px;height:100vh;box-sizing:border-box}
+    .grid{display:grid;grid-template-columns:1fr 42vw;gap:14px;height:calc(100vh - 80px)}
+    .panel{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px;overflow:auto}
+    .panel.left{display:flex;flex-direction:column;overflow:hidden}
+    .time{font-size:clamp(56px,8vw,120px);line-height:1;font-weight:700}
+    .date{font-size:2.2vw;margin-top:8px;opacity:.9}
+    .meta{margin-top:10px;font-size:1.8vw;opacity:.9}
+    .quote{font-size:clamp(22px,2.0vw,48px);line-height:1.6}
+    .quote .from{margin-top:10px;font-size:14px;opacity:.8}
+    .row{display:flex;gap:8px;align-items:center}
+    .btn{padding:7px 12px;border:none;border-radius:8px;cursor:pointer}
+    .btn.primary{background:#22c55e;color:#071a12}
+    .btn.secondary{background:#334155;color:#e6f1ff}
+    .muted{opacity:.7}
+    .quote-card{margin-top:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(255,255,255,0.12)}
+    .quote-card.general{background:rgba(34,197,94,0.10);border-left:4px solid #22c55e}
+    .quote-card.specific.cn{background:rgba(245,158,11,0.10);border-left:4px solid #f59e0b}
+    .quote-card.specific.en{background:rgba(96,165,250,0.10);border-left:4px solid #60a5fa}
+    .quote-card .icon{font-size:28px;margin-right:8px}
+    .quote-card .from{font-style:italic;margin-top:6px}
+    .quote-card.general .from{color:#22c55e}
+    .quote-card.specific.cn .from{color:#f59e0b}
+    .quote-card.specific.en .from{color:#60a5fa}
+    .poem-lines{margin-top:4px;white-space:pre-line;opacity:.92}
+    .time-box{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px}
+    .quote-card.poem-full{background:rgba(255,255,255,0.06);border-left:none}
+    .annotate-box{margin-top:14px;flex:1;position:relative;padding-bottom:64px;overflow:hidden}
+    .annotate-toolbar{display:flex;gap:8px;position:absolute;left:12px;right:12px;bottom:12px;z-index:4}
+    .annotate-toolbar .btn{display:flex;align-items:center;gap:6px}
+    #annotate-canvas{width:100%;height:calc(100% - 64px);display:block;border:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12);border-radius:12px;background:rgba(255,255,255,0.04)}
+    #eraser-cursor{position:absolute;width:40px;height:40px;border:2px solid rgba(255,255,255,0.85);background:rgba(255,255,255,0.18);border-radius:6px;pointer-events:none;display:none;z-index:3}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel left">
+        <div class="time-box">
+          <div class="time" id="t-time"></div>
+          <div class="date" id="t-date"></div>
+          <div class="meta" id="t-meta"></div>
+        </div>
+        <div style="position:fixed;left:24px;bottom:24px;">
+          <button class="btn secondary" id="btn-exit"><i class="ri-logout-box-r-line"></i> 退出</button>
+        </div>
+        <div class="annotate-box">
+          <div class="annotate-toolbar">
+            <button class="btn secondary" id="tool-pen"><i class="ri-pencil-line"></i> 批注</button>
+            <button class="btn secondary" id="tool-eraser"><i class="ri-eraser-line"></i> 橡皮擦</button>
+            <button class="btn danger" id="tool-clear"><i class="ri-delete-bin-line"></i> 清页</button>
+          </div>
+          <canvas id="annotate-canvas"></canvas>
+          <div id="eraser-cursor"></div>
+        </div>
+      </div>
+      <div class="panel right">
+        <div class="row" style="justify-content:flex-end;">
+          <button class="btn secondary" id="btn-refresh"><i class="ri-refresh-line"></i> 刷新</button>
+        </div>
+        <div class="quote-card general">
+          <div class="row" style="gap:10px;align-items:center;">
+            <i class="ri-star-line" style="font-size:28px;color:#22c55e;"></i>
+            <div>
+              <div class="quote" id="q-general"></div>
+              <div class="quote from" id="q-general-from"></div>
+            </div>
+          </div>
+        </div>
+        <div class="quote-card specific cn" id="card-specific-cn" style="display:none;">
+          <div class="row" style="gap:10px;align-items:center;">
+            <i class="ri-book-2-line" style="font-size:28px;color:#f59e0b;"></i>
+            <div>
+              <div class="quote" id="q-specific"></div>
+              <div class="quote from" id="q-specific-from"></div>
+              <div class="quote from" id="q-specific-translate"></div>
+            </div>
+          </div>
+        </div>
+        <div class="quote-card poem-full" id="card-poem-full" style="display:none;">
+          <div>
+            <div class="poem-lines" id="q-poem-lines"></div>
+          </div>
+        </div>
+        <div class="quote-card specific en" id="card-specific-en" style="display:none;">
+          <div class="row" style="gap:10px;align-items:center;">
+            <i class="ri-translate" style="font-size:28px;color:#60a5fa;"></i>
+            <div>
+              <div class="quote" id="q-specific-en"></div>
+              <div class="quote from" id="q-specific-en-from"></div>
+              <div class="quote from" id="q-specific-en-translate"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const $ = (s) => document.querySelector(s);
+    window.pluginAPI?.ui.ensureStyles();
+    $('#btn-exit').addEventListener('click',()=>window.pluginAPI?.windowControl('close'));
+    async function tick(){
+      const t = await window.pluginAPI?.getCurrentTime();
+      const d = new Date(t?.iso || Date.now());
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      const ss = String(d.getSeconds()).padStart(2,'0');
+      $('#t-time').textContent = `${hh}:${mm}:${ss}`;
+      const wk = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][d.getDay()];
+      $('#t-date').textContent = `${y}-${m}-${day} ${wk}`;
+      const days = Number(t?.daysFromBase || 0);
+      const weekIdx = Math.floor(days/7)+1;
+      let even = Math.floor(days/7)%2===0;
+      const off = await window.pluginAPI?.configGet('system','biweekOffset');
+      if (off) even = !even;
+      const tag = even? '双周':'单周';
+      $('#t-meta').textContent = `第${weekIdx}周 · ${tag} · 已开学${days}天`;
+    }
+    let timer = null;
+    function startClock(){ if (timer) clearInterval(timer); tick(); timer = setInterval(tick, 500); }
+    async function getActiveMode(){
+      const cfg = await window.pluginAPI?.configGetAll('morningReading');
+      const list = Array.isArray(cfg?.boardPeriods)?cfg.boardPeriods:[];
+      const now = new Date();
+      const w = now.getDay()===0?7:now.getDay();
+      const base = await window.pluginAPI?.configGet('system','semesterStart') || await window.pluginAPI?.configGet('system','offsetBaseDate');
+      const off = await window.pluginAPI?.configGet('system','biweekOffset');
+      let even = null;
+      if (base){ try{ const bd = new Date(String(base)+'T00:00:00'); const diff = Math.floor((now-bd)/86400e3); const wi = Math.floor(diff/7); even = wi%2===0; if (off) even=!even; }catch{} }
+      const match = (r)=>{ if(r==='any'||r==null) return true; if(even==null) return false; return r==='even'?even:!even; };
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mm = String(now.getMinutes()).padStart(2,'0');
+      const cur = `${hh}:${mm}`;
+      for(const p of list){ if(p?.enabled===false) continue; const onW = Array.isArray(p?.weekdays)?p.weekdays.includes(w):true; const ok = match(p?.biweek); const s = String(p?.start||'').slice(0,5); const e = String(p?.end||'').slice(0,5); if(!onW||!ok) continue; if(/^\d{2}:\d{2}$/.test(s)&&/^\d{2}:\d{2}$/.test(e)){ if(s<=cur && cur<e) return String(p?.type||'cn'); } }
+      return 'cn';
+    }
+    async function fetchQuote(force){
+      const mode = await getActiveMode();
+      try{
+        // 通用金句始终显示
+        try{
+          const rg = await fetch('https://api.v1.inkpick.cn/api/random',{cache:'no-store'});
+          const jg = await rg.json();
+          $('#q-general').textContent = String(jg?.content||'');
+          const byG = [jg?.author||'', jg?.source||''].filter(Boolean).join(' · ');
+          $('#q-general-from').textContent = byG ? byG : '';
+        }catch{}
+        if(mode==='cn'){
+          $('#card-specific-cn').style.display = '';
+          $('#card-specific-en').style.display = 'none';
+          $('#card-poem-full').style.display = '';
+          let j = null;
+          if(!force){ j = getCache('jinrishici'); }
+          if(!j){ const r = await fetch('https://v2.jinrishici.com/one.json',{cache:'no-store'}); j = await r.json(); setCache('jinrishici', j); }
+          const d = j?.data || {};
+          $('#q-specific').textContent = String(d?.content||'');
+          const org = d?.origin || {};
+          const by = [org?.author||'', org?.title||''].filter(Boolean).join(' · ');
+          $('#q-specific-from').textContent = by ? by : '';
+          $('#q-specific-translate').textContent = '';
+          try {
+            const lines = Array.isArray(org?.content) ? org.content : [];
+            $('#q-poem-lines').textContent = (lines.length ? lines.join('\n') : '');
+          } catch { $('#q-poem-lines').textContent = ''; }
+          return;
+        }
+        if(mode==='en'){
+          $('#card-specific-cn').style.display = 'none';
+          $('#card-specific-en').style.display = '';
+          $('#card-poem-full').style.display = 'none';
+          const r = await fetch('https://apiv3.shanbay.com/weapps/dailyquote/quote',{cache:'no-store'});
+          const j = await r.json();
+          $('#q-specific-en').textContent = String(j?.content||'');
+          const by = String(j?.author||'');
+          $('#q-specific-en-from').textContent = by ? by : '';
+          $('#q-specific-en-translate').textContent = String(j?.translation||'');
+          $('#q-poem-lines').textContent = '';
+          return;
+        }
+      }catch{
+        $('#q-general').textContent = '洛阳亲友如相问，一片冰心在玉壶';
+        $('#q-general-from').textContent = '王昌龄 · 芙蓉楼送辛渐';
+        $('#card-specific-cn').style.display = 'none';
+        $('#card-specific-en').style.display = 'none';
+        $('#card-poem-full').style.display = 'none';
+        $('#q-poem-lines').textContent = '';
+      }
+    }
+    function getCache(key){ try{ const raw = localStorage.getItem('mr.cache.'+key); if(!raw) return null; const obj = JSON.parse(raw); if(!obj||!obj.ts||!obj.data) return null; if(Date.now()-obj.ts > 20*60*1000) return null; return obj.data; }catch{ return null; } }
+    function setCache(key,data){ try{ localStorage.setItem('mr.cache.'+key, JSON.stringify({ ts: Date.now(), data })); }catch{} }
+    $('#btn-refresh').addEventListener('click', ()=>fetchQuote(true));
+    startClock();
+    fetchQuote();
+
+    let tool = 'pen';
+    const penBtn = document.getElementById('tool-pen');
+    const eraserBtn = document.getElementById('tool-eraser');
+    const clearBtn = document.getElementById('tool-clear');
+    const cvs = document.getElementById('annotate-canvas');
+    const annotateBox = document.querySelector('.annotate-box');
+    const eraserCursor = document.getElementById('eraser-cursor');
+    let ctx = null; let drawing=false; let lastX=0, lastY=0; let dpr = window.devicePixelRatio || 1; const ERASER_SIZE = 40;
+    function getAnnotateCache(){ try{ const raw = localStorage.getItem('mr.annotate.board'); if(!raw) return null; const obj = JSON.parse(raw); if(!obj||!obj.data) return null; return obj.data; }catch{ return null; } }
+    function setAnnotateCache(dataUrl){ try{ localStorage.setItem('mr.annotate.board', JSON.stringify({ ts: Date.now(), data: dataUrl })); }catch{} }
+    function sizeCanvas(){ const rect = cvs.getBoundingClientRect(); const w = Math.max(10, rect.width); const h = Math.max(10, rect.height); cvs.width = Math.floor(w * dpr); cvs.height = Math.floor(h * dpr); if(ctx){ ctx.setTransform(1,0,0,1,0,0); } }
+    function initCanvas(){ ctx = cvs.getContext('2d'); sizeCanvas(); const cached = getAnnotateCache(); if (cached) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, cvs.width, cvs.height); }; img.src = cached; } }
+    function setTool(t){ tool = t; if (t === 'eraser') { try { eraserCursor.style.display = ''; eraserCursor.style.width = ERASER_SIZE+'px'; eraserCursor.style.height = ERASER_SIZE+'px'; } catch {} } else { try { eraserCursor.style.display = 'none'; } catch {} } }
+    penBtn.addEventListener('click', ()=>setTool('pen'));
+    eraserBtn.addEventListener('click', ()=>setTool('eraser'));
+    clearBtn.addEventListener('click', ()=>{ if(!ctx) return; ctx.clearRect(0,0,cvs.width,cvs.height); setAnnotateCache(cvs.toDataURL('image/png')); });
+    function getCanvasPoint(e){ const ca = cvs.getBoundingClientRect(); const x = Math.max(0, Math.min(e.clientX - ca.left, ca.width)); const y = Math.max(0, Math.min(e.clientY - ca.top, ca.height)); return { x, y, dx: Math.round(x * dpr), dy: Math.round(y * dpr), ca }; }
+    cvs.addEventListener('pointerdown', (e)=>{ const p = getCanvasPoint(e); drawing=true; lastX=p.x; lastY=p.y; e.target.setPointerCapture?.(e.pointerId); if(tool==='eraser'){ try { eraserCursor.style.display = ''; } catch {} ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(p.dx, p.dy, Math.floor((ERASER_SIZE * dpr)/2), 0, Math.PI*2); ctx.fill(); ctx.restore(); } });
+    cvs.addEventListener('pointermove', (e)=>{ if(!ctx) return; const p = getCanvasPoint(e); const x=p.x, y=p.y; const ba = annotateBox.getBoundingClientRect(); const lx = (p.ca.left - ba.left) + x - ERASER_SIZE/2; const ly = (p.ca.top - ba.top) + y - ERASER_SIZE/2; if(tool==='pen'){ if(!drawing) return; ctx.strokeStyle = '#e6f1ff'; ctx.lineWidth = 3 * dpr; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(Math.round(lastX*dpr), Math.round(lastY*dpr)); ctx.lineTo(p.dx, p.dy); ctx.stroke(); lastX=x; lastY=y; } else { if(eraserCursor.style.display !== '') { try { eraserCursor.style.display = ''; } catch {} } eraserCursor.style.transform = `translate(${lx}px, ${ly}px)`; if(drawing) { ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = ERASER_SIZE * dpr; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(Math.round(lastX*dpr), Math.round(lastY*dpr)); ctx.lineTo(p.dx, p.dy); ctx.stroke(); ctx.restore(); lastX=x; lastY=y; } } });
+    cvs.addEventListener('pointerup', (e)=>{ drawing=false; try{ cvs.releasePointerCapture?.(e.pointerId); }catch{} setAnnotateCache(cvs.toDataURL('image/png')); });
+    cvs.addEventListener('pointerenter', ()=>{ if(tool==='eraser'){ try { eraserCursor.style.display = ''; } catch {} } });
+    cvs.addEventListener('pointerleave', ()=>{ try { eraserCursor.style.display = 'none'; } catch {} });
+    window.addEventListener('resize', ()=>{ const snap = cvs ? cvs.toDataURL('image/png') : null; initCanvas(); if (snap) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, cvs.width, cvs.height); setAnnotateCache(snap); }; img.src = snap; } });
+    window.addEventListener('blur', ()=>{ try { setAnnotateCache(cvs.toDataURL('image/png')); } catch {} });
+    initCanvas();
+  </script>
+</body>
+</html>

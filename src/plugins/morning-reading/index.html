@@ -103,6 +103,9 @@
     .wrap {
       overflow-y: hidden;
     }
+    #board-period-list .setting-item { display:block; margin-bottom:10px; }
+    #board-period-list .setting-icon { margin-left:0px; margin-bottom:5px; }
+    #board-period-list .setting-main { margin-bottom:10px; }
   </style>
 </head>
 
@@ -118,7 +121,7 @@
   <div class="wrap">
     <div class="tabs">
       <div class="tab active" data-page="p-stand">站立早读提醒</div>
-      <div class="tab" data-page="p-plan" title="规划中">早读看板（规划）</div>
+      <div class="tab" data-page="p-plan">早读看板</div>
     </div>
 
     <div class="page active" id="p-stand">
@@ -281,9 +284,87 @@
     </div>
 
     <div class="page" id="p-plan">
-      <div class="card">
-        <div style="font-size:16px; font-weight:600;">功能规划</div>
-        <div class="muted">早读看板与早读应用将与其他插件结合开发。</div>
+      <div class="section main">
+        <div class="section-title"><i class="ri-dashboard-2-line"></i> 早读看板</div>
+        <div class="grid-two">
+          <div>
+            <div class="section" style="padding:12px;">
+              <div class="section-title" style="justify-content:space-between;">
+                <span>时段列表</span>
+                <span style="display:flex;gap:8px;">
+                  <button class="btn secondary" id="btn-b-add"><i class="ri-add-line"></i> 新增时段</button>
+                  <button class="btn" id="btn-b-open"><i class="ri-sun-foggy-line"></i> 打开看板</button>
+                </span>
+              </div>
+              <div id="board-period-list"></div>
+            </div>
+          </div>
+          <div>
+            <div class="section" id="board-editor-sec" style="padding:12px; display:none;">
+              <div class="section-title" style="justify-content:space-between;">
+                <div>
+                  <span style="font-weight:600;" id="board-editor-title">编辑时段</span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn primary" id="btn-b-save" disabled><i class="ri-save-line"></i> 保存并应用</button>
+                </div>
+              </div>
+              <div class="form">
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-pencil-line"></i></div>
+                  <div class="setting-main">
+                    <div class="setting-title">名称</div>
+                    <div class="setting-desc">例如：语文早读看板</div>
+                  </div>
+                  <div class="setting-action"><div class="inline"><input id="bf-name" type="text" placeholder="例如：语文早读看板" /></div></div>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-toggle-line"></i></div>
+                  <div class="setting-main"><div class="setting-title">启用该时段</div><div class="setting-desc">保存后自动应用。</div></div>
+                  <div class="setting-action"><label class="switch"><input type="checkbox" id="bf-enabled" /><span class="slider"></span></label></div>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-time-line"></i></div>
+                  <div class="setting-main"><div class="setting-title">开始与结束时间</div><div class="setting-desc">格式 HH:MM</div></div>
+                  <div class="setting-action"><div class="inline"><input id="bf-start" type="time" /><input id="bf-end" type="time" /></div></div>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-calendar-check-line"></i></div>
+                  <div class="setting-main"><div class="setting-title">周几启用</div><div class="setting-desc">点击选择启用的工作日</div></div>
+                  <div class="setting-action"><div class="chips" id="bf-weekdays"></div></div>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-shuffle-line"></i></div>
+                  <div class="setting-main"><div class="setting-title">单双周</div><div class="setting-desc">不限、双周或单周</div></div>
+                  <div class="setting-action">
+                    <div class="options" role="group" aria-label="单双周">
+                      <input type="radio" id="b-biweek-any" name="b-biweek" value="any" />
+                      <label for="b-biweek-any">不限</label>
+                      <input type="radio" id="b-biweek-even" name="b-biweek" value="even" />
+                      <label for="b-biweek-even">双周</label>
+                      <input type="radio" id="b-biweek-odd" name="b-biweek" value="odd" />
+                      <label for="b-biweek-odd">单周</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-icon"><i class="ri-book-open-line"></i></div>
+                  <div class="setting-main"><div class="setting-title">内容类型</div><div class="setting-desc">通用金句、今日诗词或英语句子</div></div>
+                  <div class="setting-action">
+                    <div class="options" role="group" aria-label="内容类型">
+                      <input type="radio" id="b-type-general" name="b-type" value="general" />
+                      <label for="b-type-general">通用金句</label>
+                      <input type="radio" id="b-type-cn" name="b-type" value="cn" />
+                      <label for="b-type-cn">今日诗词</label>
+                      <input type="radio" id="b-type-en" name="b-type" value="en" />
+                      <label for="b-type-en">英语句子</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -320,12 +401,16 @@
 
     // 读取配置并初始化
     let periods = [];
+    let boardPeriods = [];
     let currentIndex = null; // 当前正在编辑的条目索引（未选择为 null）
+    let currentBoardIndex = null;
     async function init() {
-      await window.settingsAPI?.configEnsureDefaults('morningReading', { periods: [] });
+      await window.settingsAPI?.configEnsureDefaults('morningReading', { periods: [], boardPeriods: [] });
       const cfg = await window.settingsAPI?.configGetAll('morningReading');
       periods = Array.isArray(cfg?.periods) ? cfg.periods : [];
+      boardPeriods = Array.isArray(cfg?.boardPeriods) ? cfg.boardPeriods : [];
       renderList();
+      renderBoardList();
     }
 
     function addItem() {
@@ -333,6 +418,12 @@
       periods.push({ name: `早读时段${idx}`, enabled: true, start: '06:50', end: '07:20', weekdays: [1, 2, 3, 4, 5], biweek: 'any', textStart: '站立早读开始', textEnd: '站立早读结束', soundIn: true, soundOut: true, speakStart: false, speakEnd: false });
       renderList();
       fillEditor(periods[periods.length - 1], periods.length - 1);
+    }
+    function addBoardItem() {
+      const idx = boardPeriods.length + 1;
+      boardPeriods.push({ name: `看板时段${idx}`, enabled: true, start: '06:50', end: '07:20', weekdays: [1,2,3,4,5], biweek: 'any', type: 'general' });
+      renderBoardList();
+      fillBoardEditor(boardPeriods[boardPeriods.length - 1], boardPeriods.length - 1);
     }
 
     function renderList() {
@@ -355,9 +446,36 @@
           </div>`;
         // 事件
         const chk = item.querySelector('input[type=checkbox]');
-        chk.addEventListener('change', (e) => { p.enabled = e.target.checked; });
+        chk.addEventListener('change', async (e) => { p.enabled = e.target.checked; await window.settingsAPI?.configSet('morningReading', 'periods', periods); await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]); });
         item.querySelector('[data-op=edit]').addEventListener('click', () => { fillEditor(p, idx); });
-        item.querySelector('[data-op=del]').addEventListener('click', () => { periods.splice(idx, 1); renderList(); });
+        item.querySelector('[data-op=del]').addEventListener('click', async () => { periods.splice(idx, 1); await window.settingsAPI?.configSet('morningReading', 'periods', periods); await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]); renderList(); });
+        listEl.appendChild(item);
+      });
+    }
+
+    function renderBoardList() {
+      const listEl = $('#board-period-list');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      boardPeriods.forEach((p, idx) => {
+        const item = document.createElement('div'); item.className = 'setting-item';
+        const name = p.name || ('时段' + (idx + 1));
+        const desc = `${p.start || '--:--'} ~ ${p.end || '--:--'} · 周${(p.weekdays || []).map(v => weekdaysLabels[v - 1]).join('')} · ${(p.biweek === 'even' ? '双周' : p.biweek === 'odd' ? '单周' : '不限')} · ${(p.type==='cn'?'今日诗词':p.type==='en'?'英语句子':'通用金句')}`;
+        item.innerHTML = `
+          <div class="setting-icon"><i class="ri-time-line"></i></div>
+          <div class="setting-main">
+            <div class="setting-title">${name}</div>
+            <div class="setting-desc">${desc}</div>
+          </div>
+          <div class="setting-action" style="gap:8px;">
+            <label class="switch" title="启用"><input type="checkbox" ${p.enabled !== false ? 'checked' : ''}/><span class="slider"></span></label>
+            <button class="btn secondary" data-op="edit"><i class="ri-edit-line"></i> 编辑</button>
+            <button class="btn danger" data-op="del"><i class="ri-delete-bin-line"></i> 删除</button>
+          </div>`;
+        const chk = item.querySelector('input[type=checkbox]');
+        chk.addEventListener('change', async (e) => { p.enabled = e.target.checked; await window.settingsAPI?.configSet('morningReading', 'boardPeriods', boardPeriods); await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]); });
+        item.querySelector('[data-op=edit]').addEventListener('click', () => { fillBoardEditor(p, idx); });
+        item.querySelector('[data-op=del]').addEventListener('click', async () => { boardPeriods.splice(idx, 1); await window.settingsAPI?.configSet('morningReading', 'boardPeriods', boardPeriods); await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]); renderBoardList(); });
         listEl.appendChild(item);
       });
     }
@@ -373,9 +491,32 @@
       const el = document.getElementById(id);
       if (el) el.checked = true;
     }
+    function getBoardBiweek() {
+      const r = document.querySelector('input[name="b-biweek"]:checked');
+      return r?.value || 'any';
+    }
+    function setBoardBiweek(v) {
+      const ids = { any: 'b-biweek-any', even: 'b-biweek-even', odd: 'b-biweek-odd' };
+      const id = ids[v] || ids.any;
+      const el = document.getElementById(id);
+      if (el) el.checked = true;
+    }
+    function getBoardType() {
+      const r = document.querySelector('input[name="b-type"]:checked');
+      return r?.value || 'general';
+    }
+    function setBoardType(v) {
+      const ids = { general: 'b-type-general', cn: 'b-type-cn', en: 'b-type-en' };
+      const id = ids[v] || ids.general;
+      const el = document.getElementById(id);
+      if (el) el.checked = true;
+    }
 
     function getEditorWeekdays() {
       return $$('#f-weekdays .chip').filter(c => c.classList.contains('active')).map(c => parseInt(c.dataset.v, 10));
+    }
+    function getBoardWeekdays() {
+      return $$('#bf-weekdays .chip').filter(c => c.classList.contains('active')).map(c => parseInt(c.dataset.v, 10));
     }
 
     function fillEditor(p, idx) {
@@ -401,6 +542,19 @@
       $('#btn-test-start')?.removeAttribute('disabled');
       $('#btn-test-end')?.removeAttribute('disabled');
     }
+    function fillBoardEditor(p, idx) {
+      currentBoardIndex = (typeof idx === 'number') ? idx : boardPeriods.findIndex(x => x === p);
+      $('#bf-name').value = p.name || '';
+      $('#bf-enabled').checked = p.enabled !== false;
+      $('#bf-start').value = p.start || '';
+      $('#bf-end').value = p.end || '';
+      renderWeekdays($('#bf-weekdays'), Array.isArray(p.weekdays) ? p.weekdays : []);
+      setBoardBiweek(p.biweek || 'any');
+      setBoardType(p.type || 'general');
+      const sec = document.getElementById('board-editor-sec'); if (sec) sec.style.display = '';
+      const t = document.getElementById('board-editor-title'); if (t) t.textContent = `编辑：${p.name || '未命名时段'}`;
+      $('#btn-b-save')?.removeAttribute('disabled');
+    }
 
     function readEditor() {
       return {
@@ -417,6 +571,17 @@
         soundOut: $('#f-sound-out').checked,
         speakStart: $('#f-speak-start').checked,
         speakEnd: $('#f-speak-end').checked
+      };
+    }
+    function readBoardEditor() {
+      return {
+        name: $('#bf-name').value.trim() || '未命名时段',
+        enabled: $('#bf-enabled').checked,
+        start: $('#bf-start').value.trim(),
+        end: $('#bf-end').value.trim(),
+        weekdays: getBoardWeekdays(),
+        biweek: getBoardBiweek(),
+        type: getBoardType()
       };
     }
 
@@ -441,6 +606,16 @@
       const cur = readEditor();
       await window.settingsAPI?.pluginCall('morning.reading', 'previewEnd', [cur]);
     });
+    $('#btn-b-add')?.addEventListener('click', addBoardItem);
+    $('#btn-b-save')?.addEventListener('click', async () => {
+      if (currentBoardIndex == null) return;
+      const cur = readBoardEditor();
+      boardPeriods[currentBoardIndex] = { ...boardPeriods[currentBoardIndex], ...cur };
+      await window.settingsAPI?.configSet('morningReading', 'boardPeriods', boardPeriods);
+      await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]);
+      renderBoardList();
+    });
+    $('#btn-b-open')?.addEventListener('click', async () => { await window.settingsAPI?.pluginCall('morning.reading', 'openBoard', []); });
 
     init();
     // 默认未选择：右侧不显示设置，需点击编辑或新增。

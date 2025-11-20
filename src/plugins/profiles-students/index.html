@@ -188,18 +188,9 @@
         await loadStudents();
       }
 
-      function openImportBox() {
-        const box = document.getElementById('import-box'); if (box) box.style.display = 'block';
-      }
-      function closeImportBox() {
-        const box = document.getElementById('import-box'); if (box) box.style.display = 'none';
-      }
-      function applyImportText() {
-        const ta = document.getElementById('import-text');
-        applyImportTextWith(String((ta?.value) || ''));
-        if (ta) ta.value = '';
-        closeImportBox();
-      }
+      function openImportBox() { const box = document.getElementById('import-box'); if (box) box.style.display = 'block'; }
+      function closeImportBox() { const box = document.getElementById('import-box'); if (box) box.style.display = 'none'; }
+      function applyImportText() { const ta = document.getElementById('import-text'); applyImportTextWith(String((ta?.value) || '')); if (ta) ta.value=''; closeImportBox(); }
       function applyImportTextWith(text) {
         const lines = String(text||'').split(/\r?\n/).map(s => s.trim()).filter(s => s.length);
         const existing = new Set(students.map(s => String(s?.name||'').trim()).filter(Boolean));
@@ -257,13 +248,6 @@
           channel = String(u.searchParams.get('channel') || '');
           caller = String(u.searchParams.get('caller') || '');
         } catch {}
-        const btnImport = document.getElementById('btn-import');
-        const btnImportCancel = document.getElementById('btn-import-cancel');
-        const btnImportApply = document.getElementById('btn-import-apply');
-        btnImport?.addEventListener('click', openImportBox);
-        btnImportCancel?.addEventListener('click', closeImportBox);
-        btnImportApply?.addEventListener('click', applyImportText);
-
         if (window.lowbarAPI) {
           window.lowbarAPI.subscribe?.(channel);
           window.lowbarAPI.onEvent?.((name, payload) => {
@@ -271,7 +255,6 @@
             if (payload?.type === 'update') {
               if (payload.target === 'refresh') loadStudents();
               if (payload.target === 'students.save') saveStudents();
-              if (payload.target === 'students.import.open') openImportBox();
               if (payload.target === 'students.import.apply') applyImportTextWith(String(payload?.value?.text || ''));
             }
           });
@@ -281,6 +264,12 @@
           if (actions) actions.style.display = 'flex';
           document.getElementById('btn-add')?.addEventListener('click', () => { students.push({ name:'', gender:'' }); renderBody(); });
           document.getElementById('btn-save')?.addEventListener('click', saveStudents);
+          const btnImport = document.getElementById('btn-import');
+          const btnImportCancel = document.getElementById('btn-import-cancel');
+          const btnImportApply = document.getElementById('btn-import-apply');
+          btnImport?.addEventListener('click', openImportBox);
+          btnImportCancel?.addEventListener('click', closeImportBox);
+          btnImportApply?.addEventListener('click', applyImportText);
         }
         await loadColumns();
         await loadStudents();

@@ -9,19 +9,32 @@
       html, body { height: 100%; overflow: hidden; }
       body { margin: 0; background: transparent; display:flex; align-items:center; justify-content:center; overflow: hidden; }
       .root { width: 100%; height: 100%; position: relative; display:flex; align-items:center; justify-content:center; overflow: hidden; }
-      .center-btn { width: 50px; height: 50px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.26); cursor: pointer; }
-      .center-btn i { font-size: 22px; color: #e6f0ff; }
+      .center-btn { width: 50px; height: 50px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(20,28,40,0.62); border: 1px solid rgba(255,255,255,0.30); cursor: pointer; position: relative; z-index: 3; }
+      .center-btn i { font-size: 22px; color: #ffffff; }
       .center-btn:active { transform: scale(0.96); }
-      .ring { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-      .item { width: 36px; height: 36px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); pointer-events:auto; cursor:pointer; transition: opacity .18s ease, transform .18s ease; }
-      .item i { font-size:18px; color:#e6f0ff; }
+      .ring { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index: 2; }
+      .item { width: 44px; height: 58px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; background: rgba(20,28,40,0.52); border: 1px solid rgba(255,255,255,0.28); pointer-events:auto; cursor:pointer; transition: opacity .2s ease, transform .2s ease; }
+      .item i { font-size:22px; color:#e6f0ff; }
+      .item .label { font-size:11px; line-height:12px; color:#e6f0ff; opacity:0.88; max-width:64px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .item:hover { transform: scale(1.06); }
       .hidden { opacity:0; transform: scale(0.6); pointer-events:none; }
-      
+      .sectors { position:absolute; inset:0; pointer-events:none; z-index: 1; }
+      .wedge { transition: opacity .2s ease; }
+      .circle-bg { position:absolute; inset:0; border-radius:50%; background: rgba(20,28,40,0.28); border: 1px solid rgba(255,255,255,0.18); pointer-events: auto; z-index: 0; }
+      .sector .circle-bg { opacity: 1; }
+      .classic .circle-bg { opacity: 0; }
+      .classic .item { background: transparent; border: none; height: 58px; width: 56px; }
+      .classic .item .dot { width: 52px; height: 52px; border-radius: 50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background: rgba(20,28,40,0.62); border: 1px solid rgba(255,255,255,0.30); }
+      .classic .item i { color:#ffffff; font-size: 19px; }
+      .classic .item .label { font-size: 11px; line-height: 12px; max-width: 48px; margin: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sector .item { background: transparent; border: none; }
+    
     </style>
   </head>
   <body>
     <div class="root" id="root">
+      <div class="circle-bg" id="circleBg"></div>
+      <div class="sectors" id="sectors"></div>
       <div class="ring" id="ring"></div>
       <div class="center-btn" id="center"><i class="ri-compass-3-line"></i></div>
       
@@ -33,6 +46,8 @@
       let expanded = false;
       let items = [];
       const scope = 'screen.compass';
+      let theme = 'classic';
+      let activeIndex = -1;
       let toggleLock = false;
 
       async function ensureDefaults() {
@@ -50,34 +65,97 @@
           const list = (raw && raw.result) ? raw.result : raw;
           items = Array.isArray(list) ? list : [];
         } catch { items = []; }
+        try { const t = await window.compassAPI.configGet(scope, 'theme'); const v = (t && t.result) ? t.result : t; theme = (v === 'sector') ? 'sector' : 'classic'; } catch { theme = 'classic'; }
       }
 
       function placeItems() {
         ring.innerHTML = '';
+        const rootEl = document.getElementById('root');
+        const sectors = document.getElementById('sectors'); sectors.innerHTML = '';
         const rootRect = (document.getElementById('root')?.getBoundingClientRect?.()) || { width: 0, height: 0 };
-        const W = Math.max(180, Math.floor(rootRect.width || window.innerWidth || document.documentElement.clientWidth || 220));
-        const H = Math.max(180, Math.floor(rootRect.height || window.innerHeight || document.documentElement.clientHeight || 220));
+        const W = Math.max(200, Math.floor(rootRect.width || window.innerWidth || document.documentElement.clientWidth || 240));
+        const H = Math.max(200, Math.floor(rootRect.height || window.innerHeight || document.documentElement.clientHeight || 240));
         if (W < 40 || H < 40) { try { setTimeout(placeItems, 50); } catch {} return; }
         const cx = Math.floor(W / 2), cy = Math.floor(H / 2);
-        let R = Math.min(cx, cy) - 32; if (R < 24) R = 24;
+        let R = Math.min(cx, cy) - 24; if (R < 22) R = 22;
         const N = items.length;
+        try { if (theme === 'sector') { rootEl.classList.add('sector'); rootEl.classList.remove('classic'); } else { rootEl.classList.add('classic'); rootEl.classList.remove('sector'); } } catch {}
+        if (theme === 'sector' && N > 0) {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+          svg.setAttribute('width','100%');
+          svg.setAttribute('height','100%');
+          svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+          const ro = Math.min(R + 14, Math.min(cx, cy) - 10);
+          const centerR = 25;
+          const ri = Math.max(centerR + 4, Math.round(R * 0.5));
+          for (let i = 0; i < N; i++) {
+            const a1 = (Math.PI * 2) * (i / N);
+            const a2 = (Math.PI * 2) * ((i + 1) / N);
+            const o1x = Math.round(cx + ro * Math.cos(a1));
+            const o1y = Math.round(cy + ro * Math.sin(a1));
+            const o2x = Math.round(cx + ro * Math.cos(a2));
+            const o2y = Math.round(cy + ro * Math.sin(a2));
+            const i2x = Math.round(cx + ri * Math.cos(a2));
+            const i2y = Math.round(cy + ri * Math.sin(a2));
+            const i1x = Math.round(cx + ri * Math.cos(a1));
+            const i1y = Math.round(cy + ri * Math.sin(a1));
+            const largeArc = ((a2 - a1) % (Math.PI*2)) > Math.PI ? 1 : 0;
+            const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+            const d = `M ${o1x} ${o1y} A ${ro} ${ro} 0 ${largeArc} 1 ${o2x} ${o2y} L ${i2x} ${i2y} A ${ri} ${ri} 0 ${largeArc} 0 ${i1x} ${i1y} Z`;
+            path.setAttribute('d', d);
+            path.setAttribute('fill','rgba(64,128,255,0.18)');
+            path.setAttribute('stroke','rgba(64,128,255,0.32)');
+            path.setAttribute('stroke-width','1');
+            path.style.opacity = (expanded && activeIndex === i) ? '1' : '0';
+            path.setAttribute('class','wedge');
+            path.dataset.index = String(i);
+            path.addEventListener('mouseenter', () => { if (!expanded) return; activeIndex = i; try { path.style.opacity = '1'; } catch {} });
+            path.addEventListener('mouseleave', () => { if (!expanded) return; activeIndex = -1; try { path.style.opacity = '0'; } catch {} });
+            path.addEventListener('click', async () => {
+              if (!expanded) return;
+              const it = items[i];
+              try { await window.compassAPI.pluginCall('screen.compass', 'performAction', [it]); } catch {}
+              try { setExpanded(false); } catch {}
+            });
+            svg.appendChild(path);
+          }
+          sectors.appendChild(svg);
+          try { sectors.style.pointerEvents = expanded ? 'auto' : 'none'; } catch {}
+        }
         for (let i = 0; i < N; i++) {
           const it = items[i];
-          const a = (Math.PI * 2) * (i / Math.max(N, 1));
-          let x = Math.round(cx + R * Math.cos(a));
-          let y = Math.round(cy + R * Math.sin(a));
+          const a = (Math.PI * 2) * ((i + 0.5) / Math.max(N, 1));
+          const centerR = 25;
+          const ro2 = Math.min(R + 14, Math.min(cx, cy) - 10);
+          const ri2 = Math.max(centerR + 4, Math.round(R * 0.5));
+          const RB = Math.round((ro2 + ri2) / 2);
+          let x = Math.round(cx + RB * Math.cos(a));
+          let y = Math.round(cy + RB * Math.sin(a));
           const div = document.createElement('div');
           div.className = 'item';
           div.style.position = 'absolute';
-          x = Math.max(18, Math.min(W - 18, x));
-          y = Math.max(18, Math.min(H - 18, y));
-          div.style.left = (x - 18) + 'px';
-          div.style.top = (y - 18) + 'px';
+          const halfW = (theme === 'classic') ? 28 : 22;
+          const halfH = 29;
+          x = Math.max(halfW, Math.min(W - halfW, x));
+          y = Math.max(halfH+1, Math.min(H - (halfH+1), y));
+          div.style.left = (x - halfW) + 'px';
+          div.style.top = (y - halfH) + 'px';
           div.title = it.label || '';
-          div.innerHTML = `<i class="${it.icon || 'ri-circle-line'}"></i>`;
+          const labelText = String(it.label || '').trim();
+          if (theme === 'classic') { div.innerHTML = `<div class="dot"><i class="${it.icon || 'ri-circle-line'}"></i><div class="label">${labelText}</div></div>`; }
+          else { div.innerHTML = `<i class="${it.icon || 'ri-circle-line'}"></i><div class="label">${labelText}</div>`; }
+          const updateWedgesOpacity = () => {
+            try {
+              const wedges = sectors.querySelectorAll('.wedge');
+              wedges.forEach((w)=>{ const idx = Number(w.dataset.index||-1); w.style.opacity = (expanded && idx===activeIndex) ? '1' : '0'; });
+            } catch {}
+          };
+          div.addEventListener('mouseenter', () => { activeIndex = i; updateWedgesOpacity(); });
+          div.addEventListener('mouseleave', () => { activeIndex = -1; updateWedgesOpacity(); });
           div.addEventListener('click', async () => {
             if (!expanded) return;
             try { await window.compassAPI.pluginCall('screen.compass', 'performAction', [it]); } catch {}
+            try { setExpanded(false); } catch {}
           });
           ring.appendChild(div);
         }
@@ -94,9 +172,13 @@
 
       center.addEventListener('click', () => { if (dragging || justDragged || toggleLock) return; toggleLock = true; setExpanded(!expanded); setTimeout(() => { toggleLock = false; }, 160); });
 
+      let inactivityTimer = null;
+      function resetInactivityTimer(){ try { if (inactivityTimer) clearTimeout(inactivityTimer); inactivityTimer = setTimeout(() => { if (expanded) setExpanded(false); }, 30000); } catch {} }
+
       let dragging = false; let startScreenX = 0; let startScreenY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false;
       function onPointerDown(e){
         dragging = true; moved = false; startScreenX = e.screenX; startScreenY = e.screenY;
+        try { window.compassAPI.pluginCall('screen.compass','setDragging',[true]); } catch {}
         window.compassAPI.getBounds().then((raw)=>{
           const b = (raw && raw.result) ? raw.result : raw;
           startWinX = (b && typeof b.x==='number')? b.x:0; startWinY = (b && typeof b.y==='number')? b.y:0;
@@ -104,7 +186,7 @@
         });
       }
       function onPointerMove(e){ if (!dragging) return; const dx=e.screenX-startScreenX, dy=e.screenY-startScreenY; if (Math.abs(dx)>2 || Math.abs(dy)>2) moved = true; window.compassAPI.moveTo(startWinX+dx, startWinY+dy); }
-      function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); }
+      function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); try { window.compassAPI.pluginCall('screen.compass','setDragging',[false]); } catch {} }
       center.addEventListener('pointerdown', onPointerDown);
       center.addEventListener('pointermove', onPointerMove);
       center.addEventListener('pointerup', onPointerUp);
@@ -116,7 +198,7 @@
         if (window.__compassToggleTs && Date.now() - window.__compassToggleTs < 140) return; window.__compassToggleTs = Date.now();
         try { window.compassAPI.pluginCall('screen.compass','setExpandedWindow',[!!on]); } catch {}
         let done = false;
-        const run = () => { if (done) return; done = true; try { placeItems(); __origSetExpanded(on); updateCenterIcon(); } catch {} };
+        const run = () => { if (done) return; done = true; try { placeItems(); __origSetExpanded(on); updateCenterIcon(); if (expanded) resetInactivityTimer(); else { try { if (inactivityTimer) clearTimeout(inactivityTimer); } catch {} } } catch {} };
         const onResize = () => { try { window.removeEventListener('resize', onResize); } catch {} run(); };
         try { window.addEventListener('resize', onResize); } catch {}
         setTimeout(() => { if (!done) { try { window.removeEventListener('resize', onResize); } catch {} run(); } }, 140);
@@ -134,14 +216,21 @@
             try {
               if (Array.isArray(payload.buttons)) { items = payload.buttons; }
               else { await loadItems(); }
+              if (payload.theme) { theme = (payload.theme === 'sector') ? 'sector' : 'classic'; }
             } catch {}
             placeItems(); setExpanded(expanded);
           }
         });
       } catch {}
-      // 点击空白区域收起
+      // 点击空白区域收起（仅圆形背景以外的空白区域）
       const root = document.getElementById('root');
       root.addEventListener('click', (e) => { if (!expanded) return; if (e.target === root) setExpanded(false); });
+      try {
+        root.addEventListener('pointerdown', resetInactivityTimer);
+        center.addEventListener('pointerdown', resetInactivityTimer);
+        ring.addEventListener('pointerdown', resetInactivityTimer);
+        document.getElementById('sectors').addEventListener('pointerdown', resetInactivityTimer);
+      } catch {}
     </script>
   </body>
   </html>

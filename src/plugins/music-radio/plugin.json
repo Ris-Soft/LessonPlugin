@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "author": "LessonPlugin",
   "icon": "ri-radio-line",
-  "description": "底栏应用：背景为 AMLL DOM 歌词播放器，中央提供 推荐/搜索/设置/关于 悬浮层。",
+  "description": "音乐电台：提供音乐播放、搜索、推荐等功能。",
   "actions": [
     { "id": "openRadio", "icon": "ri-radio-line", "text": "打开音乐电台", "target": "openRadio" }
   ],
