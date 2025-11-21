@@ -1,0 +1,12 @@
+{
+  "id": "annotate.fabric",
+  "name": "屏幕批注",
+  "version": "0.1.0",
+  "author": "LessonPlugin",
+  "icon": "ri-pencil-ruler-2-line",
+  "description": "基于 Fabric.js 的屏幕批注支持，提供白板窗口与可调用批注区域",
+  "enabled": true,
+  "actions": [
+    { "id": "openWhiteboard", "icon": "ri-window-line", "text": "打开白板", "target": "openWhiteboard" }
+  ]
+}

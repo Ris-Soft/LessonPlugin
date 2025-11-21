@@ -5,6 +5,9 @@ const extract = require('extract-zip');
 const { v4: uuidv4 } = require('uuid');
 const Module = require('module');
 const { app, webContents } = require('electron');
+const https = require('https');
+const http = require('http');
+let tar = null;
 
 let manifestPath = '';
 let pluginsRoot = '';
@@ -22,6 +25,7 @@ let storeRoot = '';
 let progressReporter = null; // 供插件在初始化期间更新启动页文本
 // 引入自动化管理器引用，供插件入口 API 使用
 let automationManagerRef = null;
+try { tar = require('tar'); } catch {}
 
 function readJsonSafe(jsonPath, fallback) {
   try {
@@ -765,65 +769,61 @@ module.exports.closeAllWindows = function closeAllWindows() {
   try { eventSubscribers.clear(); } catch {}
 };
 
-// --------- NPM 管理 ---------
-function runNpm(args, cwd) {
+// --------- Registry 访问与下载 ---------
+function httpGet(url) {
   return new Promise((resolve) => {
-    const trySpawn = (cmd, argv) => {
-      try {
-        const env = { ...process.env };
-        if (process.platform === 'linux') {
-          const extra = ['/usr/bin', '/usr/local/bin', '/bin'];
-          const cur = String(env.PATH || '');
-          const paths = new Set(cur.split(':').filter(Boolean).concat(extra));
-          env.PATH = Array.from(paths).join(':');
+    try {
+      const mod = url.startsWith('https') ? https : http;
+      const req = mod.get(url, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return resolve(httpGet(res.headers.location));
         }
-        const p = spawn(cmd, argv, { cwd, shell: true, env });
-        return p;
-      } catch {
-        return null;
-      }
-    };
-    let child = trySpawn('npm', args);
-    if (!child) {
-      child = trySpawn('pnpm', mapToPnpmArgs(args));
+        if ((res.statusCode || 0) !== 200) {
+          let err = '';
+          res.on('data', (d) => { err += String(d || ''); });
+          res.on('end', () => resolve({ ok: false, error: `HTTP_${res.statusCode}: ${err}` }));
+          return;
+        }
+        const chunks = [];
+        res.on('data', (d) => chunks.push(Buffer.from(d)));
+        res.on('end', () => resolve({ ok: true, buffer: Buffer.concat(chunks) }));
+      });
+      req.on('error', (e) => resolve({ ok: false, error: e?.message || String(e) }));
+    } catch (e) {
+      resolve({ ok: false, error: e?.message || String(e) });
     }
-    let out = '';
-    let err = '';
-    if (!child) return resolve({ code: 127, out, err: 'no_package_manager' });
-    child.stdout.on('data', (d) => (out += String(d)));
-    child.stderr.on('data', (d) => (err += String(d)));
-    child.on('close', (code) => resolve({ code, out, err }));
   });
 }
 
-function mapToPnpmArgs(npmArgs) {
-  const a = Array.isArray(npmArgs) ? npmArgs.slice() : [];
-  if (!a.length) return [];
-  if (a[0] === 'view') {
-    const rest = a.slice(1);
-    return ['view', ...rest];
-  }
-  if (a[0] === 'install') {
-    const rest = a.slice(1);
-    const pkg = rest.find((x) => /@/.test(String(x)) && !/^--/.test(String(x)));
-    const args = ['add'];
-    if (pkg) args.push(pkg);
-    const idxReg = rest.indexOf('--registry');
-    if (idxReg >= 0 && rest[idxReg + 1]) args.push('--registry', rest[idxReg + 1]);
-    return args;
-  }
-  return a;
+function fetchJson(url) {
+  return httpGet(url).then((res) => {
+    if (!res.ok) return { ok: false, error: res.error };
+    try { return { ok: true, json: JSON.parse(res.buffer.toString('utf-8')) }; }
+    catch (e) { return { ok: false, error: e?.message || 'json_parse_error' }; }
+  });
+}
+
+function encodePkgPath(name) {
+  const base = String(config.registry || 'https://registry.npmmirror.com').replace(/\/+$/g, '');
+  const segs = String(name).split('/').filter(Boolean).map((s) => encodeURIComponent(s));
+  return `${base}/${segs.join('/')}`;
 }
 
 module.exports.getPackageVersions = async function getPackageVersions(name) {
-  const args = ['view', name, 'versions', '--json', '--registry', config.registry];
-  const result = await runNpm(args, path.dirname(manifestPath));
-  if (result.code !== 0) return { ok: false, error: result.err || 'npm view 失败' };
+  const url = encodePkgPath(name);
+  const res = await fetchJson(url);
+  if (!res.ok) return { ok: false, error: res.error || 'registry 请求失败' };
+  const data = res.json || {};
   try {
-    const versions = JSON.parse(result.out);
+    const versionsObj = data.versions || {};
+    let versions = Object.keys(versionsObj);
+    try {
+      const cmp = require('semver-compare');
+      versions.sort(cmp);
+    } catch {}
     return { ok: true, versions };
   } catch (e) {
-    return { ok: false, error: '解析版本失败' };
+    return { ok: false, error: e?.message || '解析版本失败' };
   }
 };
 
@@ -831,34 +831,52 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   const segs = String(name).split('/').filter(Boolean);
   const dest = path.join(storeRoot, ...segs, version);
   if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-  const args = ['install', `${name}@${version}`, '--registry', config.registry];
-  onProgress && onProgress({ stage: 'npm', message: `下载 ${name}@${version} ...` });
-  const result = await runNpm(args, dest);
-  if (result.code !== 0) return { ok: false, error: result.err || 'npm install 失败' };
-  onProgress && onProgress({ stage: 'npm', message: `完成 ${name}@${version}` });
   const nm = path.join(dest, 'node_modules');
-  try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch {}
-  const directPath = path.join(dest, 'node_modules', ...segs);
-  if (!fs.existsSync(directPath)) {
-    try {
-      const pnpmRoot = path.join(dest, 'node_modules', '.pnpm');
-      if (fs.existsSync(pnpmRoot)) {
-        const entries = fs.readdirSync(pnpmRoot).filter((e) => {
-          try { return fs.statSync(path.join(pnpmRoot, e)).isDirectory(); } catch { return false; }
-        });
-        let nested = null;
-        for (const e of entries) {
-          const base = path.join(pnpmRoot, e, 'node_modules', ...segs);
-          if (fs.existsSync(base)) { nested = base; break; }
-        }
-        if (nested) {
-          try { fs.mkdirSync(path.dirname(directPath), { recursive: true }); } catch {}
-          const type = process.platform === 'win32' ? 'junction' : 'dir';
-          try { fs.symlinkSync(nested, directPath, type); } catch {}
-        }
-      }
-    } catch {}
+  if (!fs.existsSync(nm)) { try { fs.mkdirSync(nm, { recursive: true }); } catch {} }
+  const directPath = path.join(nm, ...segs);
+  if (fs.existsSync(directPath)) return { ok: true, path: directPath };
+  onProgress && onProgress({ stage: 'npm', message: `下载 ${name}@${version} ...` });
+  const metaRes = await fetchJson(`${encodePkgPath(name)}`);
+  if (!metaRes.ok) return { ok: false, error: metaRes.error || '获取包信息失败' };
+  const data = metaRes.json || {};
+  const verData = (data.versions && data.versions[version]) ? data.versions[version] : null;
+  const tarball = verData && verData.dist && verData.dist.tarball ? verData.dist.tarball : null;
+  if (!tarball) return { ok: false, error: '缺少 tarball 地址' };
+  const tgz = await httpGet(tarball);
+  if (!tgz.ok) return { ok: false, error: tgz.error || '下载失败' };
+  const tmpDir = path.join(dest, '__tmp__');
+  try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
+  const tmpTgz = path.join(tmpDir, `${segs[segs.length - 1]}-${version}.tgz`);
+  try { fs.writeFileSync(tmpTgz, tgz.buffer); } catch (e) { return { ok: false, error: e?.message || '写入临时文件失败' }; }
+  if (!tar) return { ok: false, error: '缺少 tar 依赖，无法解压' };
+  try {
+    await tar.x({ file: tmpTgz, cwd: tmpDir });
+  } catch (e) {
+    return { ok: false, error: e?.message || '解压失败' };
   }
+  const extracted = path.join(tmpDir, 'package');
+  if (!fs.existsSync(extracted)) return { ok: false, error: '解压内容缺失' };
+  try {
+    fs.mkdirSync(path.dirname(directPath), { recursive: true });
+    const copyDir = (src, dst) => {
+      const items = fs.readdirSync(src);
+      if (!fs.existsSync(dst)) fs.mkdirSync(dst, { recursive: true });
+      for (const it of items) {
+        const s = path.join(src, it);
+        const d = path.join(dst, it);
+        const st = fs.statSync(s);
+        if (st.isDirectory()) { copyDir(s, d); }
+        else { fs.copyFileSync(s, d); }
+      }
+    };
+    copyDir(extracted, directPath);
+  } catch (e) {
+    return { ok: false, error: e?.message || '复制解压内容失败' };
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
+  try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch {}
+  onProgress && onProgress({ stage: 'npm', message: `完成 ${name}@${version}` });
   return { ok: fs.existsSync(directPath), path: directPath };
 };
 

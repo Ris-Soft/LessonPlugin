@@ -17,7 +17,8 @@ function createCompassWindow() {
     const pt = screen.getCursorScreenPoint ? screen.getCursorScreenPoint() : { x: 0, y: 0 };
     const d = screen.getDisplayNearestPoint ? screen.getDisplayNearestPoint(pt) : screen.getPrimaryDisplay();
     const b = d.bounds;
-    const w = 96, h = 96, mr = 16, mb = 32;
+    const w = 96, h = 96, mr = 24, mb = 32;
+    const isLinux = process.platform === 'linux';
     compassWin = new BrowserWindow({
       x: b.x + b.width - w - mr,
       y: b.y + b.height - h - mb,
@@ -34,6 +35,8 @@ function createCompassWindow() {
       fullscreenable: false,
       skipTaskbar: true,
       alwaysOnTop: true,
+      type: isLinux ? 'toolbar' : undefined,
+      focusable: isLinux ? false : true,
       hasShadow: false,
       webPreferences: {
         nodeIntegration: false,
@@ -44,7 +47,10 @@ function createCompassWindow() {
     compassWin.loadFile(path.join(__dirname, 'float', 'compass.html'));
     try { compassWin.setAlwaysOnTop(true); } catch {}
     try { compassWin.setAlwaysOnTop(true, 'screen-saver'); } catch {}
+    try { if (isLinux) compassWin.setAlwaysOnTop(true, 'pop-up-menu'); } catch {}
+    try { if (isLinux) compassWin.setAlwaysOnTop(true, 'status'); } catch {}
     try { compassWin.setVisibleOnAllWorkspaces(true); } catch {}
+    try { compassWin.setSkipTaskbar(true); } catch {}
     compassWin.on('closed', () => { compassWin = null; });
     let snapTimer = null;
     const snap = () => {

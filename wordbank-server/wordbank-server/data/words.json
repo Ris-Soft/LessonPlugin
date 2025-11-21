@@ -1814,6 +1814,156 @@
         },
         "request_id": "9cb3379402d91cae828ecb82"
       }
+    },
+    {
+      "id": "1763736244033-i5g4di",
+      "word": "helli",
+      "cn": "",
+      "createdAt": 1763736244033,
+      "translations": []
+    },
+    {
+      "id": "1763736250359-u25e59",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1763736250359,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1763736306922-ky6859",
+      "word": "boost",
+      "cn": "v. 促进；增加；支援；n. 推动；帮助；宣扬",
+      "createdAt": 1763736306922,
+      "translations": [
+        {
+          "pos": "v",
+          "cn": "促进；增加；支援"
+        },
+        {
+          "pos": "n",
+          "cn": "推动；帮助；宣扬"
+        }
+      ]
+    },
+    {
+      "id": "1763736316486-a95ttl",
+      "word": "think",
+      "cn": "v. 想，认为，以为",
+      "createdAt": 1763736316486,
+      "translations": [
+        {
+          "pos": "v",
+          "cn": "想，认为，以为"
+        }
+      ]
+    },
+    {
+      "id": "1763736607977-iw63hr",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1763736607977,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1763736754309-jt1apt",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1763736754309,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1763736785025-35nqd0",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1763736785025,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1763736850565-yjiv6i",
+      "word": "hello",
+      "cn": "int. 喂",
+      "createdAt": 1763736850565,
+      "translations": [
+        {
+          "pos": "int",
+          "cn": "喂"
+        }
+      ]
+    },
+    {
+      "id": "1763736864492-fx4j9o",
+      "word": "hiss",
+      "cn": "n. 嘶嘶声；v. 嘶嘶作声",
+      "createdAt": 1763736864492,
+      "translations": [
+        {
+          "pos": "n",
+          "cn": "嘶嘶声"
+        },
+        {
+          "pos": "v",
+          "cn": "嘶嘶作声"
+        }
+      ]
+    },
+    {
+      "id": "1763737246001-8s5pa7",
+      "word": "fu'c'k",
+      "cn": "",
+      "createdAt": 1763737246001,
+      "translations": []
+    },
+    {
+      "id": "1763737252912-8egjsz",
+      "word": "good",
+      "cn": "adj. 好的；有本事的",
+      "createdAt": 1763737252912,
+      "translations": [
+        {
+          "pos": "adj",
+          "cn": "好的；有本事的"
+        }
+      ]
+    },
+    {
+      "id": "1763737264156-u5y0ir",
+      "word": "damn",
+      "cn": "interjection. 该死，见鬼〔表示很生气或失望〕；adv. 非常，很；adj. 该死的〔表示对某人或某事物生气〕",
+      "createdAt": 1763737264156,
+      "translations": [
+        {
+          "pos": "interjection",
+          "cn": "该死，见鬼〔表示很生气或失望〕"
+        },
+        {
+          "pos": "adv",
+          "cn": "非常，很"
+        },
+        {
+          "pos": "adj",
+          "cn": "该死的〔表示对某人或某事物生气〕"
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,523 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>屏幕批注</title>
+  <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+  <style>
+    html, body { height: 100%; margin: 0; background: transparent; }
+    .wrap { display: flex; flex-direction: column; height: 100%; }
+    #board { flex: 1; position: relative; background: rgba(0,0,0,0.02); overflow: hidden; }
+    #board .canvas-container { position: absolute; inset: 0; }
+    #toolbar { height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(30,35,40,0.85); color: #fff; }
+    #toolbar button { height: 32px; padding: 0 10px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+    #toolbar button.active { background: #0ea5e9; }
+    #toolbar input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
+    #toolbar input[type=range] { width: 160px; }
+    #pageCtrl { position: absolute; right: 12px; bottom: 68px; display: flex; gap: 6px; align-items: center; background: rgba(30,35,40,0.7); color: #fff; padding: 6px 10px; border-radius: 8px; }
+    #pageCtrl button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+    #eraseCursor { position: absolute; border: 1px dashed #ff8080; pointer-events: none; }
+    .spacer { flex: 1; }
+    .file { display: none; }
+    .popup { position: fixed; z-index: 999; background: rgba(30,35,40,0.95); color: #fff; padding: 10px 12px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); display: none; gap: 12px; align-items: center; }
+    .popup label { display: flex; align-items: center; gap: 8px; }
+    .popup input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
+    .popup input[type=range] { width: 160px; }
+    #selTools { position: absolute; display: none; background: rgba(30,35,40,0.95); color: #fff; padding: 6px 8px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); gap: 8px; align-items: center; }
+    #selTools button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="board"></div>
+      <div id="toolbar">
+        <button id="modeDraw"><i class="ri-pencil-line"></i> 书写</button>
+        <button id="modeSelect"><i class="ri-cursor-line"></i> 选择</button>
+        <button id="modePan"><i class="ri-drag-move-2-line"></i> 漫游</button>
+        <button id="modeErase"><i class="ri-eraser-line"></i> 橡皮</button>
+        <button id="toggleTwoFinger"><i class="ri-fingerprint-line"></i> 双指漫游</button>
+        <button id="boardSettings"><i class="ri-settings-2-line"></i> 白板设置</button>
+        <div class="spacer"></div>
+        <button id="exportPNG"><i class="ri-image-line"></i> 导出PNG</button>
+        <button id="exportJSON"><i class="ri-file-list-3-line"></i> 导出JSON</button>
+        <button id="importJSON"><i class="ri-upload-2-line"></i> 导入JSON</button>
+        <input id="importFile" class="file" type="file" accept=".wbjson,application/json">
+      </div>
+      <div id="popup" class="popup">
+        <div id="penSettings" style="display:flex; gap:12px; align-items:center;">
+          <label>颜色 <input id="penColor" type="color" value="#ff3b30"></label>
+          <label>粗细 <input id="penWidth" type="range" min="1" max="30" value="6"></label>
+        </div>
+        <div id="eraserSettings" style="display:none; gap:12px; align-items:center;">
+          <label>橡皮大小 <input id="eraseSize" type="range" min="20" max="200" value="80"></label>
+        </div>
+        <div id="boardSettingsPanel" style="display:none; gap:12px; align-items:center;">
+          <button id="bgWhite">背景 白</button>
+          <button id="bgDark">背景 暗黑</button>
+          <button id="bgDeepGreen">背景 深绿</button>
+        </div>
+      </div>
+    <div id="pageCtrl">
+      <button id="prevPage"><i class="ri-arrow-left-s-line"></i> 上一页</button>
+      <span id="pageLabel">1</span>
+      <button id="nextPage"><i class="ri-arrow-right-s-line"></i> 下一页</button>
+    </div>
+  </div>
+  <script>
+    async function loadScript(src, type = 'text/javascript') {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.type = type;
+        s.onload = () => resolve(true);
+        s.onerror = () => reject(new Error('load_failed'));
+        document.head.appendChild(s);
+      });
+    }
+    (async () => {
+      let fabric = window.fabric || null;
+      if (!fabric || typeof fabric.Canvas !== 'function') {
+        const candidates = [
+          // './node_modules/fabric/dist/index.min.js',
+          // './node_modules/fabric/dist/index.js',
+          // './node_modules/fabric/node_modules/fabric/dist/index.min.js',
+          './fabric.min.js'
+        ];
+        let ok = false;
+        for (const p of candidates) {
+          try { await loadScript(p); ok = true; break; } catch {}
+        }
+        fabric = ok ? window.fabric : null;
+      }
+      if (!fabric || typeof fabric.Canvas !== 'function') {
+        alert('Fabric.js 加载失败，请安装依赖或检查路径');
+        return;
+      }
+    const board = document.getElementById('board');
+    const el = document.createElement('canvas');
+    el.style.position = 'absolute'; el.style.inset = '0';
+    board.appendChild(el);
+    const canvas = new fabric.Canvas(el, {
+      isDrawingMode: true,
+      selection: false,
+      backgroundColor: 'transparent',
+      preserveObjectStacking: true
+    });
+    const canvasEl = (typeof canvas.getElement === 'function') ? canvas.getElement() : (canvas.lowerCanvasEl || null);
+
+    function fit() {
+      const r = board.getBoundingClientRect();
+      const w = Math.floor(r.width);
+      const h = Math.floor(r.height);
+      if (typeof canvas.setDimensions === 'function') {
+        canvas.setDimensions({ width: w, height: h });
+      } else {
+        if (typeof canvas.setWidth === 'function') canvas.setWidth(w);
+        else if (canvasEl) canvasEl.width = w;
+        if (typeof canvas.setHeight === 'function') canvas.setHeight(h);
+        else if (canvasEl) canvasEl.height = h;
+      }
+      if (typeof canvas.requestRenderAll === 'function') canvas.requestRenderAll();
+      else if (typeof canvas.renderAll === 'function') canvas.renderAll();
+    }
+    window.addEventListener('resize', fit);
+    window.addEventListener('load', fit);
+    setTimeout(fit, 0);
+
+    const state = {
+      mode: 'draw',
+      twoFingerPan: false,
+      eraseSize: 80,
+      pages: [],
+      pageIndex: 0
+    };
+    const popup = document.getElementById('popup');
+    const penSettings = document.getElementById('penSettings');
+    const eraserSettings = document.getElementById('eraserSettings');
+    function showPopup(which, anchorEl) {
+      penSettings.style.display = which === 'pen' ? 'flex' : 'none';
+      eraserSettings.style.display = which === 'eraser' ? 'flex' : 'none';
+      boardSettingsPanel.style.display = which === 'board' ? 'flex' : 'none';
+      popup.style.display = 'flex';
+      try {
+        const defaultId = which === 'pen' ? 'modeDraw' : (which === 'eraser' ? 'modeErase' : 'boardSettings');
+        const rect = anchorEl ? anchorEl.getBoundingClientRect() : document.getElementById(defaultId).getBoundingClientRect();
+        const px = Math.max(12, rect.left);
+        const ph = popup.offsetHeight || 48;
+        const py = Math.max(12, rect.top - ph - 8);
+        popup.style.left = px + 'px';
+        popup.style.top = py + 'px';
+      } catch {}
+    }
+    function hidePopup() { popup.style.display = 'none'; }
+    document.addEventListener('mousedown', (e) => {
+      try {
+        if (popup.style.display === 'flex') {
+          const within = popup.contains(e.target) || document.getElementById('modeDraw').contains(e.target) || document.getElementById('modeErase').contains(e.target);
+          if (!within) hidePopup();
+        }
+      } catch {}
+    });
+
+    let currentBrush = null;
+    function setMode(m) {
+      state.mode = m;
+      document.getElementById('modeDraw').classList.toggle('active', m==='draw');
+      document.getElementById('modeSelect').classList.toggle('active', m==='select');
+      document.getElementById('modePan').classList.toggle('active', m==='pan');
+      document.getElementById('modeErase').classList.toggle('active', m==='erase');
+      if (m === 'draw') {
+        canvas.isDrawingMode = true;
+        canvas.selection = false;
+        canvas.getObjects().forEach(o => o.selectable = false);
+        if (!(currentBrush instanceof fabric.PencilBrush)) {
+          try { currentBrush = new fabric.PencilBrush(canvas); } catch { try { currentBrush = new fabric.PencilBrush({ canvas }); } catch {} }
+          if (!currentBrush) currentBrush = new fabric.PencilBrush(canvas);
+          currentBrush.color = penColor.value;
+          currentBrush.width = Number(penWidth.value);
+          currentBrush.decimate = 2;
+        }
+        canvas.freeDrawingBrush = currentBrush;
+        hidePopup();
+      } else if (m === 'select') {
+        canvas.isDrawingMode = false;
+        canvas.selection = true;
+        canvas.skipTargetFind = false;
+        canvas.getObjects().forEach(o => {
+          const isEraser = (o.isEraser === true) || (o.globalCompositeOperation === 'destination-out');
+          o.selectable = !isEraser;
+          o.evented = !isEraser;
+          o.lockMovementX = false;
+          o.lockMovementY = false;
+        });
+        hidePopup();
+      } else if (m === 'pan') {
+        canvas.isDrawingMode = false;
+        canvas.selection = false;
+        canvas.getObjects().forEach(o => o.selectable = false);
+        canvas.skipTargetFind = true;
+        hidePopup();
+      } else if (m === 'erase') {
+        canvas.selection = false;
+        canvas.skipTargetFind = true;
+        canvas.getObjects().forEach(o => { o.selectable = false; o.erasable = true; });
+        if (fabric.EraserBrush) {
+          const eb = new fabric.EraserBrush(canvas);
+          eb.width = Number(eraseSize.value);
+          canvas.freeDrawingBrush = eb;
+          canvas.isDrawingMode = true;
+          try { canvas.discardActiveObject(); } catch {}
+          if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+        } else {
+          canvas.isDrawingMode = false;
+          canvas.skipTargetFind = true;
+        }
+        showPopup('eraser');
+      }
+    }
+
+    let brush = null;
+    try { brush = new fabric.PencilBrush(canvas); } catch { try { brush = new fabric.PencilBrush({ canvas }); } catch {} }
+    if (!brush) brush = new fabric.PencilBrush(canvas);
+    brush.color = '#ff3b30';
+    brush.width = 6;
+    brush.decimate = 2;
+    canvas.freeDrawingBrush = brush;
+
+    const penColor = document.getElementById('penColor');
+    const penWidth = document.getElementById('penWidth');
+    const eraseSize = document.getElementById('eraseSize');
+    const boardSettingsBtn = document.getElementById('boardSettings');
+    const boardSettingsPanel = document.getElementById('boardSettingsPanel');
+    penColor.addEventListener('input', () => { canvas.freeDrawingBrush.color = penColor.value; });
+    penWidth.addEventListener('input', () => { canvas.freeDrawingBrush.width = Number(penWidth.value); });
+    eraseSize.addEventListener('input', () => {
+      state.eraseSize = Number(eraseSize.value);
+      if (eraseCursor) resizeEraseCursor(state.eraseSize);
+      try {
+        if (state.mode === 'erase' && fabric && fabric.EraserBrush && canvas.freeDrawingBrush && (canvas.freeDrawingBrush instanceof fabric.EraserBrush)) {
+          canvas.freeDrawingBrush.width = state.eraseSize;
+        }
+      } catch {}
+    });
+
+    const btnDraw = document.getElementById('modeDraw');
+    const btnErase = document.getElementById('modeErase');
+    const btnPan = document.getElementById('modePan');
+    document.getElementById('modeDraw').addEventListener('click', (ev) => {
+      if (state.mode !== 'draw') { setMode('draw'); hidePopup(); }
+      else { if (popup.style.display === 'flex') hidePopup(); else showPopup('pen', btnDraw); }
+      updateEraseCursorVis();
+    });
+    document.getElementById('modeSelect').addEventListener('click', () => { hidePopup(); setMode('select'); updateEraseCursorVis(); });
+    document.getElementById('modeErase').addEventListener('click', (ev) => {
+      if (state.mode !== 'erase') { setMode('erase'); hidePopup(); }
+      else { if (popup.style.display === 'flex') hidePopup(); else showPopup('eraser', btnErase); }
+      updateEraseCursorVis();
+    });
+    boardSettingsBtn.addEventListener('click', (ev) => {
+      if (popup.style.display === 'flex' && boardSettingsPanel.style.display === 'flex') { hidePopup(); }
+      else { showPopup('board', boardSettingsBtn); }
+    });
+    btnPan.addEventListener('click', () => { setMode('pan'); hidePopup(); updateEraseCursorVis(); });
+    document.getElementById('toggleTwoFinger').addEventListener('click', () => {
+      state.twoFingerPan = !state.twoFingerPan;
+      document.getElementById('toggleTwoFinger').classList.toggle('active', state.twoFingerPan);
+    });
+
+    function savePageSnapshot() {
+      try { state.pages[state.pageIndex] = canvas.toJSON(); } catch {}
+    }
+    function loadPageSnapshot(i) {
+      const data = state.pages[i];
+      canvas.clear();
+      if (data) {
+        canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); setTimeout(() => { fit(); if (canvas.requestRenderAll) canvas.requestRenderAll(); }, 0); });
+      } else {
+        canvas.renderAll();
+      }
+      document.getElementById('pageLabel').textContent = String(i + 1);
+    }
+    document.getElementById('prevPage').addEventListener('click', () => {
+      savePageSnapshot();
+      if (state.pageIndex > 0) state.pageIndex--; 
+      loadPageSnapshot(state.pageIndex);
+    });
+    document.getElementById('nextPage').addEventListener('click', () => {
+      savePageSnapshot();
+      if (state.pageIndex >= state.pages.length - 1) state.pages.push(null);
+      state.pageIndex++;
+      loadPageSnapshot(state.pageIndex);
+    });
+    state.pages.push(null);
+    loadPageSnapshot(0);
+
+    function download(filename, content, mime) {
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    document.getElementById('exportPNG').addEventListener('click', () => {
+      const url = canvas.toDataURL({ format: 'png', multiplier: 1 });
+      const a = document.createElement('a');
+      a.download = `annotation-page-${state.pageIndex+1}.png`;
+      a.href = url;
+      a.click();
+    });
+    document.getElementById('exportJSON').addEventListener('click', () => {
+      const json = JSON.stringify(canvas.toJSON());
+      download(`annotation-page-${state.pageIndex+1}.wbjson`, json, 'application/json');
+    });
+    document.getElementById('importJSON').addEventListener('click', () => {
+      document.getElementById('importFile').value = '';
+      document.getElementById('importFile').click();
+    });
+    document.getElementById('importFile').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { const data = JSON.parse(String(reader.result || '{}')); canvas.clear(); canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); }); } catch {}
+      };
+      reader.readAsText(f);
+    });
+
+    const eraseCursor = document.createElement('div');
+    eraseCursor.id = 'eraseCursor';
+    board.appendChild(eraseCursor);
+    function resizeEraseCursor(size) {
+      const zoom = typeof canvas.getZoom === 'function' ? canvas.getZoom() : ((canvas.viewportTransform && canvas.viewportTransform[0]) || 1);
+      const px = Math.max(2, Math.floor(size * zoom));
+      eraseCursor.style.width = px + 'px';
+      eraseCursor.style.height = px + 'px';
+    }
+    resizeEraseCursor(state.eraseSize);
+    eraseCursor.style.left = '0px';
+    eraseCursor.style.top = '0px';
+    eraseCursor.style.display = 'none';
+    const updateEraseCursorVis = () => { eraseCursor.style.display = (state.mode === 'erase' && !(fabric && fabric.EraserBrush)) ? 'block' : 'none'; };
+    canvas.on('path:created', (e) => {
+      try {
+        const p = e.path;
+        if (!p) return;
+        if (state.mode === 'draw') {
+          p.erasable = true;
+        } else if (state.mode === 'erase' && fabric && fabric.EraserBrush) {
+          p.selectable = false;
+          p.evented = false;
+          p.excludeFromExport = true;
+          p.isEraser = true;
+        }
+      } catch {}
+    });
+
+    
+
+    function intersectsRect(obj, rx, ry, rw, rh) {
+      const b = obj.getBoundingRect(false, true);
+      return !(b.left > rx + rw || b.left + b.width < rx || b.top > ry + rh || b.top + b.height < ry);
+    }
+    function applyEraseAtCanvas(x, y) {
+      try {
+        const size = state.eraseSize || 80;
+        const half = size / 2;
+        const rx = x - half;
+        const ry = y - half;
+        const rw = size;
+        const rh = size;
+        const objs = canvas.getObjects();
+        let changed = false;
+        for (let i = objs.length - 1; i >= 0; i--) {
+          const o = objs[i];
+          if (o && o.erasable === false) continue;
+          if (o && intersectsRect(o, rx, ry, rw, rh)) {
+            canvas.remove(o);
+            changed = true;
+          }
+        }
+        if (changed) { if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }
+      } catch {}
+    }
+
+    let draggingErase = false; let draggingPan = false; let lastScreenX = 0; let lastScreenY = 0;
+    function getPointerScreen(opt) {
+      try {
+        const e = opt && opt.e ? opt.e : opt;
+        const rect = canvas.upperCanvasEl.getBoundingClientRect();
+        const cx = (e && (e.clientX != null ? e.clientX : (e.touches && e.touches[0] && e.touches[0].clientX))) || 0;
+        const cy = (e && (e.clientY != null ? e.clientY : (e.touches && e.touches[0] && e.touches[0].clientY))) || 0;
+        const x = cx - rect.left;
+        const y = cy - rect.top;
+        return { x, y };
+      } catch { return { x: 0, y: 0 }; }
+    }
+    function getPointerCanvas(opt) {
+      try {
+        const p = getPointerScreen(opt);
+        if (fabric && fabric.util && fabric.Point && typeof fabric.util.invertTransform === 'function' && typeof fabric.util.transformPoint === 'function') {
+          const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]);
+          const tp = fabric.util.transformPoint(new fabric.Point(p.x, p.y), inv);
+          return { x: tp.x, y: tp.y };
+        }
+        return p;
+      } catch { return { x: 0, y: 0 }; }
+    }
+    canvas.on('mouse:down', (opt) => {
+      const e = opt.e;
+      if (!(fabric && fabric.EraserBrush) && state.mode === 'erase' && e.button === 0) { draggingErase = true; const p = getPointerCanvas(opt); applyEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
+      if ((state.mode === 'pan' && e.button === 0) || (state.twoFingerPan && e.button === 1)) { draggingPan = true; const sp = getPointerScreen(opt); lastScreenX = sp.x; lastScreenY = sp.y; }
+    });
+    canvas.on('mouse:move', (opt) => {
+      const e = opt.e;
+      const sp = getPointerScreen(opt);
+      resizeEraseCursor(state.eraseSize);
+      const zoom = typeof canvas.getZoom === 'function' ? canvas.getZoom() : ((canvas.viewportTransform && canvas.viewportTransform[0]) || 1);
+      const half = (state.eraseSize * zoom) / 2;
+      eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`;
+      if (draggingErase) { const p = getPointerCanvas(opt); applyEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
+      if (draggingPan) {
+        const dx = (typeof e.movementX === 'number') ? e.movementX : (sp.x - lastScreenX);
+        const dy = (typeof e.movementY === 'number') ? e.movementY : (sp.y - lastScreenY);
+        lastScreenX = sp.x; lastScreenY = sp.y;
+        if (fabric && fabric.Point && typeof canvas.relativePan === 'function') {
+          canvas.relativePan(new fabric.Point(dx, dy));
+        } else {
+          const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt);
+        }
+      }
+    });
+    canvas.on('mouse:up', () => { draggingErase = false; draggingPan = false; });
+
+    canvas.on('mouse:wheel', (opt) => {
+      const e = opt.e; let delta = e.deltaY; let zoom = canvas.getZoom(); zoom *= 0.999 ** delta;
+      zoom = Math.max(0.2, Math.min(3, zoom));
+      const p = typeof canvas.getPointer === 'function' ? canvas.getPointer(e) : { x: e.offsetX, y: e.offsetY };
+      canvas.zoomToPoint(new fabric.Point(p.x, p.y), zoom);
+      resizeEraseCursor(state.eraseSize);
+      opt.e.preventDefault(); opt.e.stopPropagation();
+    });
+
+    canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
+      if (state.twoFingerPan && e.touches.length === 2) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; }
+    }, { passive: false });
+    canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
+      if (state.twoFingerPan && e.touches.length === 2 && draggingPan) {
+        const sp = getPointerScreen({ e });
+        const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y;
+        if (fabric && fabric.Point && typeof canvas.relativePan === 'function') {
+          canvas.relativePan(new fabric.Point(dx, dy));
+        } else {
+          const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt);
+        }
+        e.preventDefault();
+      }
+    }, { passive: false });
+    canvas.upperCanvasEl.addEventListener('touchend', () => { draggingPan = false; }, { passive: false });
+
+    const selTools = document.createElement('div');
+    selTools.id = 'selTools';
+    selTools.innerHTML = '<button id="toolClone"><i class="ri-file-copy-2-line"></i> 克隆</button><button id="toolDelete"><i class="ri-delete-bin-6-line"></i> 删除</button><button id="toolCloneNew"><i class="ri-pages-line"></i> 克隆到新页面</button>';
+    board.appendChild(selTools);
+    function positionSelTools(obj) {
+      try {
+        const br = obj.getBoundingRect(false, true);
+        const vt = canvas.viewportTransform || [1,0,0,1,0,0];
+        const tl = fabric.util.transformPoint(new fabric.Point(br.left, br.top), vt);
+        const brp = fabric.util.transformPoint(new fabric.Point(br.left + br.width, br.top + br.height), vt);
+        const left = Math.max(8, Math.min(tl.x, brp.x));
+        const top = Math.min(board.getBoundingClientRect().height - 40, Math.max(tl.y, brp.y) + 6);
+        selTools.style.left = left + 'px';
+        selTools.style.top = top + 'px';
+      } catch {}
+    }
+    function hideSelTools() { selTools.style.display = 'none'; }
+    function showSelTools(obj) { positionSelTools(obj); selTools.style.display = 'flex'; }
+    canvas.on('selection:created', (e) => { const o = e.selected && e.selected[0]; if (o) showSelTools(o); });
+    canvas.on('selection:updated', (e) => { const o = e.selected && e.selected[0]; if (o) showSelTools(o); });
+    canvas.on('selection:cleared', () => hideSelTools());
+    canvas.on('object:moving', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
+    canvas.on('object:scaling', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
+    canvas.on('object:rotating', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
+    canvas.on('after:render', () => { const o = canvas.getActiveObject(); if (o && selTools.style.display === 'flex') positionSelTools(o); });
+    async function cloneObject(o) {
+      try {
+        if (!o) return null;
+        let target = o;
+        if (target.type === 'activeSelection' && typeof target.toGroup === 'function') {
+          try { target = target.toGroup(); } catch {}
+        }
+        if (typeof target.clone !== 'function') return null;
+        if (target.clone.length > 0) {
+          return await new Promise((resolve) => { try { target.clone((cl) => resolve(cl)); } catch { resolve(null); } });
+        } else {
+          const res = target.clone();
+          if (res && typeof res.then === 'function') { return await res; }
+          return res || null;
+        }
+      } catch { return null; }
+    }
+    selTools.querySelector('#toolClone').addEventListener('click', async () => {
+      const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; cl.left = (o.left||0) + 10; cl.top = (o.top||0) + 10; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+    });
+    selTools.querySelector('#toolDelete').addEventListener('click', () => { const o = canvas.getActiveObject(); if (!o) return; canvas.remove(o); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools(); });
+    selTools.querySelector('#toolCloneNew').addEventListener('click', async () => {
+      const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; savePageSnapshot(); if (state.pageIndex >= state.pages.length - 1) state.pages.push(null); state.pageIndex++; loadPageSnapshot(state.pageIndex); cl.left = 40; cl.top = 40; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools();
+    });
+
+    function setBackgroundColor(color) {
+      try { canvas.setBackgroundColor(color, () => { if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }); }
+      catch { canvas.backgroundColor = color; if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }
+    }
+    document.getElementById('bgWhite').addEventListener('click', () => setBackgroundColor('#ffffff'));
+    document.getElementById('bgDark').addEventListener('click', () => setBackgroundColor('#121212'));
+    document.getElementById('bgDeepGreen').addEventListener('click', () => setBackgroundColor('#0b3d2e'));
+
+    setMode('draw');
+    updateEraseCursorVis();
+    })();
+  </script>
+</body>
+</html>

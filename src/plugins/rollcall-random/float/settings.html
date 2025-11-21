@@ -15,9 +15,14 @@
       .row label { display:flex; align-items:center; gap:8px; }
       .row .hint { color: var(--muted); font-size: 12px; }
       .btns { display:flex; gap:8px; margin-top: 12px; }
-      button { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.08); color: var(--fg); }
+      button { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.08); color: var(--fg); transition: all .15s ease; cursor: pointer; }
       button.primary { background: rgba(125,200,255,0.25); border-color: rgba(125,200,255,0.35); }
       button.danger { background: rgba(255,80,80,0.25); border-color: rgba(255,80,80,0.35); }
+      button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+      button:active { filter: brightness(0.95); transform: translateY(0); }
+      button:focus-visible { outline: 2px solid rgba(125,200,255,0.7); outline-offset: 2px; }
+      .field { display:flex; align-items:center; gap:8px; }
+      .field input[type="number"] { width: 88px; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: var(--fg); }
       .muted { color: var(--muted); }
       .bg-icon { position: fixed; right: 12px; bottom: 8px; font-size: 72px; color: rgba(255,255,255,0.08); pointer-events: none; }
     </style>
@@ -27,7 +32,11 @@
     <div class="card">
       <div class="row">
         <label><input id="chk-norepeat" type="checkbox" /> 抽选不重复</label>
-        <div class="hint">已抽到的姓名将暂不参与下一次抽选</div>
+        <div class="hint">排除最近抽取的若干同学</div>
+      </div>
+      <div class="row">
+        <div class="field"><span>排除最近次数</span><input id="inp-recent-limit" type="number" min="1" max="100" step="1" /></div>
+        <div class="hint">默认 20，范围 1-100</div>
       </div>
       <div class="btns">
         <button id="btn-save" class="primary"><i class="ri-save-3-line"></i> 保存设置</button>
@@ -37,10 +46,10 @@
     </div>
     <div class="bg-icon"><i class="ri-shuffle-line"></i></div>
     <script>
-      let channel = ''; let caller = ''; let initNoRepeat = '1';
-      function readInit() { try { const u = new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||''); initNoRepeat=String(u.searchParams.get('noRepeat')||'1'); } catch {} }
-      function initUi() { const chk = document.getElementById('chk-norepeat'); chk.checked = (initNoRepeat==='1'); }
-      async function save() { const v = document.getElementById('chk-norepeat').checked ? '1' : '0'; try { await window.lowbarAPI?.emitEvent?.(channel, { type:'float.settings', noRepeat: v }); } catch {} }
+      let channel = ''; let caller = ''; let initNoRepeat = '1'; let initRecentLimit = '20';
+      function readInit() { try { const u = new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||''); initNoRepeat=String(u.searchParams.get('noRepeat')||'1'); initRecentLimit=String(u.searchParams.get('recentLimit')||'20'); } catch {} }
+      function initUi() { const chk = document.getElementById('chk-norepeat'); chk.checked = (initNoRepeat==='1'); const inp = document.getElementById('inp-recent-limit'); inp.value = initRecentLimit || '20'; }
+      async function save() { const v = document.getElementById('chk-norepeat').checked ? '1' : '0'; const k = Number(document.getElementById('inp-recent-limit').value || '20'); const recentLimit = Math.max(1, Math.min(100, Math.floor(Number.isFinite(k)?k:20))); try { await window.lowbarAPI?.emitEvent?.(channel, { type:'float.settings', noRepeat: v, recentLimit }); } catch {} }
       async function resetPicked() { try { await window.lowbarAPI?.emitEvent?.(channel, { type:'float.settings', resetPicked: true }); } catch {} }
       document.getElementById('btn-save').addEventListener('click', save);
       document.getElementById('btn-reset').addEventListener('click', resetPicked);

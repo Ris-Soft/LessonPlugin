@@ -20,9 +20,16 @@
       th { background:#1b1b1b; }
       .row { display:flex; gap:10px; align-items:center; }
       .muted { opacity:.8; }
-      .sugg-box { position: relative; margin-right: 18px;  }
-      /* 限制建议列表宽度为输入框宽度，避免覆盖到汉语输入 */
-      .sugg-list { position:absolute; top:100%; left:0; background:#1b1b1b; border:1px solid #2c2c2c; border-radius:8px; margin-top:4px; max-height:180px; overflow:auto; z-index:5; width:100%; max-width:100%; box-shadow:0 4px 12px rgba(0,0,0,0.35); }
+      .sugg-box { position: relative; }
+      .upper-module { margin-bottom:8px; }
+      .upper-module.float { position: fixed; left: 0; right: 0; bottom: var(--kb-offset, 0px); z-index: 50; padding: 6px 10px; }
+      .sugg-list { position:absolute; bottom:100%; left:0; margin-bottom:4px; background:#1b1b1b; border:1px solid #2c2c2c; border-radius:8px; width:100%; box-shadow:0 4px 12px rgba(0,0,0,0.35); z-index:6; }
+      .sugg-head { display:flex; justify-content:flex-end; gap:8px; padding:6px 8px; border-bottom:1px solid #2c2c2c; }
+      .sugg-body { max-height:120px; overflow:auto; }
+      .sugg-item { display:block; width:100%; text-align:left; padding:6px 10px; border:none; background:transparent; color:#e6e6e6; }
+      .sugg-item:hover, .sugg-item.active { background:#262626; }
+      @media (min-width: 641px) { .sugg-box { max-width: 360px; } }
+      @media (max-width: 640px) { .sugg-box { max-width: 100%; } }
       .sugg-item { display:block; width:100%; text-align:left; padding:6px 10px; border:none; background:transparent; color:#e6e6e6; }
       .sugg-item:hover { background:#262626; }
       .pos-list { display:flex; flex-wrap: wrap; gap:8px; margin-top:8px; }
@@ -61,14 +68,20 @@
 
       <section class="card" style="margin-top:14px;">
         <b><i class="ri-add-line"></i> 添加词汇</b>
-        <!-- 将翻译选择框移到输入行上方，避免遮挡输入和建议列表 -->
-        <div id="dictBox" class="pos-list" style="margin-bottom:8px;"></div>
+        <div id="upperModule" class="upper-module">
+          <div id="dictBox" class="pos-list" style="display:none;"></div>
+        </div>
         <div class="row" style="margin-top:8px;">
-          <div class="sugg-box" style="flex:1; min-width:240px; max-width:420px;">
-            <input id="word" placeholder="英文单词（不支持短语）" style="width:100%;" />
-            <div id="suggestions" class="sugg-list" style="display:none;"></div>
+          <div class="sugg-box" style="flex:1; min-width:240px;">
+            <input id="word" placeholder="英文单词" style="width:235px;" />
+            <div id="suggestions" class="sugg-list" style="display:none;">
+              <div class="sugg-head"><button id="suggCollapse" class="link">收起候选</button></div>
+              <div id="suggBody" class="sugg-body"></div>
+            </div>
           </div>
-          <input id="cn" placeholder="汉语解释（可留空）" />
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <input id="cn" placeholder="汉语解释（可留空）" style="flex:1;" />
           <button id="addBtn"><i class="ri-save-2-line"></i> 添加</button>
         </div>
         <div id="addRes" class="muted" style="margin-top:8px;"></div>
@@ -106,16 +119,32 @@
         } catch { document.getElementById('tbody').innerHTML = '<tr><td colspan="4">加载失败</td></tr>'; }
       }
       function debounce(fn, wait) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
+      let suggItems = [];
+      let suggActive = -1;
+      function renderSuggest(items) {
+        const body = document.getElementById('suggBody');
+        body.innerHTML = items.map(x => `<button class="sugg-item" data-w="${x.word}">${x.word}</button>`).join('');
+        document.getElementById('suggestions').style.display = '';
+        document.getElementById('dictBox').style.display = 'none';
+      }
+      function setSuggActive(idx) {
+        const els = Array.from(document.querySelectorAll('#suggBody .sugg-item'));
+        els.forEach((el, i) => { if (i === idx) el.classList.add('active'); else el.classList.remove('active'); });
+        suggActive = idx;
+        const sel = suggItems[idx];
+        if (sel && sel.word) document.getElementById('word').value = sel.word;
+      }
       async function fetchSuggest(prefix) {
-        if (!prefix || /\s/.test(prefix)) { document.getElementById('suggestions').style.display = 'none'; return; }
+        const dict = document.getElementById('dictBox');
+        if (!prefix || /\s/.test(prefix)) { document.getElementById('suggestions').style.display = 'none'; dict.style.display = 'none'; suggItems = []; suggActive = -1; return; }
         try {
           const r = await fetch('https://api.datamuse.com/words?sp=' + encodeURIComponent(prefix) + '*');
           const list = await r.json();
-          const box = document.getElementById('suggestions');
           const top = (Array.isArray(list) ? list : []).slice(0, 8);
-          if (!top.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-          box.innerHTML = top.map(x => `<button class="sugg-item" data-w="${x.word}">${x.word}</button>`).join('');
-          box.style.display = '';
+          if (!top.length) { document.getElementById('suggestions').style.display = 'none'; document.getElementById('suggBody').innerHTML = ''; dict.style.display = 'none'; suggItems = []; suggActive = -1; return; }
+          suggItems = top;
+          suggActive = -1;
+          renderSuggest(suggItems);
         } catch { document.getElementById('suggestions').style.display = 'none'; }
       }
       function parseDict(remote) {
@@ -161,6 +190,8 @@
               return `<label class="pos-chip"><input type="checkbox" id="${id}" data-pos="${it.pos}" data-cn="${it.text}" checked /> ${label}</label>`;
             }).join('');
           }
+          document.getElementById('dictBox').style.display = '';
+          document.getElementById('suggestions').style.display = 'none';
         } catch { /* ignore */ }
       }
       function getEditKey() { return localStorage.getItem('wordbank.editKey') || ''; }
@@ -211,13 +242,21 @@
       document.getElementById('word').addEventListener('blur', (ev) => {
         const v = ev.target.value.trim();
         setTimeout(() => {
-          const box = document.getElementById('suggestions'); box.style.display = 'none'; box.innerHTML = '';
+          document.getElementById('suggestions').style.display = 'none';
+          const body = document.getElementById('suggBody'); if (body) body.innerHTML = '';
           const cnCurrent = document.getElementById('cn').value.trim();
           if (v && !suggClicking && !cnCurrent) fetchDict(v.toLowerCase());
           suggClicking = false;
         }, 120);
       });
       document.getElementById('suggestions').addEventListener('click', (ev) => {
+        if (ev.target.closest('#suggCollapse')) {
+          document.getElementById('suggestions').style.display = 'none';
+          const w = document.getElementById('word').value.trim();
+          const cnCurrent = document.getElementById('cn').value.trim();
+          if (w && !cnCurrent) fetchDict(w.toLowerCase());
+          return;
+        }
         const btn = ev.target.closest('.sugg-item'); if (!btn) return;
         const w = btn.getAttribute('data-w');
         document.getElementById('word').value = w; document.getElementById('suggestions').style.display = 'none';
@@ -227,17 +266,32 @@
       // 在英文输入框按下回车视为"提交"并收起建议框
       document.getElementById('word').addEventListener('keydown', (ev) => {
         const isEnter = ev.key === 'Enter' || ev.code === 'Enter' || ev.keyCode === 13;
-        if (!isEnter) return;
-        ev.preventDefault();
-        const box = document.getElementById('suggestions'); box.style.display = 'none'; box.innerHTML = '';
-        addWord();
+        const isDown = ev.key === 'ArrowDown' || ev.code === 'ArrowDown' || ev.keyCode === 40;
+        const isUp = ev.key === 'ArrowUp' || ev.code === 'ArrowUp' || ev.keyCode === 38;
+        if (isDown || isUp) {
+          if (document.getElementById('suggestions').style.display !== 'none' && suggItems.length) {
+            ev.preventDefault();
+            const len = suggItems.length;
+            let next = suggActive;
+            if (isDown) next = (next + 1 + len) % len; else next = (next - 1 + len) % len;
+            setSuggActive(next);
+          }
+          return;
+        }
+        if (isEnter) {
+          ev.preventDefault();
+          document.getElementById('suggestions').style.display = 'none';
+          const body = document.getElementById('suggBody'); if (body) body.innerHTML = '';
+          addWord();
+        }
       });
       // 在汉语解释输入框按下回车也视为"提交"并立即清空表单
       document.getElementById('cn').addEventListener('keydown', async (ev) => {
         const isEnter = ev.key === 'Enter' || ev.code === 'Enter' || ev.keyCode === 13;
         if (!isEnter) return;
         ev.preventDefault();
-        const box = document.getElementById('suggestions'); box.style.display = 'none'; box.innerHTML = '';
+        document.getElementById('suggestions').style.display = 'none';
+        const body = document.getElementById('suggBody'); if (body) body.innerHTML = '';
         
         const word = document.getElementById('word').value.trim();
         const cn = document.getElementById('cn').value.trim();
@@ -287,6 +341,20 @@
       refreshHealth();
       loadWords();
       showKeyOverlayIfNeeded();
+
+      const upperModule = document.getElementById('upperModule');
+      function updateKbOffset() {
+        const vv = window.visualViewport;
+        const gap = vv ? (window.innerHeight - vv.height) : 0;
+        upperModule.style.setProperty('--kb-offset', Math.max(gap, 0) + 'px');
+      }
+      function enableUpperFloat() { updateKbOffset(); upperModule.classList.add('float'); }
+      function disableUpperFloat() { upperModule.classList.remove('float'); }
+      document.getElementById('word').addEventListener('focus', enableUpperFloat);
+      document.getElementById('cn').addEventListener('focus', enableUpperFloat);
+      document.getElementById('word').addEventListener('blur', () => { setTimeout(disableUpperFloat, 150); });
+      document.getElementById('cn').addEventListener('blur', () => { setTimeout(disableUpperFloat, 150); });
+      if (window.visualViewport) { window.visualViewport.addEventListener('resize', updateKbOffset); }
     </script>
   </body>
 </html>

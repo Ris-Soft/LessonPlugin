@@ -19,15 +19,23 @@
       showSeconds: qs('seconds') === '1',
       blinkColon: qs('blink') === '1'
     };
+    const tz = qs('tz') || 'Asia/Shanghai';
     function pad(n){ return String(n).padStart(2,'0'); }
     function fmt(){
       const d = new Date();
-      let h = pad(d.getHours());
-      let m = pad(d.getMinutes());
-      let s = pad(d.getSeconds());
-      const colon = opts.blinkColon ? (d.getSeconds()%2===0 ? ':' : ' ') : ':';
+      let parts;
+      try {
+        parts = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, hour12: false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }).formatToParts(d);
+      } catch { parts = null; }
+      const get = (t) => parts ? (parts.find(p=>p.type===t)?.value || '') : null;
+      const secVal = parts ? parseInt(get('second')||'0',10) : (d.getSeconds());
+      const h = parts ? get('hour') : pad(d.getHours());
+      const m = parts ? get('minute') : pad(d.getMinutes());
+      const s = parts ? get('second') : pad(d.getSeconds());
+      const colon = opts.blinkColon ? (secVal%2===0 ? ':' : ' ') : ':';
       const base = opts.showSeconds ? `${h}${colon}${m}${colon}${s}` : `${h}${colon}${m}`;
-      return { time: base, date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` };
+      const dateStr = parts ? `${get('year')}-${get('month')}-${get('day')}` : `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      return { time: base, date: dateStr };
     }
     function tick(){
       const { time, date } = fmt();

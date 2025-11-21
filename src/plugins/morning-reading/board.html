@@ -33,11 +33,8 @@
     .poem-lines{margin-top:4px;white-space:pre-line;opacity:.92}
     .time-box{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px}
     .quote-card.poem-full{background:rgba(255,255,255,0.06);border-left:none}
-    .annotate-box{margin-top:14px;flex:1;position:relative;padding-bottom:64px;overflow:hidden}
-    .annotate-toolbar{display:flex;gap:8px;position:absolute;left:12px;right:12px;bottom:12px;z-index:4}
-    .annotate-toolbar .btn{display:flex;align-items:center;gap:6px}
-    #annotate-canvas{width:100%;height:calc(100% - 64px);display:block;border:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12);border-radius:12px;background:rgba(255,255,255,0.04)}
-    #eraser-cursor{position:absolute;width:40px;height:40px;border:2px solid rgba(255,255,255,0.85);background:rgba(255,255,255,0.18);border-radius:6px;pointer-events:none;display:none;z-index:3}
+    .annotate-box{margin-top:14px;flex:1;position:relative;overflow:hidden}
+    #annotate-frame{width:100%;height:100%;display:block;border:none;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.12);background:transparent}
   </style>
 </head>
 <body>
@@ -53,13 +50,7 @@
           <button class="btn secondary" id="btn-exit"><i class="ri-logout-box-r-line"></i> 退出</button>
         </div>
         <div class="annotate-box">
-          <div class="annotate-toolbar">
-            <button class="btn secondary" id="tool-pen"><i class="ri-pencil-line"></i> 批注</button>
-            <button class="btn secondary" id="tool-eraser"><i class="ri-eraser-line"></i> 橡皮擦</button>
-            <button class="btn danger" id="tool-clear"><i class="ri-delete-bin-line"></i> 清页</button>
-          </div>
-          <canvas id="annotate-canvas"></canvas>
-          <div id="eraser-cursor"></div>
+          <iframe id="annotate-frame" src="../annotate-fabric/whiteboard.html"></iframe>
         </div>
       </div>
       <div class="panel right">
@@ -109,15 +100,20 @@
     $('#btn-exit').addEventListener('click',()=>window.pluginAPI?.windowControl('close'));
     async function tick(){
       const t = await window.pluginAPI?.getCurrentTime();
-      const d = new Date(t?.iso || Date.now());
-      const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,'0');
-      const day = String(d.getDate()).padStart(2,'0');
-      const hh = String(d.getHours()).padStart(2,'0');
-      const mm = String(d.getMinutes()).padStart(2,'0');
-      const ss = String(d.getSeconds()).padStart(2,'0');
+      const d = new Date(Number(t?.nowMs || Date.now()));
+      let tz = 'Asia/Shanghai';
+      try { const v = await window.pluginAPI?.configGet?.('system','timeZone'); if (v) tz = String(v); } catch {}
+      let parts = null;
+      try { parts = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, hour12: false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', weekday:'long' }).formatToParts(d); } catch {}
+      const get = (t) => parts ? (parts.find(p=>p.type===t)?.value || '') : null;
+      const y = parts ? get('year') : String(d.getFullYear());
+      const m = parts ? get('month') : String(d.getMonth()+1).padStart(2,'0');
+      const day = parts ? get('day') : String(d.getDate()).padStart(2,'0');
+      const hh = parts ? get('hour') : String(d.getHours()).padStart(2,'0');
+      const mm = parts ? get('minute') : String(d.getMinutes()).padStart(2,'0');
+      const ss = parts ? get('second') : String(d.getSeconds()).padStart(2,'0');
+      const wk = parts ? get('weekday') : ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][d.getDay()];
       $('#t-time').textContent = `${hh}:${mm}:${ss}`;
-      const wk = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][d.getDay()];
       $('#t-date').textContent = `${y}-${m}-${day} ${wk}`;
       const days = Number(t?.daysFromBase || 0);
       const weekIdx = Math.floor(days/7)+1;
@@ -203,31 +199,7 @@
     startClock();
     fetchQuote();
 
-    let tool = 'pen';
-    const penBtn = document.getElementById('tool-pen');
-    const eraserBtn = document.getElementById('tool-eraser');
-    const clearBtn = document.getElementById('tool-clear');
-    const cvs = document.getElementById('annotate-canvas');
-    const annotateBox = document.querySelector('.annotate-box');
-    const eraserCursor = document.getElementById('eraser-cursor');
-    let ctx = null; let drawing=false; let lastX=0, lastY=0; let dpr = window.devicePixelRatio || 1; const ERASER_SIZE = 40;
-    function getAnnotateCache(){ try{ const raw = localStorage.getItem('mr.annotate.board'); if(!raw) return null; const obj = JSON.parse(raw); if(!obj||!obj.data) return null; return obj.data; }catch{ return null; } }
-    function setAnnotateCache(dataUrl){ try{ localStorage.setItem('mr.annotate.board', JSON.stringify({ ts: Date.now(), data: dataUrl })); }catch{} }
-    function sizeCanvas(){ const rect = cvs.getBoundingClientRect(); const w = Math.max(10, rect.width); const h = Math.max(10, rect.height); cvs.width = Math.floor(w * dpr); cvs.height = Math.floor(h * dpr); if(ctx){ ctx.setTransform(1,0,0,1,0,0); } }
-    function initCanvas(){ ctx = cvs.getContext('2d'); sizeCanvas(); const cached = getAnnotateCache(); if (cached) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, cvs.width, cvs.height); }; img.src = cached; } }
-    function setTool(t){ tool = t; if (t === 'eraser') { try { eraserCursor.style.display = ''; eraserCursor.style.width = ERASER_SIZE+'px'; eraserCursor.style.height = ERASER_SIZE+'px'; } catch {} } else { try { eraserCursor.style.display = 'none'; } catch {} } }
-    penBtn.addEventListener('click', ()=>setTool('pen'));
-    eraserBtn.addEventListener('click', ()=>setTool('eraser'));
-    clearBtn.addEventListener('click', ()=>{ if(!ctx) return; ctx.clearRect(0,0,cvs.width,cvs.height); setAnnotateCache(cvs.toDataURL('image/png')); });
-    function getCanvasPoint(e){ const ca = cvs.getBoundingClientRect(); const x = Math.max(0, Math.min(e.clientX - ca.left, ca.width)); const y = Math.max(0, Math.min(e.clientY - ca.top, ca.height)); return { x, y, dx: Math.round(x * dpr), dy: Math.round(y * dpr), ca }; }
-    cvs.addEventListener('pointerdown', (e)=>{ const p = getCanvasPoint(e); drawing=true; lastX=p.x; lastY=p.y; e.target.setPointerCapture?.(e.pointerId); if(tool==='eraser'){ try { eraserCursor.style.display = ''; } catch {} ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(p.dx, p.dy, Math.floor((ERASER_SIZE * dpr)/2), 0, Math.PI*2); ctx.fill(); ctx.restore(); } });
-    cvs.addEventListener('pointermove', (e)=>{ if(!ctx) return; const p = getCanvasPoint(e); const x=p.x, y=p.y; const ba = annotateBox.getBoundingClientRect(); const lx = (p.ca.left - ba.left) + x - ERASER_SIZE/2; const ly = (p.ca.top - ba.top) + y - ERASER_SIZE/2; if(tool==='pen'){ if(!drawing) return; ctx.strokeStyle = '#e6f1ff'; ctx.lineWidth = 3 * dpr; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(Math.round(lastX*dpr), Math.round(lastY*dpr)); ctx.lineTo(p.dx, p.dy); ctx.stroke(); lastX=x; lastY=y; } else { if(eraserCursor.style.display !== '') { try { eraserCursor.style.display = ''; } catch {} } eraserCursor.style.transform = `translate(${lx}px, ${ly}px)`; if(drawing) { ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = ERASER_SIZE * dpr; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(Math.round(lastX*dpr), Math.round(lastY*dpr)); ctx.lineTo(p.dx, p.dy); ctx.stroke(); ctx.restore(); lastX=x; lastY=y; } } });
-    cvs.addEventListener('pointerup', (e)=>{ drawing=false; try{ cvs.releasePointerCapture?.(e.pointerId); }catch{} setAnnotateCache(cvs.toDataURL('image/png')); });
-    cvs.addEventListener('pointerenter', ()=>{ if(tool==='eraser'){ try { eraserCursor.style.display = ''; } catch {} } });
-    cvs.addEventListener('pointerleave', ()=>{ try { eraserCursor.style.display = 'none'; } catch {} });
-    window.addEventListener('resize', ()=>{ const snap = cvs ? cvs.toDataURL('image/png') : null; initCanvas(); if (snap) { const img = new Image(); img.onload = () => { ctx.drawImage(img, 0, 0, cvs.width, cvs.height); setAnnotateCache(snap); }; img.src = snap; } });
-    window.addEventListener('blur', ()=>{ try { setAnnotateCache(cvs.toDataURL('image/png')); } catch {} });
-    initCanvas();
+    
   </script>
 </body>
 </html>

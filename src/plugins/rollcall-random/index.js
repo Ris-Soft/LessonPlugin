@@ -9,6 +9,8 @@ const state = {
   picked: new Set(),
   currentName: '',
   noRepeat: true,
+  recent: [],
+  recentLimit: 20,
   backgroundBase: '',
   floatSettingsBase: ''
 };
@@ -28,13 +30,19 @@ async function ensureStudents() {
 
 function pickOne() {
   const names = state.students.map((s) => String(s.name || '').trim()).filter((n) => !!n);
-  let pool = names;
-  if (state.noRepeat && state.picked.size < names.length) pool = names.filter((n) => !state.picked.has(n));
-  if (!pool.length && names.length) { state.picked.clear(); pool = names.slice(); }
-  if (!pool.length) return '';
+  const unique = Array.from(new Set(names));
+  const exclude = state.noRepeat ? new Set(state.recent) : new Set();
+  let pool = state.noRepeat ? unique.filter((n) => !exclude.has(n)) : unique;
+  if (!pool.length) pool = unique;
   const idx = Math.floor(Math.random() * pool.length);
   const name = pool[idx] || '';
-  if (name) { state.currentName = name; if (state.noRepeat) state.picked.add(name); }
+  if (name) {
+    state.currentName = name;
+    if (state.noRepeat) {
+      state.recent.push(name);
+      if (state.recent.length > state.recentLimit) state.recent.shift();
+    }
+  }
   return name;
 }
 
@@ -74,10 +82,14 @@ const functions = {
         if (payload.id === 'start-roll') {
           await ensureStudents();
           const names = state.students.map((s) => String(s.name || '').trim()).filter((n) => !!n);
+          const unique = Array.from(new Set(names));
           const finalName = pickOne();
           const seq = [];
-          const steps = names.length ? 5 : 0;
-          for (let i = 0; i < steps; i++) { const j = Math.floor(Math.random() * names.length); seq.push(names[j] || finalName || ''); }
+          const exclude = state.noRepeat ? new Set(state.recent) : new Set();
+          const pool = state.noRepeat ? unique.filter((n) => !exclude.has(n)) : unique;
+          const basePool = pool.length ? pool : unique;
+          const steps = basePool.length ? Math.min(5, basePool.length) : 0;
+          for (let i = 0; i < steps; i++) { const j = Math.floor(Math.random() * basePool.length); seq.push(basePool[j] || finalName || ''); }
           try { pluginApi.emit(state.eventChannel, { type: 'animate.pick', names: seq, final: finalName, stepMs: 40 }); } catch {}
         }
       } else if (payload.type === 'left.click') {
@@ -88,12 +100,19 @@ const functions = {
           u.searchParams.set('channel', state.eventChannel);
           u.searchParams.set('caller', 'rollcall.random');
           u.searchParams.set('noRepeat', state.noRepeat ? '1' : '0');
+          u.searchParams.set('recentLimit', String(state.recentLimit || 20));
           emitUpdate('floatingUrl', u.href);
         }
       } else if (payload.type === 'float.settings') {
         const v = String(payload.noRepeat || '').trim();
         if (v === '1' || v === '0') state.noRepeat = (v === '1');
-        if (payload.resetPicked) state.picked.clear();
+        const rl = Number(payload.recentLimit);
+        if (Number.isFinite(rl)) {
+          const k = Math.max(1, Math.min(100, Math.floor(rl)));
+          state.recentLimit = k;
+          if (state.recent.length > state.recentLimit) state.recent = state.recent.slice(-state.recentLimit);
+        }
+        if (payload.resetPicked) { state.recent = []; state.picked.clear(); state.currentName = ''; }
       }
       return true;
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }

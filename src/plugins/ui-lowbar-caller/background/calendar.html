@@ -18,15 +18,26 @@
   </style>
   <script>
     function qs(name){ const m = location.search.match(new RegExp('[?&]'+name+'=([^&]+)')); return m? decodeURIComponent(m[1]) : null; }
+    const tz = qs('tz') || 'Asia/Shanghai';
     function daysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
+    function getWeekdayIndex(y,m,d){
+      try {
+        const label = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(new Date(Date.UTC(y, m, d, 12)));
+        return ({Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6})[label] ?? new Date(y, m, d).getDay();
+      } catch { return new Date(y, m, d).getDay(); }
+    }
     function render(){
       const now = new Date();
+      let parts = null;
+      try { parts = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(now); } catch {}
+      const get = (t) => parts ? (parts.find(p=>p.type===t)?.value || '') : null;
+      const curY = parts ? parseInt(get('year'),10) : now.getFullYear();
+      const curM0 = parts ? (parseInt(get('month'),10)-1) : now.getMonth();
       const off = parseInt(qs('offset')||'0',10);
-      const base = new Date(now.getFullYear(), now.getMonth(), 1);
-      if (Number.isFinite(off)) base.setMonth(base.getMonth() + off);
-      const y = base.getFullYear(); const m = base.getMonth();
+      let y = curY; let m = curM0;
+      if (Number.isFinite(off)) { m += off; while (m < 0) { m += 12; y -= 1; } while (m >= 12) { m -= 12; y += 1; } }
       document.getElementById('ym').textContent = `${y}-${String(m+1).padStart(2,'0')}`;
-      const firstWd = new Date(y, m, 1).getDay();
+      const firstWd = getWeekdayIndex(y, m, 1);
       const prevMonthDays = new Date(y, m, 0).getDate();
       const thisMonthDays = daysInMonth(y, m);
       const cells = [];
@@ -43,7 +54,8 @@
         const div = document.createElement('div');
         const col = i % 7;
         const isWeekend = (col===0 || col===6);
-        const isToday = (!outside && now.getFullYear()===y && now.getMonth()===m && now.getDate()===day);
+        const ty = curY; const tm = curM0; const td = parts ? parseInt(get('day'),10) : now.getDate();
+        const isToday = (!outside && ty===y && tm===m && td===day);
         div.className = 'cell'+(outside?' outside':'')+(isWeekend?' weekend':'')+(isToday?' today':'');
         div.textContent = String(day);
         grid.appendChild(div);

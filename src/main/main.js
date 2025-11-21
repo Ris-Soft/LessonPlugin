@@ -270,7 +270,8 @@ app.whenReady().then(async () => {
     timeOffset: 0,
     autoOffsetDaily: 0,
     offsetBaseDate: new Date().toISOString().slice(0, 10),
-    developerMode: false
+    developerMode: false,
+    timeZone: 'Asia/Shanghai'
   });
   // 后端日志：仅在开发者模式启用时捕获与保存
   try { backendLog.init({ enabled: !!store.get('system', 'developerMode') }); } catch {}

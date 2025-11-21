@@ -41,7 +41,8 @@ async function initGeneralSettings() {
     offsetBaseDate: new Date().toISOString().slice(0, 10),
     semesterStart: new Date().toISOString().slice(0, 10),
     biweekOffset: false,
-    marketApiBase: 'http://localhost:3030/'
+    marketApiBase: 'http://localhost:3030/',
+    timeZone: 'Asia/Shanghai'
   };
   await window.settingsAPI?.configEnsureDefaults('system', defaults);
   const cfg = await window.settingsAPI?.configGetAll('system');
@@ -397,14 +398,47 @@ async function initGeneralSettings() {
   autoOffsetDaily.value = Number(cfg.autoOffsetDaily || 0);
 
   // 时间与日期：实时展示与计算逻辑
+  const tzInput = document.getElementById('time-zone');
+  if (tzInput) {
+    tzInput.value = String(cfg.timeZone || 'Asia/Shanghai');
+    tzInput.addEventListener('change', async () => {
+      const val = String(tzInput.value || '').trim() || 'Asia/Shanghai';
+      await window.settingsAPI?.configSet('system', 'timeZone', val);
+      cfg.timeZone = val;
+      updateTimeSummaries();
+    });
+  }
+
   const formatDateTime = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    const ss = String(d.getSeconds()).padStart(2, '0');
-    return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+    try {
+      const tz = String(cfg.timeZone || 'Asia/Shanghai');
+      const parts = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: tz,
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }).formatToParts(d);
+      const get = (t) => parts.find(p => p.type === t)?.value || '';
+      const y = get('year');
+      const m = get('month');
+      const day = get('day');
+      const hh = get('hour');
+      const mm = get('minute');
+      const ss = get('second');
+      return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+    } catch {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const ss = String(d.getSeconds()).padStart(2, '0');
+      return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+    }
   };
   // 使用统一接口从主进程获取当前时间与偏移（preciseTime/NTP/每日偏移均已应用）
   const updateTimeSummaries = async () => {

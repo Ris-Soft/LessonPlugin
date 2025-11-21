@@ -9,9 +9,9 @@
       body { margin:0; font-family: system-ui, sans-serif; background:#0f0f0f; color:#e6e6e6; }
       .stage { position:absolute; inset:0; padding: 24px 28px 120px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
       .card { background:#151515; border:1px solid #262626; border-radius:14px; padding:28px 24px; width: 820px; max-width: 92vw; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
-      .title { font-size: 46px; font-weight: 800; text-align:center; letter-spacing: .8px; color:#f2f2f2; }
+      .title { font-size: 54px; font-weight: 800; text-align:center; letter-spacing: .8px; color:#f2f2f2; }
       .title.done { color:#7fe38a; }
-      .cn { font-size: 20px; text-align:center; margin-top: 14px; color:#cfcfcf; }
+      .cn { font-size: 30px; text-align:center; margin-top: 14px; color:#cfcfcf; }
       .muted { opacity: .85; }
       .progress { margin-top: 14px; text-align:center; color:#9aa0a6; font-size: 14px; }
       .summary { margin-top: 14px; background:#141414; border:1px solid #252525; border-radius:12px; padding:14px; width: 820px; max-width: 92vw; }
@@ -42,6 +42,18 @@
       const summaryEl = document.getElementById('summary');
       const statsEl = document.getElementById('stats');
       let list = []; let idx = 0; let done = new Set(); let startAt = Date.now(); let showCnCurrent = false;
+      function applyCheckFontSizes(titleSize, cnSize) {
+        try {
+          let style = document.getElementById('check-font-override');
+          if (!style) { style = document.createElement('style'); style.id = 'check-font-override'; document.head.appendChild(style); }
+          const t = Number.isFinite(titleSize) && titleSize>0 ? titleSize : null;
+          const c = Number.isFinite(cnSize) && cnSize>0 ? cnSize : null;
+          const chunks = [];
+          if (t) chunks.push(`.title { font-size: ${t}px !important; }`);
+          if (c) chunks.push(`.cn { font-size: ${c}px !important; }`);
+          style.textContent = chunks.join(' ');
+        } catch {}
+      }
       // 事件去抖：避免同一命令在极短时间内被重复触发（导致跳奇数/闪烁）
       let lastCmd = '';
       let lastCmdAt = 0;
@@ -99,6 +111,7 @@
               { id:'check-next', text:'下一个', icon:'ri-arrow-right-s-line' },
               { id:'check-mark', text:'标记完成', icon:'ri-checkbox-line' },
               { id:'check-showcn', text:'显示中文', icon:'ri-translate' },
+              { id:'check-settings', text:'检查设置', icon:'ri-settings-3-line' },
               { id:'check-random', text:'随机抽选', icon:'ri-shuffle-line' },
               { id:'check-stop', text:'结束提问', icon:'ri-stop-circle-line' }
             ] });
@@ -211,6 +224,7 @@
             { id:'check-next', text:'下一个', icon:'ri-arrow-right-s-line' },
             { id:'check-mark', text:'标记完成', icon:'ri-checkbox-line' },
             { id:'check-showcn', text: (showCnCurrent?'隐藏中文':'显示中文'), icon:'ri-translate' },
+            { id:'check-settings', text:'检查设置', icon:'ri-settings-3-line' },
             { id:'check-random', text:'随机抽选', icon:'ri-shuffle-line' },
             { id:'check-stop', text:'结束提问', icon:'ri-stop-circle-line' }
           ];
@@ -231,7 +245,15 @@
           if (payload.type === 'control') {
             const act = String(payload.action||'');
             const cmd = String(payload.cmd||'');
-            if (act === 'check') { handleCmd(cmd); return; }
+            if (act === 'check') {
+              if (cmd === 'set-font') {
+                const t = parseInt(String(payload.titlesize||''),10);
+                const c = parseInt(String(payload.cnsize||''),10);
+                applyCheckFontSizes(Number.isFinite(t)?t:undefined, Number.isFinite(c)?c:undefined);
+                return;
+              }
+              handleCmd(cmd); return;
+            }
             if (act === 'summary') { handleCmd(cmd === 'review' ? 'summary-review' : (cmd === 'exit' ? 'summary-exit' : cmd)); return; }
             if (act === 'checker') { handleCmd(cmd); return; }
             handleCmd(cmd);
@@ -240,6 +262,22 @@
           // 兜底：直接处理点击事件（模板派发）
           if (payload.type === 'click') {
             const id = String(payload.id||'');
+            if (id === 'check-settings') {
+              try {
+                const float = new URL('../../../plugins/multiword/float/check-setup.html', window.location.href).href;
+                const u = new URL(float);
+                u.searchParams.set('server', server);
+                try {
+                  const curTitle = parseInt(String(window.getComputedStyle(wordEl).fontSize||''),10);
+                  const curCn = parseInt(String(window.getComputedStyle(cnEl).fontSize||''),10);
+                  if (Number.isFinite(curTitle)) u.searchParams.set('titlesize', String(curTitle));
+                  if (Number.isFinite(curCn)) u.searchParams.set('cnsize', String(curCn));
+                } catch {}
+                api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 840, height: 600 } });
+                api().emitEvent(CH, { type:'update', target:'floatingUrl', value: u.href });
+              } catch {}
+              return;
+            }
             handleCmd(id);
           }
         });

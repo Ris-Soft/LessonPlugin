@@ -569,7 +569,31 @@ async function initAutomationSettings() {
       if (s.startsWith('plugin')) return '插件';
       return '—';
     })();
-    const lastText = it.lastSuccessAt ? new Date(it.lastSuccessAt).toLocaleString() : '—';
+    let tz = 'Asia/Shanghai';
+    try { const v = await window.settingsAPI?.configGet?.('system', 'timeZone'); if (v) tz = String(v); } catch {}
+    const formatDateTimeTZ = (d) => {
+      try {
+        const parts = new Intl.DateTimeFormat('zh-CN', {
+          timeZone: tz,
+          hour12: false,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }).formatToParts(d);
+        const get = (t) => parts.find(p => p.type === t)?.value || '';
+        const y = get('year');
+        const m = get('month');
+        const day = get('day');
+        const hh = get('hour');
+        const mm = get('minute');
+        const ss = get('second');
+        return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+      } catch { return d.toLocaleString(); }
+    };
+    const lastText = it.lastSuccessAt ? formatDateTimeTZ(new Date(it.lastSuccessAt)) : '—';
     const metaId = document.createElement('div'); metaId.className = 'muted'; metaId.textContent = 'ID：' + (it.id || '—');
     const metaSource = document.createElement('div'); metaSource.className = 'muted'; metaSource.textContent = '来源：' + sourceText;
     const metaLast = document.createElement('div'); metaLast.className = 'muted'; metaLast.textContent = '上次成功执行：' + lastText;

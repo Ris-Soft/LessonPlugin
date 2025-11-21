@@ -44,14 +44,17 @@
     <fieldset>
       <legend>轮播参数</legend>
       <div class="row">
-        <label>最近天数<input type="number" id="days" min="1" value="7" /></label>
-        <label>每词秒数<input type="number" id="wordsec" min="1" value="2" /></label>
-        <label>每译秒数<input type="number" id="cnsec" min="1" value="1" /></label>
+        <label>最近天数<input type="number" id="days" min="1" value="7" /> <button type="button" class="incdec" data-target="days" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="days" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
+        <label>每词秒数<input type="number" id="wordsec" min="1" value="2" /> <button type="button" class="incdec" data-target="wordsec" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="wordsec" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
+        <label>每译秒数<input type="number" id="cnsec" min="1" value="1" /> <button type="button" class="incdec" data-target="cnsec" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="cnsec" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
         <label>默认显示中文<select id="showcn"><option value="1">是</option><option value="0">否</option></select></label>
+        <label>英文字号<input type="number" id="wordsize" min="12" value="34" /> <button type="button" class="incdec" data-target="wordsize" data-step="-2" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="wordsize" data-step="+2" title="增加"><i class="ri-add-line"></i></button></label>
+        <label>中文字号<input type="number" id="cnsize" min="12" value="24" /> <button type="button" class="incdec" data-target="cnsize" data-step="-2" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="cnsize" data-step="+2" title="增加"><i class="ri-add-line"></i></button></label>
       </div>
       <div class="muted">单页显示数量将根据可视区域高度自动计算</div>
       <div class="ops">
         <button id="startCarousel"><i class="ri-play-circle-line"></i> 开始轮播</button>
+        <button id="applyFontCarousel"><i class="ri-pencil-ruler-2-line"></i> 应用字号</button>
         <button id="backHome"><i class="ri-arrow-go-back-line"></i> 返回首页</button>
       </div>
     </fieldset>
@@ -59,6 +62,8 @@
   <script>
     const qs = new URLSearchParams(location.search);
     const server = qs.get('server')||'';
+    const qsWordSize = parseInt(String(qs.get('wordsize')||''),10);
+    const qsCnSize = parseInt(String(qs.get('cnsize')||''),10);
     document.getElementById('serverTip').textContent = server ? ('已连接：' + server) : '(未传递服务器参数)';
     const h = (id) => document.getElementById(id);
     const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
@@ -68,6 +73,8 @@
         wordsec: parseInt(h('wordsec').value||'2',10)||2,
         cnsec: parseInt(h('cnsec').value||'1',10)||1,
         showcn: String(h('showcn').value||'1'),
+        wordsize: parseInt(h('wordsize').value||'34',10)||34,
+        cnsize: parseInt(h('cnsize').value||'24',10)||24,
         server: String(server||'').trim()
       };
       const bg = new URL('../../../plugins/multiword/background/carousel.html', window.location.href).href;
@@ -77,6 +84,7 @@
         { id:'carousel-pause', text:'暂停', icon:'ri-pause-circle-line' },
         { id:'carousel-next', text:'下一页', icon:'ri-skip-forward-line' },
         { id:'carousel-toggle-cn', text:'中文开关', icon:'ri-translate' },
+        { id:'open-carousel-settings', text:'轮播设置', icon:'ri-settings-3-line' },
         { id:'carousel-stop', text:'结束轮播', icon:'ri-stop-circle-line' }
       ] });
       // 启动轮播后关闭设置浮窗
@@ -86,6 +94,32 @@
       const home = new URL('./externallib.html', window.location.href).href;
       window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: home });
     };
+    try {
+      if (Number.isFinite(qsWordSize) && qsWordSize>0) h('wordsize').value = String(qsWordSize);
+      if (Number.isFinite(qsCnSize) && qsCnSize>0) h('cnsize').value = String(qsCnSize);
+    } catch {}
+    h('applyFontCarousel').onclick = () => {
+      const wf = parseInt(h('wordsize').value||'34',10)||34;
+      const cf = parseInt(h('cnsize').value||'24',10)||24;
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'control', action:'carousel', cmd:'set-font', wordsize: wf, cnsize: cf });
+    };
+  </script>
+  <script>
+    try {
+      document.querySelectorAll('.incdec[data-target]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = String(btn.getAttribute('data-target')||'').trim();
+          const step = parseInt(String(btn.getAttribute('data-step')||'0'), 10) || 0;
+          const el = document.getElementById(id);
+          if (!el) return;
+          const min = parseInt(String(el.getAttribute('min')||'0'), 10) || 0;
+          const cur = parseInt(String(el.value||''), 10);
+          const base = Number.isFinite(cur) ? cur : min || 0;
+          const next = Math.max(min, base + step);
+          el.value = String(next);
+        });
+      });
+    } catch {}
   </script>
 </body>
 </html>

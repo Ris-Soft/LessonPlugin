@@ -232,7 +232,20 @@
         try { const r = await fetch(base.replace(/\/$/, '') + '/health'); const j = await r.json(); return !!(j && j.ok); } catch { return false; }
       };
       const loadWords = async (base) => {
-        try { const r = await fetch(base.replace(/\/$/, '') + '/words'); const j = await r.json(); tbody.innerHTML = (j.words||[]).map(w => `<tr><td>${w.word}</td><td>${w.cn||''}</td><td>${new Date(w.createdAt||Date.now()).toLocaleString()}</td></tr>`).join(''); } catch { tbody.innerHTML = '<tr><td colspan="3">加载失败</td></tr>'; }
+        try {
+          const r = await fetch(base.replace(/\/$/, '') + '/words');
+          const j = await r.json();
+          const tz = 'Asia/Shanghai';
+          const fmt = (ms) => {
+            try {
+              const d = new Date(ms||Date.now());
+              const parts = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, hour12: false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }).formatToParts(d);
+              const get = (t) => parts.find(p=>p.type===t)?.value || '';
+              return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+            } catch { return new Date(ms||Date.now()).toLocaleString(); }
+          };
+          tbody.innerHTML = (j.words||[]).map(w => `<tr><td>${w.word}</td><td>${w.cn||''}</td><td>${fmt(w.createdAt)}</td></tr>`).join('');
+        } catch { tbody.innerHTML = '<tr><td colspan="3">加载失败</td></tr>'; }
       };
       const syncUrl = async () => {
         try {
