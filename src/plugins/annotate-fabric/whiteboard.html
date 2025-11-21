@@ -15,7 +15,7 @@
     #toolbar button.active { background: #0ea5e9; }
     #toolbar input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
     #toolbar input[type=range] { width: 160px; }
-    #pageCtrl { position: absolute; right: 12px; bottom: 68px; display: flex; gap: 6px; align-items: center; background: rgba(30,35,40,0.7); color: #fff; padding: 6px 10px; border-radius: 8px; }
+    #pageCtrl { position: absolute; right: 12px; bottom: 96px; display: flex; gap: 6px; align-items: center; background: rgba(30,35,40,0.7); color: #fff; padding: 6px 10px; border-radius: 8px; }
     #pageCtrl button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
     #eraseCursor { position: absolute; border: 1px dashed #ff8080; pointer-events: none; }
     .spacer { flex: 1; }
@@ -24,6 +24,8 @@
     .popup label { display: flex; align-items: center; gap: 8px; }
     .popup input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
     .popup input[type=range] { width: 160px; }
+    .popup button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+    .popup button.active { background: #0ea5e9; }
     #selTools { position: absolute; display: none; background: rgba(30,35,40,0.95); color: #fff; padding: 6px 8px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); gap: 8px; align-items: center; }
     #selTools button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
   </style>
@@ -33,9 +35,9 @@
     <div id="board"></div>
       <div id="toolbar">
         <button id="modeDraw"><i class="ri-pencil-line"></i> 书写</button>
+        <button id="modeErase"><i class="ri-eraser-line"></i> 橡皮</button>
         <button id="modeSelect"><i class="ri-cursor-line"></i> 选择</button>
         <button id="modePan"><i class="ri-drag-move-2-line"></i> 漫游</button>
-        <button id="modeErase"><i class="ri-eraser-line"></i> 橡皮</button>
         <button id="toggleTwoFinger"><i class="ri-fingerprint-line"></i> 双指漫游</button>
         <button id="boardSettings"><i class="ri-settings-2-line"></i> 白板设置</button>
         <div class="spacer"></div>
@@ -46,11 +48,21 @@
       </div>
       <div id="popup" class="popup">
         <div id="penSettings" style="display:flex; gap:12px; align-items:center;">
-          <label>颜色 <input id="penColor" type="color" value="#ff3b30"></label>
+          <label>颜色 <input id="penColor" type="color" value="#ffffff"></label>
+          <div id="penPalette" style="display:flex; gap:6px; align-items:center;">
+            <button data-color="#000000" style="width:28px; padding:0; background:#000000;"></button>
+            <button data-color="#ffffff" style="width:28px; padding:0; background:#ffffff;"></button>
+            <button data-color="#ff3b30" style="width:28px; padding:0; background:#ff3b30;"></button>
+            <button data-color="#ff9f0a" style="width:28px; padding:0; background:#ff9f0a;"></button>
+            <button data-color="#34c759" style="width:28px; padding:0; background:#34c759;"></button>
+            <button data-color="#0a84ff" style="width:28px; padding:0; background:#0a84ff;"></button>
+            <button data-color="#5856d6" style="width:28px; padding:0; background:#5856d6;"></button>
+          </div>
           <label>粗细 <input id="penWidth" type="range" min="1" max="30" value="6"></label>
         </div>
         <div id="eraserSettings" style="display:none; gap:12px; align-items:center;">
           <label>橡皮大小 <input id="eraseSize" type="range" min="20" max="200" value="80"></label>
+          <button id="clearPage">清页</button>
         </div>
         <div id="boardSettingsPanel" style="display:none; gap:12px; align-items:center;">
           <button id="bgWhite">背景 白</button>
@@ -130,7 +142,8 @@
       twoFingerPan: false,
       eraseSize: 80,
       pages: [],
-      pageIndex: 0
+      pageIndex: 0,
+      bgColor: '#121212'
     };
     const popup = document.getElementById('popup');
     const penSettings = document.getElementById('penSettings');
@@ -145,7 +158,7 @@
         const rect = anchorEl ? anchorEl.getBoundingClientRect() : document.getElementById(defaultId).getBoundingClientRect();
         const px = Math.max(12, rect.left);
         const ph = popup.offsetHeight || 48;
-        const py = Math.max(12, rect.top - ph - 8);
+        const py = Math.max(12, rect.top - ph - 20);
         popup.style.left = px + 'px';
         popup.style.top = py + 'px';
       } catch {}
@@ -220,7 +233,7 @@
     let brush = null;
     try { brush = new fabric.PencilBrush(canvas); } catch { try { brush = new fabric.PencilBrush({ canvas }); } catch {} }
     if (!brush) brush = new fabric.PencilBrush(canvas);
-    brush.color = '#ff3b30';
+    brush.color = '#ffffff';
     brush.width = 6;
     brush.decimate = 2;
     canvas.freeDrawingBrush = brush;
@@ -228,10 +241,32 @@
     const penColor = document.getElementById('penColor');
     const penWidth = document.getElementById('penWidth');
     const eraseSize = document.getElementById('eraseSize');
+    const clearPageBtn = document.getElementById('clearPage');
     const boardSettingsBtn = document.getElementById('boardSettings');
     const boardSettingsPanel = document.getElementById('boardSettingsPanel');
+    const penPalette = document.getElementById('penPalette');
+    const paletteBtns = penPalette ? penPalette.querySelectorAll('button[data-color]') : [];
+    function updatePenPaletteSelection() {
+      try {
+        const cur = String(penColor.value || '').toLowerCase();
+        paletteBtns.forEach((b) => {
+          const c = String(b.getAttribute('data-color') || '').toLowerCase();
+          b.style.outline = c === cur ? '2px solid #fff' : 'none';
+        });
+      } catch {}
+    }
     penColor.addEventListener('input', () => { canvas.freeDrawingBrush.color = penColor.value; });
+    penColor.addEventListener('input', () => { updatePenPaletteSelection(); });
     penWidth.addEventListener('input', () => { canvas.freeDrawingBrush.width = Number(penWidth.value); });
+    paletteBtns.forEach((b) => {
+      b.addEventListener('click', () => {
+        const c = b.getAttribute('data-color');
+        if (!c) return;
+        penColor.value = c;
+        try { canvas.freeDrawingBrush.color = c; } catch {}
+        updatePenPaletteSelection();
+      });
+    });
     eraseSize.addEventListener('input', () => {
       state.eraseSize = Number(eraseSize.value);
       if (eraseCursor) resizeEraseCursor(state.eraseSize);
@@ -240,6 +275,17 @@
           canvas.freeDrawingBrush.width = state.eraseSize;
         }
       } catch {}
+    });
+    clearPageBtn.addEventListener('click', () => {
+      const bg = canvas.backgroundColor;
+      canvas.clear();
+      if (bg) setBackgroundColor(bg);
+      setMode('draw');
+      state.pages[state.pageIndex] = null;
+      if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+      try { hideSelTools(); } catch {}
+      try { hidePopup(); } catch {}
+      try { updateEraseCursorVis(); } catch {}
     });
 
     const btnDraw = document.getElementById('modeDraw');
@@ -275,7 +321,8 @@
       if (data) {
         canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); setTimeout(() => { fit(); if (canvas.requestRenderAll) canvas.requestRenderAll(); }, 0); });
       } else {
-        canvas.renderAll();
+        try { setBackgroundColor(state.bgColor); } catch {}
+        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
       }
       document.getElementById('pageLabel').textContent = String(i + 1);
     }
@@ -507,9 +554,16 @@
       const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; savePageSnapshot(); if (state.pageIndex >= state.pages.length - 1) state.pages.push(null); state.pageIndex++; loadPageSnapshot(state.pageIndex); cl.left = 40; cl.top = 40; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools();
     });
 
+    function updateBgButtonsActive() {
+      const c = state.bgColor || canvas.backgroundColor || 'transparent';
+      document.getElementById('bgWhite').classList.toggle('active', c === '#ffffff');
+      document.getElementById('bgDark').classList.toggle('active', c === '#121212');
+      document.getElementById('bgDeepGreen').classList.toggle('active', c === '#0b3d2e');
+    }
     function setBackgroundColor(color) {
-      try { canvas.setBackgroundColor(color, () => { if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }); }
-      catch { canvas.backgroundColor = color; if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }
+      state.bgColor = color;
+      try { canvas.setBackgroundColor(color, () => { updateBgButtonsActive(); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }); }
+      catch { canvas.backgroundColor = color; updateBgButtonsActive(); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }
     }
     document.getElementById('bgWhite').addEventListener('click', () => setBackgroundColor('#ffffff'));
     document.getElementById('bgDark').addEventListener('click', () => setBackgroundColor('#121212'));
@@ -517,6 +571,7 @@
 
     setMode('draw');
     updateEraseCursorVis();
+    updateBgButtonsActive();
     })();
   </script>
 </body>
