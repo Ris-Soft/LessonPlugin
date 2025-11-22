@@ -16,6 +16,8 @@
       .btn.secondary { background: rgba(255,255,255,0.08); }
       .btn.danger { background: rgba(255, 100, 100, 0.2); border-color: rgba(255, 100, 100, 0.4); }
       .actions { display: flex; gap: 8px; margin-top: 8px; }
+      .dup { border-color: rgba(255,100,100,0.6) !important; }
+      .hint { color: rgba(255,100,100,0.9); font-size: 12px; margin-top: 6px; }
     </style>
   </head>
   <body>
@@ -52,13 +54,16 @@
         if(!Array.isArray(cfg.roles)) cfg.roles=[]; if(!Array.isArray(cfg.groups)) cfg.groups=[]; render()
       }
       function render(){ const box=document.getElementById('list'); box.innerHTML=''; cfg.roles.forEach((name,idx)=>{ const row=el('div','item'); const inp=document.createElement('input'); inp.value=name||''; inp.placeholder='分工名称'; const up=document.createElement('button'); up.className='btn secondary'; up.innerHTML='<i class="ri-arrow-up-s-line"></i>'; const down=document.createElement('button'); down.className='btn secondary'; down.innerHTML='<i class="ri-arrow-down-s-line"></i>'; const del=document.createElement('button'); del.className='btn danger'; del.innerHTML='<i class="ri-delete-bin-line"></i>'; inp.addEventListener('input',()=>{ cfg.roles[idx]=inp.value }); up.addEventListener('click',()=>{ if(idx>0){ const t=cfg.roles[idx]; cfg.roles[idx]=cfg.roles[idx-1]; cfg.roles[idx-1]=t; render() } }); down.addEventListener('click',()=>{ if(idx<cfg.roles.length-1){ const t=cfg.roles[idx]; cfg.roles[idx]=cfg.roles[idx+1]; cfg.roles[idx+1]=t; render() } }); del.addEventListener('click',()=>{ cfg.roles.splice(idx,1); render() }); row.appendChild(inp); row.appendChild(up); row.appendChild(down); row.appendChild(del); box.appendChild(row) }) }
+      function validate(){ const inputs=[...document.querySelectorAll('.item input')]; const names=inputs.map(i=>i.value.trim()).filter(s=>s); const dupNames=names.filter((n,idx)=>names.indexOf(n)!==idx); inputs.forEach(i=>{ if(dupNames.includes(i.value.trim())) i.classList.add('dup'); else i.classList.remove('dup') }); const saveBtn=document.getElementById('save'); const hintId='roles-dup-hint'; let hint=document.getElementById(hintId); if(dupNames.length>0){ saveBtn.disabled=true; if(!hint){ hint=document.createElement('div'); hint.className='hint'; hint.id=hintId; hint.textContent='分工名称重复，请修改后保存'; document.querySelector('.section').appendChild(hint) } } else { saveBtn.disabled=false; if(hint) hint.remove() } }
       async function save(){
         try {
           const all=Array.isArray(cfg.groups)?cfg.groups:[];
           all.forEach(g=>{ const next={}; (cfg.roles||[]).forEach(r=>{ next[r]=Array.isArray(g.roles?.[r])?g.roles[r]:[] }); g.roles=next });
+          const names=(cfg.roles||[]).map(s=>String(s||'').trim()).filter(s=>s); const dup=names.filter((n,idx)=>names.indexOf(n)!==idx); if(dup.length>0){ alert('分工名称重复，请修改后保存'); return }
           if (window.lowbarAPI?.pluginCall) {
             await window.lowbarAPI.pluginCall(caller,'saveConfig', [{ roles: cfg.roles, groups: all }]);
             const res = await window.lowbarAPI.pluginCall(caller, 'getConfig'); const r=res?.result||res; cfg=r?.config||cfg;
+            try{ if(channel) window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
           } else if (window.lowbarAPI?.configEnsureDefaults) {
             await window.lowbarAPI.configEnsureDefaults('duty.easy',{
               roles: ['清洁','黑板','值日生'],
@@ -70,18 +75,21 @@
             await window.lowbarAPI.configSet('duty.easy','roles',cfg.roles);
             await window.lowbarAPI.configSet('duty.easy','groups',all);
             const verify=await window.lowbarAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+            try{ if(channel) window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
           } else if (window.pluginAPI?.configEnsureDefaults) {
             await window.pluginAPI.configEnsureDefaults('duty.easy',{});
             await window.pluginAPI.configSet('duty.easy','roles',cfg.roles);
             await window.pluginAPI.configSet('duty.easy','groups',all);
             const verify=await window.pluginAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+            try{ if(channel) window.pluginAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
           }
         } catch {}
       }
       (function(){ try{ const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'') }catch{}
         if(window.lowbarAPI){ if(channel) window.lowbarAPI.subscribe?.(channel); window.lowbarAPI.onEvent?.(async (n,p)=>{ if(n!==channel) return; if(p?.type==='update'){ if(p.target==='duty.save'){ await save(); await load(); render() } } }); }
-        load(); document.getElementById('add').addEventListener('click',()=>{ cfg.roles.push('新分工'); render() });
-        document.getElementById('save').addEventListener('click',async ()=>{ await save(); await load(); render() })
+        load(); document.getElementById('add').addEventListener('click',()=>{ cfg.roles.push('新分工'); render(); validate() });
+        document.getElementById('save').addEventListener('click',async ()=>{ await save(); await load(); render(); validate() });
+        document.addEventListener('input',(e)=>{ if(e.target && e.target.tagName==='INPUT'){ validate() } });
       })();
     </script>
   </body>

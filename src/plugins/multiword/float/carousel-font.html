@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>轮播字号设置</title>
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin:0; background:#121212; color:#e6e6e6; }
+    header { padding:12px 16px; border-bottom:1px solid #2c2c2c; display:flex; align-items:center; gap:10px; background:#171717; }
+    header b { font-size:16px; }
+    main { padding:12px 16px; }
+    fieldset { border:1px solid #2c2c2c; border-radius:10px; padding:10px 12px; background:#1b1b1b; }
+    legend { color:#9ab; }
+    label { display:block; margin:6px 0; }
+    .ops { display:flex; gap:8px; margin-top:10px; }
+    button { padding:6px 10px; border:1px solid #2c2c2c; background:#222; color:#e6e6e6; border-radius:8px; cursor:pointer; }
+    button:hover { background:#2a2a2a; }
+    input[type="number"] { background:#1f1f1f; color:#e6e6e6; border:1px solid #2a2a2a; border-radius:8px; padding:6px 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <i class="ri-pencil-ruler-2-line"></i>
+    <b>轮播字号设置</b>
+    <span id="serverTip" class="muted" style="margin-left:8px;"></span>
+  </header>
+  <main>
+    <fieldset>
+      <legend>字号</legend>
+      <label>英文字号<input type="number" id="wordsize" min="12" value="34" /> <button type="button" class="incdec" data-target="wordsize" data-step="-2" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="wordsize" data-step="+2" title="增加"><i class="ri-add-line"></i></button></label>
+      <label>中文字号<input type="number" id="cnsize" min="12" value="24" /> <button type="button" class="incdec" data-target="cnsize" data-step="-2" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="cnsize" data-step="+2" title="增加"><i class="ri-add-line"></i></button></label>
+      <div class="ops">
+        <button id="apply"><i class="ri-check-line"></i> 应用字号</button>
+        <button id="close"><i class="ri-close-line"></i> 关闭</button>
+      </div>
+    </fieldset>
+  </main>
+  <script>
+    const qs = new URLSearchParams(location.search||'');
+    const server = qs.get('server')||'';
+    const wf = parseInt(String(qs.get('wordsize')||''),10);
+    const cf = parseInt(String(qs.get('cnsize')||''),10);
+    const h = (id) => document.getElementById(id);
+    try { h('serverTip').textContent = server ? ('已连接：' + server) : ''; } catch {}
+    try { if (Number.isFinite(wf) && wf>0) h('wordsize').value = String(wf); } catch {}
+    try { if (Number.isFinite(cf) && cf>0) h('cnsize').value = String(cf); } catch {}
+    h('apply').onclick = () => {
+      const wordsize = parseInt(h('wordsize').value||'34',10)||34;
+      const cnsize = parseInt(h('cnsize').value||'24',10)||24;
+      try { window.lowbarAPI.emitEvent('multiword.lowbar', { type:'control', action:'carousel', cmd:'set-font', wordsize, cnsize }); } catch {}
+    };
+    h('close').onclick = () => { try { window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: null }); } catch {} };
+    try {
+      document.querySelectorAll('.incdec[data-target]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = String(btn.getAttribute('data-target')||'').trim();
+          const step = parseInt(String(btn.getAttribute('data-step')||'0'), 10) || 0;
+          const el = document.getElementById(id);
+          if (!el) return;
+          const min = parseInt(String(el.getAttribute('min')||'0'), 10) || 0;
+          const cur = parseInt(String(el.value||''), 10);
+          const base = Number.isFinite(cur) ? cur : min || 0;
+          const next = Math.max(min, base + step);
+          el.value = String(next);
+        });
+      });
+    } catch {}
+  </script>
+</body>
+</html>

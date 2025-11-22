@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
     <style>
       body { margin:0; font-family: system-ui, sans-serif; background:#0f0f0f; color:#e6e6e6; }
-      .stage { position: absolute; inset: 0; padding: 20px 24px 120px; }
+      .stage { position: absolute; inset: 0; padding: 20px 24px 120px; overflow: hidden; }
       .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
       .item { background:#141414; border:1px solid #252525; border-radius:10px; padding:12px; text-align:center; }
       .word { font-size: 34px; font-weight: 600; letter-spacing: 0.5px; color: #f5f5f5; }
@@ -188,6 +188,18 @@
               if (Number.isFinite(wf) && wf>0) wordFontSize = wf;
               if (Number.isFinite(cf) && cf>0) cnFontSize = cf;
               applyFontSizes();
+              requestAnimationFrame(() => {
+                const newSize = calcPageSize();
+                if (newSize !== pageSize) {
+                  const flatIndex = pageIdx * pageSize;
+                  pageSize = newSize;
+                  pages = [];
+                  for (let i=0;i<words.length;i+=pageSize) pages.push(words.slice(i,i+pageSize));
+                  pageIdx = Math.max(0, Math.min(pages.length-1, Math.floor(flatIndex / Math.max(1,pageSize))));
+                }
+                renderPage(); 
+                pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain);
+              });
               return;
             }
             else if (cmd === 'toggle-cn') { 
@@ -214,7 +226,7 @@
             else if (id === 'carousel-stop') { if (tickHandle) clearInterval(tickHandle); }
             else if (id === 'open-carousel-settings') {
               try {
-                const float = new URL('../../../plugins/multiword/float/externallib-settings.html', window.location.href).href;
+                const float = new URL('../../../plugins/multiword/float/carousel-font.html', window.location.href).href;
                 const u = new URL(float);
                 u.searchParams.set('server', String(serverBase||''));
                 u.searchParams.set('wordsize', String(wordFontSize||''));

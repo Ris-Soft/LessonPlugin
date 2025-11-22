@@ -1,7 +1,7 @@
 {
   "name": "market-server",
   "version": "1.0.0",
-  "description": "功能市场 API 与临时可视化编辑服务",
+  "description": "LessonPlugin 官网与功能市场服务",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

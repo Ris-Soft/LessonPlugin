@@ -11,16 +11,20 @@
       body { margin: 0; }
       .section { padding: 16px; background: transparent !important; border: none !important; }
       .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+      @media (max-width: 1400px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+      @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
       .card { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 14px; background: linear-gradient(180deg, rgba(40,80,120,0.25), rgba(20,30,50,0.25)); box-shadow: 0 6px 18px rgba(0,0,0,0.25); transform: translateY(0); transition: transform .2s ease, box-shadow .2s ease; }
       .card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.35); }
       .card h4 { margin: 0 0 8px 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-      .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); font-size: 12px; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-size: 12px; }
       .role { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
       .role .name { font-weight: 600; width: 88px; flex: 0 0 88px; color: var(--muted); }
       .role .list { display: flex; flex-wrap: wrap; gap: 6px; }
       .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
       .muted { color: var(--muted); }
       .today { outline: 2px solid rgba(72,207,173,0.5); }
+      .header { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     </style>
   </head>
   <body>
@@ -39,10 +43,14 @@
         let r=null; if(window.lowbarAPI?.pluginCall){ r=await window.lowbarAPI.pluginCall(caller,'getPreview'); r=r?.result||r; }
         const list=Array.isArray(r?.list)?r.list:[]; const wrap=document.getElementById('preview'); wrap.innerHTML='';
         const today=todayISO();
-        list.forEach(item=>{ const card=el('div','card'); if(item.dateISO===today) card.classList.add('today'); const h=el('h4'); const b=el('span','badge'); b.innerHTML=`<i class="ri-calendar-line"></i> ${dowStr(item.dateISO)}`; const g=el('span','badge'); g.innerHTML=`<i class="ri-group-line"></i> ${item.groupName||'未设置组'}`; const t=document.createTextNode(item.dateISO); h.appendChild(t); h.appendChild(b); h.appendChild(g); card.appendChild(h);
-          item.roles.forEach(r=>{ const row=el('div','role'); const name=el('div','name'); name.textContent=r; const lst=el('div','list');
-            const arr=Array.isArray(item.members?.[r])?item.members[r]:[]; if(arr.length===0){const t=el('span','muted'); t.textContent='未设置'; lst.appendChild(t)}
-            arr.forEach(n=>{ const t=el('span','tag'); t.innerHTML=`<i class="ri-user-line"></i> ${n||''}`; lst.appendChild(t)});
+        list.forEach(item=>{ const card=el('div','card'); if(item.dateISO===today) card.classList.add('today'); const h=el('h4'); const head=el('div','header'); const b=el('span','badge'); b.innerHTML=`<i class=\"ri-calendar-line\"></i> ${dowStr(item.dateISO)}`; const t=document.createTextNode(item.dateISO);
+          const gBadge=el('span','badge'); gBadge.innerHTML=`<i class=\"ri-group-line\"></i> ${item.groupName||'未设置组'}`;
+          head.appendChild(t); head.appendChild(b); head.appendChild(gBadge);
+          h.appendChild(head); card.appendChild(h);
+          (item.rolesGroup||[]).forEach(r=>{ const row=el('div','role'); const name=el('div','name'); name.textContent=r; const lst=el('div','list');
+            const arr=Array.isArray(item.groupMembers?.[r])?item.groupMembers[r]:[]; if(arr.length===0){const t=el('span','muted'); t.textContent='未设置'; lst.appendChild(t)}
+            arr.forEach(n=>{ const t=el('span','tag'); t.innerHTML=`<i class=\"ri-user-line\"></i> ${n||''}`; lst.appendChild(t)});
+            const soloArr=Array.isArray(item.singleMembers?.[r])?item.singleMembers[r]:[]; if(soloArr.length){ const solo=el('span','badge'); solo.innerHTML=`<i class=\"ri-user-star-line\"></i> 单人 ${soloArr[0]}`; lst.appendChild(solo) }
             row.appendChild(name); row.appendChild(lst); card.appendChild(row);
           }); wrap.appendChild(card);
         });

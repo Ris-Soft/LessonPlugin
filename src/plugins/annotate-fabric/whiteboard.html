@@ -7,16 +7,22 @@
   <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
   <style>
     html, body { height: 100%; margin: 0; background: transparent; }
+    * { -webkit-user-select: none; user-select: none; }
     .wrap { display: flex; flex-direction: column; height: 100%; }
     #board { flex: 1; position: relative; background: rgba(0,0,0,0.02); overflow: hidden; }
     #board .canvas-container { position: absolute; inset: 0; }
-    #toolbar { height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(30,35,40,0.85); color: #fff; }
-    #toolbar button { height: 32px; padding: 0 10px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
-    #toolbar button.active { background: #0ea5e9; }
+    #toolbar { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); height: 68px; display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: rgba(20,20,20,0.9); color: #fff; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+    .rect-btn { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; width:56px; height:56px; border:none; background:transparent; border-radius:6px; cursor:pointer; color:#ddd; }
+    .rect-btn:hover { background: rgba(255,255,255,0.06); }
+    .rect-btn.active { background: rgba(255,255,255,0.12); color:#fff; }
+    .rect-btn i { font-size:20px; }
+    .rect-btn span { font-size:11px; }
     #toolbar input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
     #toolbar input[type=range] { width: 160px; }
-    #pageCtrl { position: absolute; right: 12px; bottom: 96px; display: flex; gap: 6px; align-items: center; background: rgba(30,35,40,0.7); color: #fff; padding: 6px 10px; border-radius: 8px; }
-    #pageCtrl button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+    #rightCtrl { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center; background: rgba(20,20,20,0.9); color: #fff; padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+    
+    #leftCtrl { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center; background: rgba(20,20,20,0.9); color: #fff; padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+    
     #eraseCursor { position: absolute; border: 1px dashed #ff8080; pointer-events: none; }
     .spacer { flex: 1; }
     .file { display: none; }
@@ -28,23 +34,30 @@
     .popup button.active { background: #0ea5e9; }
     #selTools { position: absolute; display: none; background: rgba(30,35,40,0.95); color: #fff; padding: 6px 8px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); gap: 8px; align-items: center; }
     #selTools button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+    #pagePreview { position: fixed; right: 12px; top: 12px; bottom: 96px; display: none; background: rgba(20,20,20,0.95); color: #fff; padding: 8px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); z-index: 999; width: 168px; box-sizing: border-box; flex-direction: column; gap: 8px; }
+    #pagePreview .list { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 10px; }
+    #pagePreview .thumb { box-sizing: border-box; position: relative; display:flex; width: 100%; height: 96px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; align-items: center; justify-content: center; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto; }
+    #pagePreview .thumb img { display:block; width: 100%; height: 100%; object-fit: contain; }
+    #pagePreview .thumb .label { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,0.5); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    #pagePreview .thumb .del { position: absolute; right: 6px; top: 6px; background: transparent; color: #fff; border: none; border-radius: 4px; width: 24px; height: 24px; padding: 0; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; }
+    #pagePreview .footer { flex: 0 0 auto; display:flex; justify-content:center; }
+    #pagePreview .footer button { height: 28px; padding: 0 10px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
+    #pagePreview .list::-webkit-scrollbar { width: 10px; }
+    #pagePreview .list::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); border-radius: 8px; }
+    #pagePreview .list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 8px; }
+    #pagePreview .list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div id="board"></div>
       <div id="toolbar">
-        <button id="modeDraw"><i class="ri-pencil-line"></i> 书写</button>
-        <button id="modeErase"><i class="ri-eraser-line"></i> 橡皮</button>
-        <button id="modeSelect"><i class="ri-cursor-line"></i> 选择</button>
-        <button id="modePan"><i class="ri-drag-move-2-line"></i> 漫游</button>
-        <button id="toggleTwoFinger"><i class="ri-fingerprint-line"></i> 双指漫游</button>
-        <button id="boardSettings"><i class="ri-settings-2-line"></i> 白板设置</button>
-        <div class="spacer"></div>
-        <button id="exportPNG"><i class="ri-image-line"></i> 导出PNG</button>
-        <button id="exportJSON"><i class="ri-file-list-3-line"></i> 导出JSON</button>
-        <button id="importJSON"><i class="ri-upload-2-line"></i> 导入JSON</button>
-        <input id="importFile" class="file" type="file" accept=".wbjson,application/json">
+        <button id="modeDraw" class="rect-btn"><i class="ri-pencil-line"></i><span>批注</span></button>
+        <button id="modeErase" class="rect-btn"><i class="ri-eraser-line"></i><span>橡皮</span></button>
+        <button id="modeSelect" class="rect-btn"><i class="ri-cursor-line"></i><span>选择</span></button>
+        <button id="modePan" class="rect-btn"><i class="ri-drag-move-2-line"></i><span>漫游</span></button>
+        <button id="toggleTwoFinger" class="rect-btn"><i class="ri-fingerprint-line"></i><span>手势</span></button>
+        <button id="boardSettings" class="rect-btn"><i class="ri-settings-2-line"></i><span>设置</span></button>
       </div>
       <div id="popup" class="popup">
         <div id="penSettings" style="display:flex; gap:12px; align-items:center;">
@@ -69,11 +82,23 @@
           <button id="bgDark">背景 暗黑</button>
           <button id="bgDeepGreen">背景 深绿</button>
         </div>
+        <div id="savePanel" style="display:none; gap:12px; align-items:center;">
+          <button id="exportPNG"><i class="ri-image-line"></i> 导出PNG</button>
+          <button id="exportJSON"><i class="ri-file-list-3-line"></i> 导出JSON</button>
+          <button id="importJSON"><i class="ri-upload-2-line"></i> 导入JSON</button>
+          <input id="importFile" class="file" type="file" accept=".wbjson,application/json">
+        </div>
       </div>
-    <div id="pageCtrl">
-      <button id="prevPage"><i class="ri-arrow-left-s-line"></i> 上一页</button>
-      <span id="pageLabel">1</span>
-      <button id="nextPage"><i class="ri-arrow-right-s-line"></i> 下一页</button>
+    <div id="leftCtrl">
+      <button id="btnClose" class="rect-btn"><i class="ri-close-line"></i><span>关闭</span></button>
+      <button id="btnMin" class="rect-btn"><i class="ri-subtract-line"></i><span>最小化</span></button>
+      <button id="btnSave" class="rect-btn"><i class="ri-save-3-line"></i><span>保存</span></button>
+    </div>
+    <div id="rightCtrl">
+      <button id="prevPage" class="rect-btn"><i class="ri-arrow-left-s-line"></i><span>上一页</span></button>
+      <span id="pageLabel" style="cursor:pointer">1</span>
+      <button id="nextPage" class="rect-btn"><i class="ri-arrow-right-s-line"></i><span>下一页</span></button>
+      <div id="pagePreview"></div>
     </div>
   </div>
   <script>
@@ -89,6 +114,11 @@
     }
     (async () => {
       let fabric = window.fabric || null;
+      const params = new URLSearchParams(location.search || '');
+      const showCloseParam = params.get('showClose');
+      const showMinParam = params.get('showMinimize');
+      const showSaveParam = params.get('showSave');
+      const persistKey = params.get('persistKey');
       if (!fabric || typeof fabric.Canvas !== 'function') {
         const candidates = [
           // './node_modules/fabric/dist/index.min.js',
@@ -143,18 +173,21 @@
       eraseSize: 80,
       pages: [],
       pageIndex: 0,
-      bgColor: '#121212'
+      bgColor: '#121212',
+      pageThumbs: []
     };
     const popup = document.getElementById('popup');
     const penSettings = document.getElementById('penSettings');
     const eraserSettings = document.getElementById('eraserSettings');
+    const savePanel = document.getElementById('savePanel');
     function showPopup(which, anchorEl) {
       penSettings.style.display = which === 'pen' ? 'flex' : 'none';
       eraserSettings.style.display = which === 'eraser' ? 'flex' : 'none';
       boardSettingsPanel.style.display = which === 'board' ? 'flex' : 'none';
+      savePanel.style.display = which === 'save' ? 'flex' : 'none';
       popup.style.display = 'flex';
       try {
-        const defaultId = which === 'pen' ? 'modeDraw' : (which === 'eraser' ? 'modeErase' : 'boardSettings');
+        const defaultId = which === 'pen' ? 'modeDraw' : (which === 'eraser' ? 'modeErase' : (which === 'board' ? 'boardSettings' : 'btnSave'));
         const rect = anchorEl ? anchorEl.getBoundingClientRect() : document.getElementById(defaultId).getBoundingClientRect();
         const px = Math.max(12, rect.left);
         const ph = popup.offsetHeight || 48;
@@ -215,17 +248,17 @@
         canvas.selection = false;
         canvas.skipTargetFind = true;
         canvas.getObjects().forEach(o => { o.selectable = false; o.erasable = true; });
-        if (fabric.EraserBrush) {
-          const eb = new fabric.EraserBrush(canvas);
-          eb.width = Number(eraseSize.value);
-          canvas.freeDrawingBrush = eb;
+        try { canvas.discardActiveObject(); } catch {}
+        let eBrush = null;
+        try { if (fabric && fabric.EraserBrush) eBrush = new fabric.EraserBrush(canvas); } catch {}
+        if (eBrush) {
+          eBrush.width = Number(state.eraseSize) || 80;
+          canvas.freeDrawingBrush = eBrush;
           canvas.isDrawingMode = true;
-          try { canvas.discardActiveObject(); } catch {}
-          if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
         } else {
           canvas.isDrawingMode = false;
-          canvas.skipTargetFind = true;
         }
+        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
         showPopup('eraser');
       }
     }
@@ -244,6 +277,9 @@
     const clearPageBtn = document.getElementById('clearPage');
     const boardSettingsBtn = document.getElementById('boardSettings');
     const boardSettingsPanel = document.getElementById('boardSettingsPanel');
+    const btnClose = document.getElementById('btnClose');
+    const btnMin = document.getElementById('btnMin');
+    const btnSave = document.getElementById('btnSave');
     const penPalette = document.getElementById('penPalette');
     const paletteBtns = penPalette ? penPalette.querySelectorAll('button[data-color]') : [];
     function updatePenPaletteSelection() {
@@ -306,6 +342,12 @@
       if (popup.style.display === 'flex' && boardSettingsPanel.style.display === 'flex') { hidePopup(); }
       else { showPopup('board', boardSettingsBtn); }
     });
+    if (btnClose) btnClose.style.display = (showCloseParam === '0') ? 'none' : 'inline-flex';
+    if (btnMin) btnMin.style.display = (showMinParam === '0') ? 'none' : 'inline-flex';
+    if (btnSave) btnSave.style.display = (showSaveParam === '0') ? 'none' : 'inline-flex';
+    if (btnClose) btnClose.addEventListener('click', () => { try { if (window.annotateAPI && typeof window.annotateAPI.close === 'function') { window.annotateAPI.close(); } else { window.close(); } } catch {} });
+    if (btnMin) btnMin.addEventListener('click', () => { try { if (window.annotateAPI && typeof window.annotateAPI.minimize === 'function') { window.annotateAPI.minimize(); } } catch {} });
+    if (btnSave) btnSave.addEventListener('click', () => { if (popup.style.display === 'flex' && savePanel.style.display === 'flex') { hidePopup(); } else { showPopup('save', btnSave); } });
     btnPan.addEventListener('click', () => { setMode('pan'); hidePopup(); updateEraseCursorVis(); });
     document.getElementById('toggleTwoFinger').addEventListener('click', () => {
       state.twoFingerPan = !state.twoFingerPan;
@@ -313,7 +355,35 @@
     });
 
     function savePageSnapshot() {
-      try { state.pages[state.pageIndex] = canvas.toJSON(); } catch {}
+      try {
+        state.pages[state.pageIndex] = canvas.toJSON();
+        try {
+          const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 });
+          state.pageThumbs[state.pageIndex] = url;
+        } catch {}
+      } catch {}
+    }
+    function getTotalPages() { return Math.max(state.pages.length, state.pageIndex + 1); }
+    function updatePageLabel() { document.getElementById('pageLabel').textContent = `${state.pageIndex + 1}/${getTotalPages()}`; }
+    function savePackIfNeeded() {
+      try {
+        if (!persistKey) return;
+        const pack = { pages: state.pages, bg: state.bgColor };
+        localStorage.setItem('wb.persist.' + persistKey, JSON.stringify(pack));
+      } catch {}
+    }
+    function loadPackIfAny() {
+      try {
+        if (!persistKey) return false;
+        const raw = localStorage.getItem('wb.persist.' + persistKey);
+        if (!raw) return false;
+        const obj = JSON.parse(raw);
+        if (!obj || !Array.isArray(obj.pages)) return false;
+        state.pages = obj.pages;
+        state.pageThumbs = new Array(state.pages.length).fill(null);
+        if (obj.bg) state.bgColor = obj.bg;
+        return true;
+      } catch { return false; }
     }
     function loadPageSnapshot(i) {
       const data = state.pages[i];
@@ -324,7 +394,14 @@
         try { setBackgroundColor(state.bgColor); } catch {}
         if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
       }
-      document.getElementById('pageLabel').textContent = String(i + 1);
+      updatePageLabel();
+      try {
+        if (!state.pageThumbs[i]) {
+          const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 });
+          state.pageThumbs[i] = url;
+        }
+      } catch {}
+      savePackIfNeeded();
     }
     document.getElementById('prevPage').addEventListener('click', () => {
       savePageSnapshot();
@@ -337,8 +414,9 @@
       state.pageIndex++;
       loadPageSnapshot(state.pageIndex);
     });
-    state.pages.push(null);
+    if (!loadPackIfAny()) { state.pages.push(null); state.pageThumbs.push(null); }
     loadPageSnapshot(0);
+    setInterval(() => { try { savePageSnapshot(); savePackIfNeeded(); } catch {} }, 3000);
 
     function download(filename, content, mime) {
       const a = document.createElement('a');
@@ -376,16 +454,13 @@
     eraseCursor.id = 'eraseCursor';
     board.appendChild(eraseCursor);
     function resizeEraseCursor(size) {
-      const zoom = typeof canvas.getZoom === 'function' ? canvas.getZoom() : ((canvas.viewportTransform && canvas.viewportTransform[0]) || 1);
-      const px = Math.max(2, Math.floor(size * zoom));
+      const px = Math.max(10, Math.floor(Number(size) || 80));
       eraseCursor.style.width = px + 'px';
       eraseCursor.style.height = px + 'px';
     }
     resizeEraseCursor(state.eraseSize);
-    eraseCursor.style.left = '0px';
-    eraseCursor.style.top = '0px';
     eraseCursor.style.display = 'none';
-    const updateEraseCursorVis = () => { eraseCursor.style.display = (state.mode === 'erase' && !(fabric && fabric.EraserBrush)) ? 'block' : 'none'; };
+    const updateEraseCursorVis = () => { const useBrush = !!(fabric && fabric.EraserBrush && canvas.isDrawingMode && (canvas.freeDrawingBrush instanceof fabric.EraserBrush)); eraseCursor.style.display = (state.mode === 'erase' && !useBrush) ? 'block' : 'none'; };
     canvas.on('path:created', (e) => {
       try {
         const p = e.path;
@@ -407,25 +482,15 @@
       const b = obj.getBoundingRect(false, true);
       return !(b.left > rx + rw || b.left + b.width < rx || b.top > ry + rh || b.top + b.height < ry);
     }
-    function applyEraseAtCanvas(x, y) {
+    function stampEraseAtCanvas(x, y) {
       try {
-        const size = state.eraseSize || 80;
-        const half = size / 2;
-        const rx = x - half;
-        const ry = y - half;
-        const rw = size;
-        const rh = size;
-        const objs = canvas.getObjects();
-        let changed = false;
-        for (let i = objs.length - 1; i >= 0; i--) {
-          const o = objs[i];
-          if (o && o.erasable === false) continue;
-          if (o && intersectsRect(o, rx, ry, rw, rh)) {
-            canvas.remove(o);
-            changed = true;
-          }
-        }
-        if (changed) { if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }
+        const size = Number(state.eraseSize) || 80;
+        const r = new fabric.Rect({ left: x - size/2, top: y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false });
+        r.globalCompositeOperation = 'destination-out';
+        r.isEraser = true;
+        r.excludeFromExport = false;
+        canvas.add(r);
+        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
       } catch {}
     }
 
@@ -454,17 +519,23 @@
     }
     canvas.on('mouse:down', (opt) => {
       const e = opt.e;
-      if (!(fabric && fabric.EraserBrush) && state.mode === 'erase' && e.button === 0) { draggingErase = true; const p = getPointerCanvas(opt); applyEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
+      if (state.mode === 'erase' && e.button === 0) {
+        if (!(fabric && fabric.EraserBrush)) {
+          const p = getPointerCanvas(opt);
+          stampEraseAtCanvas(p.x, p.y);
+          draggingErase = true;
+          e.preventDefault(); e.stopPropagation();
+        }
+      }
       if ((state.mode === 'pan' && e.button === 0) || (state.twoFingerPan && e.button === 1)) { draggingPan = true; const sp = getPointerScreen(opt); lastScreenX = sp.x; lastScreenY = sp.y; }
     });
     canvas.on('mouse:move', (opt) => {
       const e = opt.e;
       const sp = getPointerScreen(opt);
       resizeEraseCursor(state.eraseSize);
-      const zoom = typeof canvas.getZoom === 'function' ? canvas.getZoom() : ((canvas.viewportTransform && canvas.viewportTransform[0]) || 1);
-      const half = (state.eraseSize * zoom) / 2;
+      const half = (Number(state.eraseSize) || 80) / 2;
       eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`;
-      if (draggingErase) { const p = getPointerCanvas(opt); applyEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
+      if (draggingErase && !(fabric && fabric.EraserBrush)) { const p = getPointerCanvas(opt); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
       if (draggingPan) {
         const dx = (typeof e.movementX === 'number') ? e.movementX : (sp.x - lastScreenX);
         const dy = (typeof e.movementY === 'number') ? e.movementY : (sp.y - lastScreenY);
@@ -488,18 +559,19 @@
     });
 
     canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
-      if (state.twoFingerPan && e.touches.length === 2) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; }
+      if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); }
+      else if (state.twoFingerPan && e.touches.length === 2) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); }
+      else if (state.mode === 'erase' && e.touches.length >= 1) { if (!(fabric && fabric.EraserBrush)) { const p = touchPointToCanvas(e.touches[0]); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); } }
     }, { passive: false });
     canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
-      if (state.twoFingerPan && e.touches.length === 2 && draggingPan) {
+      if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) {
         const sp = getPointerScreen({ e });
         const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y;
-        if (fabric && fabric.Point && typeof canvas.relativePan === 'function') {
-          canvas.relativePan(new fabric.Point(dx, dy));
-        } else {
-          const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt);
-        }
+        if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); }
+        else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); }
         e.preventDefault();
+      } else if (state.mode === 'erase' && e.touches.length >= 1) {
+        if (!(fabric && fabric.EraserBrush)) { const p = touchPointToCanvas(e.touches[0]); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); }
       }
     }, { passive: false });
     canvas.upperCanvasEl.addEventListener('touchend', () => { draggingPan = false; }, { passive: false });
@@ -572,6 +644,81 @@
     setMode('draw');
     updateEraseCursorVis();
     updateBgButtonsActive();
+
+    const pagePreview = document.getElementById('pagePreview');
+    function deletePage(i) {
+      try {
+        if (state.pages.length <= 1) { state.pages = [null]; state.pageThumbs = [null]; state.pageIndex = 0; loadPageSnapshot(0); return; }
+        state.pages.splice(i, 1);
+        state.pageThumbs.splice(i, 1);
+        if (state.pageIndex >= state.pages.length) state.pageIndex = state.pages.length - 1;
+        loadPageSnapshot(state.pageIndex);
+        buildPagePreview();
+      } catch {}
+    }
+    function buildPagePreview() {
+      try {
+        pagePreview.innerHTML = '';
+        const list = document.createElement('div'); list.className = 'list';
+        const count = Math.max(state.pages.length, state.pageIndex + 1);
+        for (let i = 0; i < count; i++) {
+          const d = document.createElement('div'); d.className = 'thumb';
+          const img = document.createElement('img'); img.src = state.pageThumbs[i] || '';
+          const lab = document.createElement('span'); lab.className = 'label'; lab.textContent = String(i + 1);
+          const del = document.createElement('button'); del.className = 'del'; del.innerHTML = '<i class="ri-delete-bin-6-line"></i>'; del.addEventListener('click', (ev) => { ev.stopPropagation(); deletePage(i); });
+          d.appendChild(img); d.appendChild(lab); d.appendChild(del);
+          d.addEventListener('click', () => { savePageSnapshot(); state.pageIndex = i; loadPageSnapshot(i); hidePagePreview(); });
+          list.appendChild(d);
+        }
+        pagePreview.appendChild(list);
+        const f = document.createElement('div'); f.className = 'footer';
+        const btn = document.createElement('button'); btn.innerHTML = '<i class="ri-arrow-down-s-line"></i> 收起'; btn.addEventListener('click', () => hidePagePreview());
+        f.appendChild(btn);
+        pagePreview.appendChild(f);
+      } catch {}
+    }
+    function showPagePreview() { try { buildPagePreview(); pagePreview.style.display = 'flex'; } catch {} }
+    function hidePagePreview() { pagePreview.style.display = 'none'; }
+    document.getElementById('pageLabel').addEventListener('click', () => { if (pagePreview.style.display === 'flex') hidePagePreview(); else showPagePreview(); });
+    document.addEventListener('mousedown', (e) => { const vis = pagePreview.style.display === 'flex'; if (vis) { const within = pagePreview.contains(e.target) || document.getElementById('pageLabel').contains(e.target); if (!within) hidePagePreview(); } });
+
+    const perTouchBrushes = {};
+    function touchPointToCanvas(tp) {
+      const rect = canvas.upperCanvasEl.getBoundingClientRect();
+      const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top;
+      const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]);
+      const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv);
+      return { x: pt.x, y: pt.y };
+    }
+    canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
+      if (state.mode === 'draw' && !state.twoFingerPan && e.touches.length > 1) {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+          const t = e.touches[i]; const id = t.identifier;
+          if (!perTouchBrushes[id]) { const b = new fabric.PencilBrush(canvas); b.color = penColor.value; b.width = Number(penWidth.value); b.decimate = 2; perTouchBrushes[id] = b; }
+          const p = touchPointToCanvas(t); try { perTouchBrushes[id].onMouseDown(p); } catch {}
+        }
+      }
+    }, { passive: false });
+    canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
+      if (state.mode === 'draw' && !state.twoFingerPan && e.touches.length > 1) {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+          const t = e.touches[i]; const id = t.identifier; const p = touchPointToCanvas(t); try { if (perTouchBrushes[id]) perTouchBrushes[id].onMouseMove(p); } catch {}
+        }
+      }
+    }, { passive: false });
+    canvas.upperCanvasEl.addEventListener('touchend', (e) => {
+      if (state.mode === 'draw' && !state.twoFingerPan) {
+        try {
+          if (e.changedTouches) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+              const t = e.changedTouches[i]; const id = t.identifier; try { if (perTouchBrushes[id]) perTouchBrushes[id].onMouseUp(); } catch {} delete perTouchBrushes[id];
+            }
+          }
+        } catch {}
+      }
+    }, { passive: false });
     })();
   </script>
 </body>

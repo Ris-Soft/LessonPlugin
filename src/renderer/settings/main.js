@@ -55,7 +55,7 @@ async function main() {
             const container = document.getElementById('plugins');
             const list = await fetchPlugins();
             container.innerHTML = '';
-            const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+            const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
             filtered.forEach((p) => container.appendChild(renderPlugin(p)));
           } catch {}
         })();
@@ -76,7 +76,10 @@ async function main() {
                     <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
                     <div class="card-desc">入口：${c.entry || 'index.html'}</div>
                   </div>
-                  <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                  <div class="inline" style="display:flex;gap:8px;align-items:center;">
+                    <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                    <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
+                  </div>
                 </div>
               `;
               const btn = el.querySelector('.preview-btn');
@@ -91,10 +94,90 @@ async function main() {
                   const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
                   closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
                   title.appendChild(closeBtn);
+                  try { title.style.justifyContent = 'space-between'; } catch {}
                   const body = document.createElement('div'); body.className = 'modal-body';
                   const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
                   body.appendChild(frame);
                   box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+                } catch {}
+              });
+              const uninstallBtn = el.querySelector('.uninstall-btn');
+              uninstallBtn?.addEventListener('click', async () => {
+                const ok = await showConfirm(`卸载组件：${c.name || c.id}？`);
+                if (!ok) return;
+                const out = await window.settingsAPI?.uninstallPlugin?.(c.id);
+                if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
+                showToast(`已卸载组件：${c.name || c.id}`, { type: 'success', duration: 2000 });
+                try {
+                  const res2 = await window.settingsAPI?.componentsList?.('');
+                  const list2 = (res2?.ok && Array.isArray(res2.components)) ? res2.components : [];
+                  container.innerHTML = '';
+                  list2.forEach((cc) => {
+                    const card = document.createElement('div');
+                    card.className = 'plugin-card';
+                    card.innerHTML = `
+                      <div class="card-header">
+                        <i class="ri-layout-3-line"></i>
+                        <div>
+                          <div class="card-title">${cc.name || cc.id} <span class="pill small">${cc.group || '未分组'}</span></div>
+                          <div class="card-desc">入口：${cc.entry || 'index.html'}</div>
+                        </div>
+                        <div class="inline" style="display:flex;gap:8px;align-items:center;">
+                          <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                          <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
+                        </div>
+                      </div>
+                    `;
+                    const preview = card.querySelector('.preview-btn');
+                    preview.addEventListener('click', async () => {
+                      try {
+                        const url = cc.url || (await window.settingsAPI?.componentEntryUrl?.(cc.id));
+                        if (!url) { await showAlert('未找到组件入口'); return; }
+                        const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+                        const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
+                        const title = document.createElement('div'); title.className = 'modal-title';
+                        title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${cc.name || cc.id}</span>`;
+                        const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
+                        closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+                        title.appendChild(closeBtn);
+                        try { title.style.justifyContent = 'space-between'; } catch {}
+                        const body = document.createElement('div'); body.className = 'modal-body';
+                        const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
+                        body.appendChild(frame);
+                        box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+                      } catch {}
+                    });
+                    const rm = card.querySelector('.uninstall-btn');
+                    rm.addEventListener('click', async () => {
+                      const ok2 = await showConfirm(`卸载组件：${cc.name || cc.id}？`);
+                      if (!ok2) return;
+                      const out2 = await window.settingsAPI?.uninstallPlugin?.(cc.id);
+                      if (!out2?.ok) { await showAlert(`卸载失败：${out2?.error || '未知错误'}`); return; }
+                      showToast(`已卸载组件：${cc.name || cc.id}`, { type: 'success', duration: 2000 });
+                      const res3 = await window.settingsAPI?.componentsList?.('');
+                      const list3 = (res3?.ok && Array.isArray(res3.components)) ? res3.components : [];
+                      container.innerHTML = '';
+                      list3.forEach((ccc) => {
+                        const card2 = document.createElement('div');
+                        card2.className = 'plugin-card';
+                        card2.innerHTML = `
+                          <div class="card-header">
+                            <i class="ri-layout-3-line"></i>
+                            <div>
+                              <div class="card-title">${ccc.name || ccc.id} <span class="pill small">${ccc.group || '未分组'}</span></div>
+                              <div class="card-desc">入口：${ccc.entry || 'index.html'}</div>
+                            </div>
+                            <div class="inline" style="display:flex;gap:8px;align-items:center;">
+                              <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                              <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
+                            </div>
+                          </div>
+                        `;
+                        container.appendChild(card2);
+                      });
+                    });
+                    container.appendChild(card);
+                  });
                 } catch {}
               });
               container.appendChild(el);
@@ -133,7 +216,7 @@ async function main() {
           const container = document.getElementById('plugins');
           const list = await fetchPlugins();
           container.innerHTML = '';
-          const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+          const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
           filtered.forEach((p) => container.appendChild(renderPlugin(p)));
         } catch {}
       })();
@@ -154,7 +237,10 @@ async function main() {
                   <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
                   <div class="card-desc">入口：${c.entry || 'index.html'}</div>
                 </div>
-                <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                <div class="inline" style="display:flex;gap:8px;align-items:center;">
+                  <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                  <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
+                </div>
               </div>
             `;
             const btn = el.querySelector('.preview-btn');
@@ -169,10 +255,90 @@ async function main() {
                 const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
                 closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
                 title.appendChild(closeBtn);
+                try { title.style.justifyContent = 'space-between'; } catch {}
                 const body = document.createElement('div'); body.className = 'modal-body';
                 const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
                 body.appendChild(frame);
                 box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+              } catch {}
+            });
+            const uninstallBtn = el.querySelector('.uninstall-btn');
+            uninstallBtn?.addEventListener('click', async () => {
+              const ok = await showConfirm(`卸载组件：${c.name || c.id}？`);
+              if (!ok) return;
+              const out = await window.settingsAPI?.uninstallPlugin?.(c.id);
+              if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
+              showToast(`已卸载组件：${c.name || c.id}`, { type: 'success', duration: 2000 });
+              try {
+                const res2 = await window.settingsAPI?.componentsList?.('');
+                const list2 = (res2?.ok && Array.isArray(res2.components)) ? res2.components : [];
+                container.innerHTML = '';
+                list2.forEach((cc) => {
+                  const card = document.createElement('div');
+                  card.className = 'plugin-card';
+                  card.innerHTML = `
+                    <div class="card-header">
+                      <i class="ri-layout-3-line"></i>
+                      <div>
+                        <div class="card-title">${cc.name || cc.id} <span class="pill small">${cc.group || '未分组'}</span></div>
+                        <div class="card-desc">入口：${cc.entry || 'index.html'}</div>
+                      </div>
+                      <div class="inline" style="display:flex;gap:8px;align-items:center;">
+                        <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                        <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
+                      </div>
+                    </div>
+                  `;
+                  const preview = card.querySelector('.preview-btn');
+                  preview.addEventListener('click', async () => {
+                    try {
+                      const url = cc.url || (await window.settingsAPI?.componentEntryUrl?.(cc.id));
+                      if (!url) { await showAlert('未找到组件入口'); return; }
+                      const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+                      const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
+                      const title = document.createElement('div'); title.className = 'modal-title';
+                      title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${cc.name || cc.id}</span>`;
+                      const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
+                      closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+                      title.appendChild(closeBtn);
+                      try { title.style.justifyContent = 'space-between'; } catch {}
+                      const body = document.createElement('div'); body.className = 'modal-body';
+                      const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
+                      body.appendChild(frame);
+                      box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+                    } catch {}
+                  });
+                  const rm = card.querySelector('.uninstall-btn');
+                  rm.addEventListener('click', async () => {
+                    const ok2 = await showConfirm(`卸载组件：${cc.name || cc.id}？`);
+                    if (!ok2) return;
+                    const out2 = await window.settingsAPI?.uninstallPlugin?.(cc.id);
+                    if (!out2?.ok) { await showAlert(`卸载失败：${out2?.error || '未知错误'}`); return; }
+                    showToast(`已卸载组件：${cc.name || cc.id}`, { type: 'success', duration: 2000 });
+                    const res3 = await window.settingsAPI?.componentsList?.('');
+                    const list3 = (res3?.ok && Array.isArray(res3.components)) ? res3.components : [];
+                    container.innerHTML = '';
+                    list3.forEach((ccc) => {
+                      const card2 = document.createElement('div');
+                      card2.className = 'plugin-card';
+                      card2.innerHTML = `
+                        <div class="card-header">
+                          <i class="ri-layout-3-line"></i>
+                          <div>
+                            <div class="card-title">${ccc.name || ccc.id} <span class="pill small">${ccc.group || '未分组'}</span></div>
+                            <div class="card-desc">入口：${ccc.entry || 'index.html'}</div>
+                          </div>
+                          <div class="inline" style="display:flex;gap:8px;align-items:center;">
+                            <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
+                            <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
+                          </div>
+                        </div>
+                      `;
+                      container.appendChild(card2);
+                    });
+                  });
+                  container.appendChild(card);
+                });
               } catch {}
             });
             container.appendChild(el);
@@ -189,7 +355,7 @@ async function main() {
     try {
       navigateToPage('plugins');
       const list = await fetchPlugins();
-      const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+      const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
       const item = filtered.find((p) => (p.id || p.name) === pluginKey);
       if (item) {
         showPluginAboutModal(item);
@@ -234,7 +400,7 @@ async function main() {
   const list = await fetchPlugins();
   container.innerHTML = '';
   // 需求：无动作的插件不应在插件列表显示（但不影响自动化编辑器的插件选择）
-  const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
+  const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
   filtered.forEach((p) => container.appendChild(renderPlugin(p)));
 
   // 打开设置页时检查缺失依赖并提示安装（避免占用启动时间）

@@ -1724,6 +1724,7 @@ module.exports.listComponents = function listComponents(group) {
     const items = (manifest.plugins || []).filter((p) => String(p.type || '').toLowerCase() === 'component');
     const baseDir = path.dirname(manifestPath);
     const out = [];
+    const seen = new Set();
     for (const p of items) {
       if (group && String(p.group || '').trim() && String(p.group).trim() !== String(group).trim()) continue;
       const entryRel = p.entry || 'index.html';
@@ -1736,7 +1737,11 @@ module.exports.listComponents = function listComponents(group) {
           url = u;
         }
       } catch {}
-      out.push({ id: p.id, name: p.name, group: p.group || null, entry: entryRel, url });
+      const key = String(p.id || p.name || '').trim();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push({ id: p.id, name: p.name, group: p.group || null, entry: entryRel, url });
+      }
     }
     return { ok: true, components: out };
   } catch (e) { return { ok: false, error: e?.message || String(e) }; }

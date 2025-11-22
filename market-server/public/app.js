@@ -28,6 +28,7 @@ document.querySelectorAll('[data-nav]').forEach((btn) => {
     const id = btn.getAttribute('data-nav');
     showPage(id);
     setActiveTopNav(id);
+    if (id === 'home') initHome();
     if (id === 'market') initMarket();
     if (id === 'dev') initDev();
     location.hash = '#' + id;
@@ -226,8 +227,40 @@ document.getElementById('publishForm').addEventListener('submit', async (e) => {
   }
 });
 
+async function initHome() {
+  try {
+    const box = document.getElementById('home-featured');
+    const empty = document.getElementById('home-featured-empty');
+    if (!box) return;
+    const catalogRes = await fetch('/api/market/catalog');
+    const cat = await catalogRes.json();
+    const items = [...(cat.plugins || []), ...(cat.automation || []), ...(cat.components || [])];
+    const featured = items.slice(0, 6);
+    box.innerHTML = featured.map((x) => {
+      const type = x.type || (x.automation ? 'automation' : 'plugin');
+      const icon = x.icon || (type === 'automation' ? 'ri-timer-line' : type === 'component' ? 'ri-layout-grid-line' : 'ri-puzzle-line');
+      const id = x.id || x.name;
+      return `<div class="plugin-card">
+        <div class="card-header">
+          <i class="${icon}"></i>
+          <div>
+            <div class="card-title">${x.name || x.id} ${x.version ? `<span class=\"pill small\">v${x.version}</span>` : ''}</div>
+            <div class="card-desc">${x.description || ''}</div>
+          </div>
+          <div class="card-action"><a href="/item.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}" class="btn secondary"><i class="ri-information-line"></i> 详情</a></div>
+        </div>
+      </div>`;
+    }).join('');
+    if (empty) empty.hidden = featured.length > 0;
+  } catch (e) {
+    const box = document.getElementById('home-featured');
+    if (box) box.innerHTML = '<em class="muted">加载精选失败</em>';
+  }
+}
+
 const initialPage = (location.hash.replace('#', '') || 'home');
 showPage(initialPage);
 setActiveTopNav(initialPage);
+if (initialPage === 'home') initHome();
 if (initialPage === 'market') initMarket();
 if (initialPage === 'dev') initDev();

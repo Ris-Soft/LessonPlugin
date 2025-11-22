@@ -57,6 +57,7 @@
         if (window.lowbarAPI?.pluginCall) {
           await window.lowbarAPI.pluginCall(caller,'saveConfig',[{ groups: cfg.groups }]);
           const res=await window.lowbarAPI.pluginCall(caller,'getConfig'); const r=res?.result||res; cfg=r?.config||cfg;
+          try{ if(channel) window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
         } else if (window.lowbarAPI?.configEnsureDefaults) {
           await window.lowbarAPI.configEnsureDefaults('duty.easy',{
             roles: ['清洁','黑板','值日生'],
@@ -67,10 +68,12 @@
           });
           await window.lowbarAPI.configSet('duty.easy','groups',cfg.groups);
           const verify=await window.lowbarAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+          try{ if(channel) window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
         } else if (window.pluginAPI?.configEnsureDefaults) {
           await window.pluginAPI.configEnsureDefaults('duty.easy',{});
           await window.pluginAPI.configSet('duty.easy','groups',cfg.groups);
           const verify=await window.pluginAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+          try{ if(channel) window.pluginAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
         }
       } catch {} }
       (function(){ try{ const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'') }catch{}

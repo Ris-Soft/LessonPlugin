@@ -19,7 +19,7 @@
       showSeconds: qs('seconds') === '1',
       blinkColon: qs('blink') === '1'
     };
-    const tz = qs('tz') || 'Asia/Shanghai';
+    let tz = qs('tz') || 'Asia/Shanghai';
     function pad(n){ return String(n).padStart(2,'0'); }
     function fmt(){
       const d = new Date();
@@ -43,7 +43,8 @@
       const dateEl = document.getElementById('date');
       if (opts.showDate) { dateEl.textContent = date; dateEl.style.display = 'block'; } else { dateEl.style.display = 'none'; }
     }
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      try { const v = await window.pluginAPI?.configGet?.('system','timeZone'); if (v) tz = String(v); } catch {}
       tick(); setInterval(tick, 500);
     });
   </script>

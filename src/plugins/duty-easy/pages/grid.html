@@ -14,16 +14,26 @@
       table { width: 100%; border-collapse: collapse; table-layout: fixed; }
       th, td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 8px; }
       th { text-align: left; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: #0b1520; }
-      .cell { min-height: 40px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; }
-      .cell.drag-over { background: rgba(255,255,255,0.06); }
-      .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); cursor: grab; margin: 4px; }
+      .cell { min-height: 40px; border-radius: 8px; padding: 6px; }
+      .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); margin: 4px; }
       .btn { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--fg); cursor: pointer; }
       .btn.secondary { background: rgba(255,255,255,0.08); }
+      .btn.danger { background: rgba(255, 100, 100, 0.2); border-color: rgba(255, 100, 100, 0.4); }
+      .actions { display:flex; gap:8px; margin-bottom:8px; }
+      .hint { color: rgba(255,100,100,0.9); font-size: 12px; margin-top: 6px; }
+      .badge { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); font-size:12px; }
+      .group-name { cursor: pointer; }
+      .group-name.active { font-weight: 700; color: #48cfad; }
     </style>
   </head>
   <body>
     <div class="section">
       <div class="section-title"><i class="ri-team-line"></i> 组别分工表</div>
+      <div class="actions">
+        <button id="openRoles" class="btn secondary"><i class="ri-list-check"></i> 分工列表</button>
+        <button id="openGroups" class="btn secondary"><i class="ri-group-line"></i> 分组列表</button>
+        <button id="openRules" class="btn secondary"><i class="ri-settings-3-line"></i> 分工规则</button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead id="thead"></thead>
@@ -54,23 +64,24 @@
         } catch {}
         if(!Array.isArray(cfg.roles)) cfg.roles=[]; if(!Array.isArray(cfg.groups)) cfg.groups=[]; render()
       }
-      function render(){ const thead=document.getElementById('thead'); const tbody=document.getElementById('tbody'); thead.innerHTML=''; tbody.innerHTML=''; const trh=el('tr'); const th0=el('th'); th0.textContent='组别'; trh.appendChild(th0); (cfg.roles||[]).forEach(r=>{ const th=el('th'); th.textContent=r||''; trh.appendChild(th) }); thead.appendChild(trh);
+      function render(){ const thead=document.getElementById('thead'); const tbody=document.getElementById('tbody'); thead.innerHTML=''; tbody.innerHTML=''; const trh=el('tr'); const th0=el('th'); const curIdx=Number.isFinite(cfg.rule?.currentGroupIndex)?cfg.rule.currentGroupIndex:0; const curName=(cfg.groups||[])[curIdx]?.name||''; th0.innerHTML=`组别 ${curName?`<span class="badge">当前：${curName}</span>`:''}`; trh.appendChild(th0); (cfg.roles||[]).forEach(r=>{ const th=el('th'); th.textContent=r||''; trh.appendChild(th) }); thead.appendChild(trh);
         (cfg.groups||[]).forEach((g,gi)=>{ const tr=el('tr'); const tdGroup=el('td'); tdGroup.textContent=g.name||''; tr.appendChild(tdGroup);
+          tdGroup.className='group-name'+(gi===curIdx?' active':''); tdGroup.addEventListener('click',()=>{ setActiveGroup(gi) });
           (cfg.roles||[]).forEach(r=>{ const td=el('td'); const cell=el('div','cell'); const arr=Array.isArray(g.roles?.[r])?g.roles[r]:[];
-            arr.forEach((n,ni)=>{ const t=el('span','tag'); t.draggable=true; t.textContent=n||''; const rm=document.createElement('button'); rm.innerHTML='<i class="ri-close-line"></i>'; rm.addEventListener('click',(e)=>{ e.stopPropagation(); const a=Array.isArray(cfg.groups?.[gi]?.roles?.[r])?cfg.groups[gi].roles[r]:[]; a.splice(ni,1); render() }); t.appendChild(rm);
-              t.addEventListener('dragstart',e=>{ try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('application/json', JSON.stringify({type:'name',from:{gi,r,ni},name:n})); e.dataTransfer.setData('text/plain', JSON.stringify({type:'name',from:{gi,r,ni},name:n})); }catch{} });
-              t.addEventListener('dragover',e=>{ e.preventDefault(); try{ e.dataTransfer.dropEffect='move' }catch{} });
-              t.addEventListener('drop',e=>{ e.preventDefault(); const raw=e.dataTransfer.getData('application/json')||e.dataTransfer.getData('text/plain'); const data=safeParse(raw); if(data?.type==='name'){ const sgi=data.from.gi; const sr=data.from.r; const sni=data.from.ni; const srcArr=Array.isArray(cfg.groups?.[sgi]?.roles?.[sr])?cfg.groups[sgi].roles[sr]:[]; const tgtArr=Array.isArray(cfg.groups?.[gi]?.roles?.[r])?cfg.groups[gi].roles[r]:[]; const srcName=srcArr[sni]; srcArr[sni]=tgtArr[ni]; tgtArr[ni]=srcName; render() } }); cell.appendChild(t) });
-            cell.addEventListener('dragover',e=>{ e.preventDefault(); try{ e.dataTransfer.dropEffect='move' }catch{}; cell.classList.add('drag-over') });
-            cell.addEventListener('dragleave',()=>{ cell.classList.remove('drag-over') });
-            cell.addEventListener('drop',e=>{ e.preventDefault(); cell.classList.remove('drag-over'); const data=safeParse(e.dataTransfer.getData('text/plain')); if(data?.type==='name'){ const sgi=data.from.gi; const sr=data.from.r; const sni=data.from.ni; const srcArr=Array.isArray(cfg.groups?.[sgi]?.roles?.[sr])?cfg.groups[sgi].roles[sr]:[]; const tgtArr=Array.isArray(cfg.groups?.[gi]?.roles?.[r])?cfg.groups[gi].roles[r]:[]; const mv=srcArr.splice(sni,1)[0]; tgtArr.push(mv); render() } });
-            const addBtn=el('button','btn secondary'); addBtn.innerHTML='<i class="ri-add-line"></i> 添加'; addBtn.addEventListener('click',()=>{ currentPick={gi,r}; openStudentsPicker(); }); cell.appendChild(addBtn);
+            arr.forEach((n,ni)=>{ const t=el('span','tag'); t.textContent=n||''; const rm=document.createElement('button'); rm.className='btn danger'; rm.innerHTML='<i class="ri-close-line"></i>'; rm.addEventListener('click',(e)=>{ e.stopPropagation(); const a=Array.isArray(cfg.groups?.[gi]?.roles?.[r])?cfg.groups[gi].roles[r]:[]; a.splice(ni,1); render() }); t.appendChild(rm); cell.appendChild(t) });
+            const addBtn=el('button','btn secondary'); addBtn.innerHTML='<i class="ri-add-line"></i> 添加'; addBtn.addEventListener('click',()=>{ if(hasDupRoles()){ showDupHint(); return } currentPick={gi,r}; openStudentsPicker(); }); cell.appendChild(addBtn);
             td.appendChild(cell); tr.appendChild(td)
           }); tbody.appendChild(tr)
         })
       }
-      function openStudentsPicker(){ try{ const url=new URL('../../../plugins/profiles-students/index.html', window.location.href); url.searchParams.set('channel', studentsChannel); url.searchParams.set('caller','profiles.students'); window.lowbarAPI?.emitEvent?.(channel, { type:'update', target:'floatingUrl', value: url.href }); }catch{} }
+      function hasDupRoles(){ const names=(cfg.roles||[]).map(s=>String(s||'').trim()).filter(Boolean); return names.some((n,idx)=>names.indexOf(n)!==idx) }
+      function showDupHint(){ let hint=document.getElementById('grid-dup-hint'); if(!hint){ hint=document.createElement('div'); hint.id='grid-dup-hint'; hint.className='hint'; hint.textContent='存在重复分工名称，请在“分工列表”修改为唯一后再添加'; document.querySelector('.section').appendChild(hint) }
+      }
+      function openStudentsPicker(){ try{ const url=new URL('../../../plugins/profiles-students/index.html', window.location.href); url.searchParams.set('channel', studentsChannel); url.searchParams.set('caller','profiles.students'); url.searchParams.set('mode','pick'); window.lowbarAPI?.emitEvent?.(channel, { type:'update', target:'floatingUrl', value: url.href }); }catch{} }
       function safeParse(t){ try{ return JSON.parse(String(t||'')) }catch{ return null } }
+      function openRolesList(){ try{ const url=new URL('./roles-list.html', window.location.href); url.searchParams.set('channel', channel); url.searchParams.set('caller','duty.easy'); window.lowbarAPI?.emitEvent?.(channel,{ type:'update', target:'floatingUrl', value: url.href }); }catch{} }
+      function openGroupsList(){ try{ const url=new URL('./groups-list.html', window.location.href); url.searchParams.set('channel', channel); url.searchParams.set('caller','duty.easy'); window.lowbarAPI?.emitEvent?.(channel,{ type:'update', target:'floatingUrl', value: url.href }); }catch{} }
+      function openRules(){ try{ const url=new URL('./rules.html', window.location.href); url.searchParams.set('channel', channel); url.searchParams.set('caller','duty.easy'); window.lowbarAPI?.emitEvent?.(channel,{ type:'update', target:'floatingUrl', value: url.href }); }catch{} }
       async function save(){ try {
         if (window.lowbarAPI?.pluginCall) {
           await window.lowbarAPI.pluginCall(caller,'saveConfig',[{ groups: cfg.groups }]);
@@ -91,9 +102,26 @@
           const verify=await window.pluginAPI.configGetAll('duty.easy'); cfg=verify||cfg;
         }
       } catch {} }
+      async function setActiveGroup(gi){ try{
+        const nextRule = { ...(cfg.rule||{}), currentGroupIndex: gi };
+        if (window.lowbarAPI?.pluginCall) {
+          await window.lowbarAPI.pluginCall(caller,'saveConfig',[{ rule: nextRule }]);
+          const res=await window.lowbarAPI.pluginCall(caller,'getConfig'); const r=res?.result||res; cfg=r?.config||cfg;
+        } else if (window.lowbarAPI?.configEnsureDefaults) {
+          await window.lowbarAPI.configEnsureDefaults('duty.easy',{});
+          await window.lowbarAPI.configSet('duty.easy','rule', nextRule);
+          const verify=await window.lowbarAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+        } else if (window.pluginAPI?.configEnsureDefaults) {
+          await window.pluginAPI.configEnsureDefaults('duty.easy',{});
+          await window.pluginAPI.configSet('duty.easy','rule', nextRule);
+          const verify=await window.pluginAPI.configGetAll('duty.easy'); cfg=verify||cfg;
+        }
+        try{ if(channel) window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'refresh', value:true }) }catch{}
+        render()
+      }catch{} }
       (function(){ try{const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'')}catch{}
-        if(window.lowbarAPI){ if(channel) window.lowbarAPI.subscribe?.(channel); window.lowbarAPI.subscribe?.(studentsChannel); window.lowbarAPI.onEvent?.(async (n,p)=>{ if(p?.type==='update'){ if(n===channel && p.target==='duty.save'){ await save(); await load() } } if(n===studentsChannel){ const name=String(p?.name||'').trim(); if(p?.type==='pick' && name && currentPick){ const arr=Array.isArray(cfg.groups?.[currentPick.gi]?.roles?.[currentPick.r])?cfg.groups[currentPick.gi].roles[currentPick.r]:(cfg.groups[currentPick.gi].roles[currentPick.r]=[]); arr.push(name); currentPick=null; render(); try{ window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'floatingUrl', value:null }); }catch{} } } }); }
-        load()
+        if(window.lowbarAPI){ if(channel) window.lowbarAPI.subscribe?.(channel); window.lowbarAPI.subscribe?.(studentsChannel); window.lowbarAPI.onEvent?.(async (n,p)=>{ if(p?.type==='update'){ if(n===channel && p.target==='duty.save'){ await save(); await load() } if(n===channel && p.target==='refresh'){ await load() } } if(n===studentsChannel){ const name=String(p?.name||'').trim(); if(p?.type==='pick' && name && currentPick){ if(hasDupRoles()){ currentPick=null; showDupHint(); return } const arr=Array.isArray(cfg.groups?.[currentPick.gi]?.roles?.[currentPick.r])?cfg.groups[currentPick.gi].roles[currentPick.r]:(cfg.groups[currentPick.gi].roles[currentPick.r]=[]); arr.push(name); currentPick=null; render(); try{ window.lowbarAPI.emitEvent?.(channel,{ type:'update', target:'floatingUrl', value:null }); }catch{} } } }); }
+        load(); document.getElementById('openRoles').addEventListener('click',openRolesList); document.getElementById('openGroups').addEventListener('click',openGroupsList); document.getElementById('openRules').addEventListener('click',openRules)
       })();
     </script>
   </body>

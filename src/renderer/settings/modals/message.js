@@ -148,6 +148,60 @@ function showToast(message = '', { type = 'info', duration = 2000 } = {}) {
   } catch { }
 }
 
+async function showLinuxTarGuide(errorText = '') {
+  return new Promise((resolve) => {
+    const old = document.querySelector('.modal-overlay');
+    if (old) old.remove();
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    const box = document.createElement('div'); box.className = 'modal-box';
+    const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = '缺少 tar 依赖 — 修复指引';
+    const msg = document.createElement('div'); msg.className = 'modal-message';
+    const sectionDesc = document.createElement('div'); sectionDesc.className = 'section';
+    const sectionTitle = document.createElement('div'); sectionTitle.className = 'section-title'; sectionTitle.innerHTML = '<i class="ri-alert-line"></i> 错误说明';
+    const sectionBody = document.createElement('div'); sectionBody.style.cssText = 'color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 6px; white-space: pre-wrap;';
+    sectionBody.textContent = (errorText ? String(errorText) + '\n' : '') + '在 Linux 环境安装 NPM 包时需要系统命令 tar 用于解压 .tgz；若缺失会导致安装失败。';
+    sectionDesc.appendChild(sectionTitle); sectionDesc.appendChild(sectionBody);
+
+    const mkCmdRow = (label, cmd) => {
+      const wrap = document.createElement('div'); wrap.className = 'section'; wrap.style.marginTop = '8px';
+      const ttl = document.createElement('div'); ttl.className = 'section-title'; ttl.innerHTML = label;
+      const row = document.createElement('div'); row.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top:6px;';
+      const code = document.createElement('pre'); code.style.cssText = 'margin:0; padding:8px; background: rgba(108,117,125,.12); border-radius:4px; font-family: monospace; font-size: 12px;';
+      code.textContent = cmd;
+      const copy = document.createElement('button'); copy.className = 'btn secondary'; copy.innerHTML = '<i class="ri-file-copy-line"></i> 复制';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(cmd); } catch {}
+      });
+      row.appendChild(code); row.appendChild(copy);
+      wrap.appendChild(ttl); wrap.appendChild(row);
+      return wrap;
+    };
+
+    const cmds = [
+      { label: '<i class="ri-ubuntu-line"></i> Debian/Ubuntu', cmd: 'sudo apt-get update && sudo apt-get install -y tar xz-utils' },
+      { label: '<i class="ri-redhat-line"></i> CentOS/RHEL/Fedora', cmd: 'sudo dnf install -y tar xz || sudo yum install -y tar xz' },
+      { label: '<i class="ri-leaf-line"></i> Alpine', cmd: 'sudo apk add --no-cache gnu-tar xz' },
+      { label: '<i class="ri-archlinux-line"></i> Arch Linux', cmd: 'sudo pacman -S --noconfirm tar xz' },
+      { label: '<i class="ri-open-source-line"></i> openSUSE', cmd: 'sudo zypper install -y tar xz' }
+    ];
+
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = '我已完成安装';
+    ok.addEventListener('click', () => { overlay.remove(); resolve(true); });
+    const cancel = document.createElement('button'); cancel.className = 'btn secondary'; cancel.textContent = '稍后再说';
+    cancel.addEventListener('click', () => { overlay.remove(); resolve(false); });
+    actions.appendChild(cancel); actions.appendChild(ok);
+
+    box.appendChild(t);
+    msg.appendChild(sectionDesc);
+    cmds.forEach(c => msg.appendChild(mkCmdRow(c.label, c.cmd)));
+    box.appendChild(msg);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
 // 统一卸载确认弹窗：返回 { confirmed, dep }
 async function showUninstallConfirm(item) {
   try {
@@ -290,4 +344,3 @@ function showProgressModal(title = '下载/安装进度', initialMessage = '准�
   };
   return controller;
 }
-

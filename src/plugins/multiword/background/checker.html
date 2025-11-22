@@ -264,7 +264,7 @@
             const id = String(payload.id||'');
             if (id === 'check-settings') {
               try {
-                const float = new URL('../../../plugins/multiword/float/check-setup.html', window.location.href).href;
+                const float = new URL('../../../plugins/multiword/float/check-font.html', window.location.href).href;
                 const u = new URL(float);
                 u.searchParams.set('server', server);
                 try {
@@ -273,7 +273,7 @@
                   if (Number.isFinite(curTitle)) u.searchParams.set('titlesize', String(curTitle));
                   if (Number.isFinite(curCn)) u.searchParams.set('cnsize', String(curCn));
                 } catch {}
-                api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 840, height: 600 } });
+                api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 740, height: 520 } });
                 api().emitEvent(CH, { type:'update', target:'floatingUrl', value: u.href });
               } catch {}
               return;

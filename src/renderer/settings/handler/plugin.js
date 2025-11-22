@@ -104,7 +104,7 @@ function renderPlugin(item) {
         const container = document.getElementById('plugins');
         const list = await fetchPlugins();
         container.innerHTML = '';
-        list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0).forEach((p) => container.appendChild(renderPlugin(p)));
+        list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0).forEach((p) => container.appendChild(renderPlugin(p)));
         await showAlert('已重载插件（开发目录 -> 用户目录）');
       });
     }
@@ -296,7 +296,7 @@ function renderPlugin(item) {
     const container = document.getElementById('plugins');
     const list = await fetchPlugins();
     container.innerHTML = '';
-    list.forEach((p) => container.appendChild(renderPlugin(p)));
+    list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin').forEach((p) => container.appendChild(renderPlugin(p)));
     showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 });
   });
   // 关于插件

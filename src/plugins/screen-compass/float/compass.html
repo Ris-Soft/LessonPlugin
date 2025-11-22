@@ -175,9 +175,9 @@
       let inactivityTimer = null;
       function resetInactivityTimer(){ try { if (inactivityTimer) clearTimeout(inactivityTimer); inactivityTimer = setTimeout(() => { if (expanded) setExpanded(false); }, 30000); } catch {} }
 
-      let dragging = false; let startClientX = 0; let startClientY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false;
+      let dragging = false; let startScreenX = 0; let startScreenY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false; let rafScheduled = false; let nextX = 0; let nextY = 0;
       function onPointerDown(e){
-        dragging = true; moved = false; startClientX = e.clientX; startClientY = e.clientY;
+        dragging = true; moved = false; startScreenX = e.screenX; startScreenY = e.screenY;
         try { window.compassAPI.pluginCall('screen.compass','setDragging',[true]); } catch {}
         window.compassAPI.getBounds().then((raw)=>{
           const b = (raw && raw.result) ? raw.result : raw;
@@ -185,8 +185,17 @@
           try { center.setPointerCapture(e.pointerId); } catch {}
         });
       }
-      function onPointerMove(e){ if (!dragging) return; const dx=e.clientX-startClientX, dy=e.clientY-startClientY; if (Math.abs(dx)>2 || Math.abs(dy)>2) moved = true; window.compassAPI.moveTo(startWinX+dx, startWinY+dy); }
-      function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); try { window.compassAPI.pluginCall('screen.compass','setDragging',[false]); } catch {} }
+      function onPointerMove(e){
+        if (!dragging) return;
+        const dx = e.screenX - startScreenX, dy = e.screenY - startScreenY;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+        nextX = startWinX + dx; nextY = startWinY + dy;
+        if (!rafScheduled) {
+          rafScheduled = true;
+          requestAnimationFrame(() => { rafScheduled = false; window.compassAPI.moveTo(nextX, nextY); });
+        }
+      }
+      function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; rafScheduled=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); try { window.compassAPI.pluginCall('screen.compass','setDragging',[false]); } catch {} }
       center.addEventListener('pointerdown', onPointerDown);
       center.addEventListener('pointermove', onPointerMove);
       center.addEventListener('pointerup', onPointerUp);

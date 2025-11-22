@@ -30,7 +30,7 @@
     <fieldset id="step1">
       <legend>步骤一：选择范围与数量</legend>
       <label>最近天数<input type="number" id="days" min="1" value="7" /> <button type="button" class="incdec" data-target="days" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="days" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
-      <label>抽取数量（为空则全部）<input type="number" id="pick" min="1" placeholder="全部" /> <button type="button" class="incdec" data-target="pick" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="pick" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
+      <label>抽取数量（为空则全部）<input type="number" id="pick" min="1" placeholder="全部" /> <button type="button" class="incdec" data-target="pick" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="pick" data-step="+1" title="增加"><i class="ri-add-line"></i></button> <button type="button" class="incdec" data-target="pick" data-step="-10" title="减少10"><i class="ri-subtract-line"></i>10</button> <button type="button" class="incdec" data-target="pick" data-step="+10" title="增加10"><i class="ri-add-line"></i>10</button></label>
       <div class="muted">从范围中抽取不重复的单词作为待提问列表</div>
       <div style="margin-top:8px; display:flex; gap:8px;">
         <button id="confirm"><i class="ri-checkbox-circle-line"></i> 选词完成，下一步</button>
@@ -56,7 +56,6 @@
       <div class="muted">单页显示数量将根据可视区域高度自动计算</div>
       <div style="margin-top:8px; display:flex; gap:8px;">
         <button id="preview"><i class="ri-slideshow-line"></i> 开始预览轮播</button>
-        <button id="applyCheckFont"><i class="ri-pencil-ruler-2-line"></i> 应用检查字号</button>
       </div>
     </fieldset>
   </main>
@@ -147,11 +146,6 @@
       if (Number.isFinite(qsTitleSize) && qsTitleSize>0) h('titlesize').value = String(qsTitleSize);
       if (Number.isFinite(qsCnSize) && qsCnSize>0) h('cnsize').value = String(qsCnSize);
     } catch {}
-    h('applyCheckFont').onclick = () => {
-      const t = parseInt(h('titlesize').value||'54',10)||54;
-      const c = parseInt(h('cnsize').value||'30',10)||30;
-      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'control', action:'check', cmd:'set-font', titlesize: t, cnsize: c });
-    };
   </script>
   <script>
     try {

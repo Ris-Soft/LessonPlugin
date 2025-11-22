@@ -29,13 +29,15 @@ function ensureDefaults() {
       { name: '一组', roles: { '清洁': [], '黑板': [], '值日生': [] } },
       { name: '二组', roles: { '清洁': [], '黑板': [], '值日生': [] } }
     ],
-    rotationLists: [ { name: '默认', roles: ['清洁', '黑板', '值日生'] } ],
     rule: {
       mode: 'list',
       currentGroupIndex: 0,
       weekdayMap: { 0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 2, 6: 0 },
-      currentRotationIndex: 0
+      mainMode: 'group',
+      singleRoleIndices: {}
     },
+    singleRoles: ['清洁', '黑板', '值日生'],
+    singleRoleLists: {},
     lastStartupDate: ''
   };
   try { store.ensureDefaults('duty.easy', defaults); } catch {}
@@ -49,7 +51,7 @@ function advanceOnStartup() {
   if (last !== today) {
     const groups = Array.isArray(cfg.groups) ? cfg.groups : [];
     const rule = cfg.rule || {};
-    const rotLists = Array.isArray(cfg.rotationLists) ? cfg.rotationLists : [];
+    let nextRule = { ...rule };
     let gi = Number.isFinite(rule.currentGroupIndex) ? rule.currentGroupIndex : 0;
     if ((rule.mode || 'list') === 'list') {
       gi = groups.length ? (gi + 1) % groups.length : 0;
@@ -58,9 +60,14 @@ function advanceOnStartup() {
       const idx = map[dow(today)];
       gi = Number.isFinite(idx) ? idx : 0;
     }
-    let ri = Number.isFinite(rule.currentRotationIndex) ? rule.currentRotationIndex : 0;
-    ri = rotLists.length ? (ri + 1) % rotLists.length : 0;
-    const nextRule = { ...rule, currentGroupIndex: gi, currentRotationIndex: ri };
+    const roles = Array.isArray(cfg.singleRoles) ? cfg.singleRoles : (Array.isArray(cfg.roles) ? cfg.roles : []);
+    const indices = typeof rule.singleRoleIndices === 'object' && rule.singleRoleIndices ? { ...rule.singleRoleIndices } : {};
+    roles.forEach(r => {
+      const arr = Array.isArray(cfg.singleRoleLists?.[r]) ? cfg.singleRoleLists[r] : [];
+      const cur = Number.isFinite(indices[r]) ? indices[r] : 0;
+      indices[r] = arr.length ? (cur + 1) % arr.length : 0;
+    });
+    nextRule = { ...nextRule, currentGroupIndex: gi, singleRoleIndices: indices };
     store.set('duty.easy', 'rule', nextRule);
     store.set('duty.easy', 'lastStartupDate', today);
   }
@@ -70,8 +77,8 @@ function predict(nextDays) {
   ensureDefaults();
   const cfg = store.getAll('duty.easy');
   const groups = Array.isArray(cfg.groups) ? cfg.groups : [];
-  const roles = Array.isArray(cfg.roles) ? cfg.roles : [];
-  const rotLists = Array.isArray(cfg.rotationLists) ? cfg.rotationLists : [];
+  const rolesAll = Array.isArray(cfg.roles) ? cfg.roles : [];
+  const singleRoles = Array.isArray(cfg.singleRoles) ? cfg.singleRoles : rolesAll;
   const rule = cfg.rule || {};
   const baseDate = new Date(todayISO());
   const out = [];
@@ -89,13 +96,19 @@ function predict(nextDays) {
       const idx = map[d.getDay()];
       gi = Number.isFinite(idx) ? idx : 0;
     }
-    let ri = Number.isFinite(rule.currentRotationIndex) ? rule.currentRotationIndex : 0;
-    ri = rotLists.length ? (ri + i) % rotLists.length : 0;
-    const rotRoles = Array.isArray(rotLists[ri]?.roles) ? rotLists[ri].roles : roles;
     const group = groups[gi] || { name: '', roles: {} };
-    const members = {};
-    rotRoles.forEach((r) => { members[r] = Array.isArray(group.roles?.[r]) ? group.roles[r] : []; });
-    out.push({ dateISO, groupIndex: gi, groupName: group.name || '', rotationIndex: ri, roles: rotRoles, members });
+    const groupMembers = {};
+    rolesAll.forEach((r) => { groupMembers[r] = Array.isArray(group.roles?.[r]) ? group.roles[r] : []; });
+    const lists = typeof cfg.singleRoleLists === 'object' && cfg.singleRoleLists ? cfg.singleRoleLists : {};
+    const indices = typeof rule.singleRoleIndices === 'object' && rule.singleRoleIndices ? rule.singleRoleIndices : {};
+    const singleMembers = {};
+    singleRoles.forEach((r) => {
+      const arr = Array.isArray(lists[r]) ? lists[r] : [];
+      const base = Number.isFinite(indices[r]) ? indices[r] : 0;
+      const pick = arr.length ? arr[(base + i) % arr.length] : undefined;
+      singleMembers[r] = pick ? [pick] : [];
+    });
+    out.push({ dateISO, groupIndex: gi, groupName: group.name || '', rolesGroup: rolesAll, groupMembers, rolesSingle: singleRoles, singleMembers });
   }
   return out;
 }
@@ -121,11 +134,8 @@ const functions = {
       ],
       centerItems: [
         { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: true },
-        { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: false },
-        { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: false },
-        { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: false },
         { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false },
-        { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: false }
+        { id: 'view-rotation', text: '轮值', icon: 'ri-user-star-line', active: false }
       ]
     };
     await pluginApi.call('ui.lowbar', 'openTemplate', [params]);
@@ -138,51 +148,23 @@ const functions = {
       } else if (payload?.type === 'click') {
         if (payload.id === 'view-preview') { state.mode = 'preview'; emitUpdate(EVENT_CHANNEL, 'centerItems', [
           { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: true },
-          { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: false },
-          { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: false },
-          { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: false },
           { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false },
-          { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: false }
+          { id: 'view-rotation', text: '轮值', icon: 'ri-user-star-line', active: false }
         ]); emitUpdate(EVENT_CHANNEL, 'backgroundUrl', state.paths.preview); }
-        if (payload.id === 'view-roles') { state.mode = 'roles'; emitUpdate(EVENT_CHANNEL, 'centerItems', [
-          { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: false },
-          { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: true },
-          { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: false },
-          { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: false },
-          { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false },
-          { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: false }
-        ]); emitUpdate(EVENT_CHANNEL, 'backgroundUrl', state.paths.roles); }
-        if (payload.id === 'view-groups') { state.mode = 'groups'; emitUpdate(EVENT_CHANNEL, 'centerItems', [
-          { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: false },
-          { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: false },
-          { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: true },
-          { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: false },
-          { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false },
-          { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: false }
-        ]); emitUpdate(EVENT_CHANNEL, 'backgroundUrl', state.paths.groups); }
         if (payload.id === 'view-rules') { state.mode = 'rules'; emitUpdate(EVENT_CHANNEL, 'centerItems', [
           { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: false },
-          { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: false },
-          { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: false },
           { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: true },
-          { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false },
-          { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: false }
+          { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false }
         ]); emitUpdate(EVENT_CHANNEL, 'backgroundUrl', state.paths.rules); }
         if (payload.id === 'view-grid') { state.mode = 'grid'; emitUpdate(EVENT_CHANNEL, 'centerItems', [
           { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: false },
-          { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: false },
-          { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: false },
-          { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: false },
           { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: true },
-          { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: false }
+          { id: 'view-rotation', text: '轮值', icon: 'ri-user-star-line', active: false }
         ]); emitUpdate(EVENT_CHANNEL, 'backgroundUrl', state.paths.grid); }
         if (payload.id === 'view-rotation') { state.mode = 'rotation'; emitUpdate(EVENT_CHANNEL, 'centerItems', [
           { id: 'view-preview', text: '预览', icon: 'ri-calendar-check-line', active: false },
-          { id: 'view-roles', text: '分工列表', icon: 'ri-list-check', active: false },
-          { id: 'view-groups', text: '分组列表', icon: 'ri-group-line', active: false },
-          { id: 'view-rules', text: '分工规则', icon: 'ri-settings-3-line', active: false },
           { id: 'view-grid', text: '组别分工', icon: 'ri-team-line', active: false },
-          { id: 'view-rotation', text: '轮执列表', icon: 'ri-loop-left-line', active: true }
+          { id: 'view-rotation', text: '轮值', icon: 'ri-user-star-line', active: true }
         ]); emitUpdate(EVENT_CHANNEL, 'backgroundUrl', state.paths.rotation); }
       }
       return true;
@@ -196,13 +178,14 @@ const functions = {
       ensureDefaults();
       if (Array.isArray(payload.roles)) store.set('duty.easy', 'roles', payload.roles);
       if (Array.isArray(payload.groups)) store.set('duty.easy', 'groups', payload.groups);
-      if (Array.isArray(payload.rotationLists)) store.set('duty.easy', 'rotationLists', payload.rotationLists);
       if (payload.rule && typeof payload.rule === 'object') store.set('duty.easy', 'rule', payload.rule);
+      if (payload.singleRoleLists && typeof payload.singleRoleLists === 'object') store.set('duty.easy', 'singleRoleLists', payload.singleRoleLists);
+      if (Array.isArray(payload.singleRoles)) store.set('duty.easy', 'singleRoles', payload.singleRoles);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
   getPreview: async () => {
-    try { return { ok: true, list: predict(4) }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    try { return { ok: true, list: predict(3) }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }
 };
 

@@ -519,6 +519,7 @@
       // 开始下载安装
       let completed = 0;
       let hasError = false;
+      let tarGuideShown = false;
 
       for (const name of missing) {
         try {
@@ -552,6 +553,13 @@
           moduleRows[name].className = 'pill small danger';
           moduleRows[name].innerHTML = `<i class="ri-close-line"></i> 失败: ${e.message}`;
           hasError = true;
+          try {
+            const msg = String(e?.message || '');
+            if (!tarGuideShown && /(缺少\s*tar|tar\s*依赖|tar.*无法解压)/i.test(msg)) {
+              tarGuideShown = true;
+              await showLinuxTarGuide(msg);
+            }
+          } catch {}
         }
 
         completed++;

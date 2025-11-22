@@ -486,5 +486,5 @@ app.post('/api/dev/publish', (req, res) => {
 
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}/`;
-  console.log(`Market server running at ${url}`);
+  console.log(`LessonPlugin 官网运行于 ${url}`);
 });
