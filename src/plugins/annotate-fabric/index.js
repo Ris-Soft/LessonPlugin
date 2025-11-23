@@ -1,5 +1,6 @@
 const path = require('path');
 const { BrowserWindow, app, screen, ipcMain } = require('electron');
+const fs = require('fs');
 
 let pluginApi = null;
 let whiteboardWin = null;
@@ -20,6 +21,35 @@ function initIPC() {
       if (win && !win.isDestroyed()) win.close();
     } catch {}
   });
+  ipcMain.on('annotate:saveJSON', (event, payload) => {
+    try {
+      const { filePath, json } = payload || {};
+      if (!filePath || typeof json !== 'string') return;
+      const dir = path.dirname(filePath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(filePath, json, 'utf8');
+    } catch {}
+  });
+  ipcMain.handle('annotate:loadJSON', async (event, payload) => {
+    try {
+      const { filePath } = payload || {};
+      if (!filePath) return null;
+      if (!fs.existsSync(filePath)) return null;
+      return fs.readFileSync(filePath, 'utf8');
+    } catch { return null; }
+  });
+  ipcMain.on('annotate:minimizeWithSave', (event, payload) => {
+    try {
+      const { filePath, json } = payload || {};
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (filePath && typeof json === 'string') {
+        const dir = path.dirname(filePath);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(filePath, json, 'utf8');
+      }
+      if (win && !win.isDestroyed()) win.minimize();
+    } catch {}
+  });
 }
 
 function openWhiteboardWindow() {
@@ -27,8 +57,8 @@ function openWhiteboardWindow() {
     whiteboardWin.focus();
     return whiteboardWin;
   }
-  const d = screen.getPrimaryDisplay();
-  const b = d.bounds;
+  const disp = screen.getPrimaryDisplay();
+  const b = disp.bounds;
   const win = new BrowserWindow({
     x: b.x,
     y: b.y,
@@ -42,14 +72,20 @@ function openWhiteboardWindow() {
   });
   whiteboardWin = win;
   try { win.setFullScreen(true); } catch {}
-  win.loadFile(path.join(__dirname, 'whiteboard.html'), { query: { showClose: '1', showMinimize: '1', variant: 'window' } });
+  const today = new Date();
+  const year = today.getFullYear();
+  const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(today.getDate()).padStart(2, '0');
+  const persistDir = path.join(app.getPath('userData'), 'annotate-fabric');
+  const persistFile = path.join(persistDir, `whiteboard-${year}${monthStr}${dayStr}.wbjson`);
+  win.loadFile(path.join(__dirname, 'whiteboard.html'), { query: { showClose: '0', showMinimize: '1', showSave: '1', variant: 'window', persistFile } });
   win.on('closed', () => { whiteboardWin = null; });
   return win;
 }
 
 function createOverlay(bounds, options) {
-  const d = screen.getPrimaryDisplay();
-  const sb = d.bounds;
+  const disp = screen.getPrimaryDisplay();
+  const sb = disp.bounds;
   const x = Math.max(sb.x, Math.min((bounds?.x ?? sb.x), sb.x + sb.width));
   const y = Math.max(sb.y, Math.min((bounds?.y ?? sb.y), sb.y + sb.height));
   const w = Math.max(100, Math.min((bounds?.width ?? Math.floor(sb.width * 0.5)), sb.width));
@@ -68,10 +104,16 @@ function createOverlay(bounds, options) {
     alwaysOnTop: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
   });
-  const showClose = options && options.showClose ? String(options.showClose) : '0';
-  const showMinimize = options && options.showMinimize ? String(options.showMinimize) : '0';
-  const showSave = options && options.showSave ? String(options.showSave) : '1';
-  win.loadFile(path.join(__dirname, 'whiteboard.html'), { query: { showClose, showMinimize, showSave, variant: 'overlay' } });
+  const showClose = '0';
+  const showMinimize = '1';
+  const showSave = '0';
+  const today = new Date();
+  const year = today.getFullYear();
+  const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(today.getDate()).padStart(2, '0');
+  const persistDir = path.join(app.getPath('userData'), 'annotate-fabric');
+  const persistFile = path.join(persistDir, `whiteboard-${year}${monthStr}${dayStr}.wbjson`);
+  win.loadFile(path.join(__dirname, 'whiteboard.html'), { query: { showClose, showMinimize, showSave: '1', variant: 'overlay', persistFile } });
   return { ok: true };
 }
 

@@ -6,7 +6,18 @@
   "icon": "ri-file-user-line",
   "description": "使用底栏模板统一样式的学生档案编辑界面",
   "actions": [
-    { "id": "openStudents", "icon": "ri-file-user-line", "text": "档案-学生列表", "target": "openStudents" }
+    {
+      "id": "openStudents",
+      "icon": "ri-file-user-line",
+      "text": "档案-学生列表",
+      "target": "openStudents"
+    }
   ],
-  "variables": ["timeISO","pluginName"]
+  "dependencies": [
+    "ui.lowbar"
+  ],
+  "variables": [
+    "timeISO",
+    "pluginName"
+  ]
 }

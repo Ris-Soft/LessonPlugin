@@ -570,7 +570,9 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
           }
         }
         if (pick) {
-          const dl = await module.exports.downloadPackageVersion(name, pick);
+          const dl = await module.exports.downloadPackageVersion(name, pick, (status) => {
+            try { if (progressReporter) progressReporter(status); } catch {}
+          });
           if (dl.ok) {
             version = pick;
             logs.push(`[deps] 下载 ${name}@${pick} 完成`);
@@ -583,6 +585,7 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
           continue;
         }
       }
+      try { if (progressReporter) progressReporter({ stage: 'npm', message: `链接 ${name}@${version} 到插件...` }); } catch {}
       const link = linkDepToPlugin(baseDir, name, version);
       if (!link.ok) {
         logs.push(`[deps] 链接 ${name}@${version} 到插件失败：${link.error}`);
@@ -591,6 +594,7 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
         const method = link.method === 'copy' ? '复制' : '链接';
         logs.push(`[deps] 已${method} ${name}@${version} 到插件`);
         try { console.log('deps:link:success', name, version, method); } catch {}
+        try { if (progressReporter) progressReporter({ stage: 'npm', message: `已${method} ${name}@${version}` }); } catch {}
       }
     }
     return { ok: true, logs };

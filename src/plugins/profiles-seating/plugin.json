@@ -1,0 +1,21 @@
+{
+  "id": "profiles.seating",
+  "name": "档案-座次表",
+  "version": "0.1.0",
+  "author": "LessonPlugin",
+  "icon": "ri-layout-bottom-line",
+  "description": "使用底栏模板统一样式的座次表编辑界面",
+  "actions": [
+    {
+      "id": "openSeating",
+      "icon": "ri-layout-bottom-line",
+      "text": "打开座次表",
+      "target": "openSeating"
+    }
+  ],
+  "dependencies": [
+    "ui.lowbar",
+    "profiles.students"
+  ],
+  "npmDependencies": {}
+}

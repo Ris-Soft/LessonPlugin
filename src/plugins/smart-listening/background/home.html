@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>智慧听力</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <style>
+      :root { --bg:#0f1115; --fg:#e6e6e6; --muted:#a8b3c5; --panel:#12161c; --border:#1f232b; --accent:#1f6feb; }
+      html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; }
+      .wrap { display: grid; grid-template-rows: 48px 1fr 110px; height: 100%; }
+      .tabs { display:flex; gap:8px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); }
+      .tabs .tab { display:flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border); border-radius: 8px; background: var(--panel); cursor:pointer; }
+      .tabs .tab.active { border-color: var(--accent); }
+      .tabs .actions { margin-left:auto; display:flex; gap:8px; }
+      .tabs .actions button { height:28px; padding:0 10px; border:1px solid var(--border); border-radius:6px; background: var(--panel); color: var(--fg); }
+      .main { display:grid; grid-template-columns: 320px 1fr; gap:0; height: calc(100% - 0px); }
+      .left { border-right:1px solid var(--border); padding:10px; display:flex; flex-direction:column; }
+      .left .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+      .left .list { flex:1; overflow:auto; border:1px solid var(--border); border-radius:10px; background: var(--panel); }
+      .left .item { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid #1a1d24; }
+      .left .item .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .left .item .ops button { background:#30363d; color:#e6e6e6; border:0; border-radius:4px; padding:2px 6px; margin-left:6px; }
+      .left .hint { color: var(--muted); font-size: 12px; padding-top: 6px; }
+      .right { padding:10px; display:flex; gap:10px; }
+      .files { flex:1; min-width: 360px; max-width: 600px; height: 440px; overflow: auto; border:1px solid var(--border); border-radius:10px; background: var(--panel); }
+      .files .file { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid #1a1d24; cursor:pointer; }
+      .files .file .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .files .file .tag { font-size: 12px; color: var(--muted); }
+      .player { flex:1; min-width: 360px; border:1px solid var(--border); border-radius:10px; background: var(--panel); padding:10px; display:flex; flex-direction:column; }
+      .player .row { display:flex; align-items:center; gap:8px; }
+      .player .title { font-weight:600; }
+      .player .progress { display:flex; align-items:center; gap:8px; margin-top:8px; }
+      .player input[type=range] { width:100%; }
+      .bottom { border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; padding:8px 10px; }
+      /* 自定义滚动条 */
+      .files::-webkit-scrollbar, .left .list::-webkit-scrollbar { width: 10px; height: 10px; }
+      .files::-webkit-scrollbar-thumb, .left .list::-webkit-scrollbar-thumb { background: #2a2f39; border-radius: 10px; }
+      .files::-webkit-scrollbar-track, .left .list::-webkit-scrollbar-track { background: #15181e; border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="tabs">
+        <div id="tabs" class="tabs-list"></div>
+        <div class="actions">
+          <button id="btn-add-dir"><i class="ri-folder-add-line"></i> 添加目录</button>
+        </div>
+      </div>
+      <div class="main">
+        <div class="left">
+          <div class="head"><span>今日听力清单</span><span id="today-count" class="hint"></span></div>
+          <div id="today" class="list"></div>
+          <div class="hint">可拖动条目或使用上下按钮调整顺序；完成后自动移除并在文件列表中标记为已听完。</div>
+        </div>
+        <div class="right">
+          <div class="files" id="files"></div>
+          <div class="player">
+            <div class="row"><i class="ri-music-2-line"></i><span id="cur-name" class="title">未选择音频</span></div>
+            <audio id="audio" preload="metadata"></audio>
+            <div class="progress">
+              <span id="elapsed">00:00</span>
+              <input type="range" id="seek" min="0" max="100" value="0" />
+              <span id="duration">00:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom">
+        <span class="hint">底栏中央提供 听力设置 / 上一首 / 暂停-播放 / 下一首 / 倍速设置</span>
+      </div>
+    </div>
+    <script>
+      const api = () => window.lowbarAPI;
+      let gState = { dirs: [], files: {}, today: [], rate: 1.0, playing: false, currentIndex: -1 };
+      let gActiveDir = '';
+      const fmt = (sec) => {
+        const s = Math.max(0, Math.floor(sec || 0)); const m = Math.floor(s / 60); const r = s % 60;
+        return String(m).padStart(2,'0') + ':' + String(r).padStart(2,'0');
+      };
+      const $ = (sel) => document.querySelector(sel);
+      const todayEl = $('#today'); const filesEl = $('#files'); const tabsEl = $('#tabs');
+      const audio = $('#audio'); const seek = $('#seek'); const curName = $('#cur-name'); const elapsed = $('#elapsed'); const duration = $('#duration');
+
+      function renderTabs() {
+        tabsEl.innerHTML = '';
+        for (const d of gState.dirs) {
+          const t = document.createElement('div'); t.className = 'tab' + (gActiveDir === d ? ' active' : '');
+          const icon = document.createElement('i'); icon.className = 'ri-folder-line';
+          const span = document.createElement('span'); span.textContent = d;
+          t.appendChild(icon); t.appendChild(span);
+          t.addEventListener('click', () => { gActiveDir = d; renderTabs(); loadFiles(); });
+          tabsEl.appendChild(t);
+        }
+      }
+      async function loadDirs() {
+        try { const r = await api().pluginCall('smart.listening','listDirectories',[]); gState.dirs = (r && r.dirs) || []; if (!gActiveDir && gState.dirs[0]) gActiveDir = gState.dirs[0]; renderTabs(); } catch {}
+      }
+      async function loadFiles() {
+        filesEl.innerHTML = '';
+        if (!gActiveDir) return;
+        try {
+          const r = await api().pluginCall('smart.listening','listFiles',[gActiveDir]);
+          const list = (r && r.files) || [];
+          for (const it of list) {
+            const row = document.createElement('div'); row.className = 'file';
+            const name = document.createElement('span'); name.className = 'name'; name.textContent = it.name;
+            const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = it.listened ? '已听完' : (it.selected ? '已选择' : '');
+            row.appendChild(name); row.appendChild(tag);
+            row.addEventListener('click', async () => {
+              try { await api().pluginCall('smart.listening','addToToday',[it.path]); loadToday(); loadFiles(); } catch {}
+            });
+            filesEl.appendChild(row);
+          }
+        } catch {}
+      }
+      async function loadToday() {
+        try { const r = await api().pluginCall('smart.listening','getState',[]); const s = r && r.ok ? r : { dirs:[], files:{}, today:[], rate:1.0, playing:false, currentIndex:-1 };
+          gState = { ...gState, dirs: s.dirs || [], files: s.files || {}, today: s.today || [], rate: s.rate || 1.0, playing: !!s.playing, currentIndex: s.currentIndex ?? -1 };
+          $('#today-count').textContent = '共 ' + (gState.today.length || 0) + ' 项';
+        } catch {}
+        todayEl.innerHTML = '';
+        gState.today.forEach((fp, idx) => {
+          const row = document.createElement('div'); row.className = 'item'; row.draggable = true; row.dataset.index = String(idx);
+          const name = document.createElement('span'); name.className = 'name'; name.textContent = fp.split('\\').pop();
+          const ops = document.createElement('div'); ops.className = 'ops';
+          const up = document.createElement('button'); up.textContent = '上移';
+          const down = document.createElement('button'); down.textContent = '下移';
+          up.addEventListener('click', () => moveItem(idx, Math.max(0, idx-1)));
+          down.addEventListener('click', () => moveItem(idx, Math.min(gState.today.length-1, idx+1)));
+          ops.appendChild(up); ops.appendChild(down);
+          row.appendChild(name); row.appendChild(ops);
+          row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(idx)); });
+          row.addEventListener('dragover', (e) => { e.preventDefault(); });
+          row.addEventListener('drop', (e) => { const from = parseInt(e.dataTransfer.getData('text/plain'),10); const to = idx; moveItem(from, to); });
+          todayEl.appendChild(row);
+        });
+      }
+      async function moveItem(from, to) {
+        if (Number.isNaN(from) || Number.isNaN(to)) return;
+        const arr = gState.today.slice();
+        const [it] = arr.splice(from, 1);
+        arr.splice(to, 0, it);
+        try { await api().pluginCall('smart.listening','reorderToday',[arr]); await loadToday(); } catch {}
+      }
+
+      function bindAudio() {
+        audio.addEventListener('loadedmetadata', () => { duration.textContent = fmt(audio.duration); });
+        audio.addEventListener('timeupdate', () => {
+          elapsed.textContent = fmt(audio.currentTime);
+          if (audio.duration && isFinite(audio.duration)) seek.value = String(Math.floor(audio.currentTime / audio.duration * 100));
+          try { api().emitEvent('smart.listening.lowbar', { type:'player-progress', cur: Math.floor(audio.currentTime), dur: Math.floor(audio.duration||0) }); } catch {}
+        });
+        audio.addEventListener('ended', () => {
+          try { api().emitEvent('smart.listening.lowbar', { type:'player-ended', filePath: audio.dataset.path || '' }); } catch {}
+        });
+        seek.addEventListener('input', () => {
+          if (audio.duration && isFinite(audio.duration)) {
+            const pos = Math.max(0, Math.min(100, parseInt(seek.value,10)||0));
+            audio.currentTime = audio.duration * (pos / 100);
+          }
+        });
+      }
+
+      function onEvent(name, data) {
+        if (name !== 'smart.listening.lowbar' || !data) return;
+        if (data.type === 'control' && data.action === 'player') {
+          if (data.cmd === 'play') {
+            const fp = String(data.filePath || '').trim(); if (!fp) return;
+            curName.textContent = fp.split('\\').pop();
+            audio.src = 'file:///' + fp.replace(/\\/g,'/'); audio.dataset.path = fp; audio.playbackRate = Number(data.rate || gState.rate || 1.0);
+            audio.load(); audio.play();
+          } else if (data.cmd === 'pause') {
+            audio.pause();
+          } else if (data.cmd === 'resume') {
+            audio.play();
+          } else if (data.cmd === 'rate') {
+            const r = Number(data.rate || 1.0); audio.playbackRate = r;
+          }
+        }
+      }
+
+      async function init() {
+        bindAudio();
+        await loadDirs();
+        await loadToday();
+        await loadFiles();
+        api().onEvent(onEvent);
+        $('#btn-add-dir').addEventListener('click', async () => {
+          try {
+            const { dialog } = require('electron');
+          } catch {}
+          // 调用后端选择目录（主进程内封装），此处用简单提示让用户在设置页添加目录
+          const p = prompt('请输入本地听力目录路径（如 D:\\Audios）：');
+          if (p) { try { await api().pluginCall('smart.listening','addDirectory',[p]); await loadDirs(); await loadFiles(); } catch {} }
+        });
+      }
+      init();
+    </script>
+  </body>
+  </html>
+

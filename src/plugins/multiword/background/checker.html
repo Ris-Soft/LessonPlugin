@@ -278,6 +278,16 @@
               } catch {}
               return;
             }
+            if (id === 'carousel-settings') {
+              try {
+                const float = new URL('../../../plugins/multiword/float/carousel-font.html', window.location.href).href;
+                const u = new URL(float);
+                u.searchParams.set('server', server);
+                api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 740, height: 520 } });
+                api().emitEvent(CH, { type:'update', target:'floatingUrl', value: u.href });
+              } catch {}
+              return;
+            }
             handleCmd(id);
           }
         });

@@ -1,97 +1,387 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>屏幕批注</title>
   <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
   <style>
-    html, body { height: 100%; margin: 0; background: transparent; }
-    * { -webkit-user-select: none; user-select: none; }
-    .wrap { display: flex; flex-direction: column; height: 100%; }
-    #board { flex: 1; position: relative; background: rgba(0,0,0,0.02); overflow: hidden; }
-    #board .canvas-container { position: absolute; inset: 0; }
-    #toolbar { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); height: 68px; display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: rgba(20,20,20,0.9); color: #fff; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
-    .rect-btn { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; width:56px; height:56px; border:none; background:transparent; border-radius:6px; cursor:pointer; color:#ddd; }
-    .rect-btn:hover { background: rgba(255,255,255,0.06); }
-    .rect-btn.active { background: rgba(255,255,255,0.12); color:#fff; }
-    .rect-btn i { font-size:20px; }
-    .rect-btn span { font-size:11px; }
-    #toolbar input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
-    #toolbar input[type=range] { width: 160px; }
-    #rightCtrl { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center; background: rgba(20,20,20,0.9); color: #fff; padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
-    
-    #leftCtrl { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center; background: rgba(20,20,20,0.9); color: #fff; padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
-    
-    #eraseCursor { position: absolute; border: 1px dashed #ff8080; pointer-events: none; }
-    .spacer { flex: 1; }
-    .file { display: none; }
-    .popup { position: fixed; z-index: 999; background: rgba(30,35,40,0.95); color: #fff; padding: 10px 12px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); display: none; gap: 12px; align-items: center; }
-    .popup label { display: flex; align-items: center; gap: 8px; }
-    .popup input[type=color] { width: 32px; height: 32px; padding: 0; border: none; background: transparent; }
-    .popup input[type=range] { width: 160px; }
-    .popup button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
-    .popup button.active { background: #0ea5e9; }
-    #selTools { position: absolute; display: none; background: rgba(30,35,40,0.95); color: #fff; padding: 6px 8px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); gap: 8px; align-items: center; }
-    #selTools button { height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
-    #pagePreview { position: fixed; right: 12px; top: 12px; bottom: 96px; display: none; background: rgba(20,20,20,0.95); color: #fff; padding: 8px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); z-index: 999; width: 168px; box-sizing: border-box; flex-direction: column; gap: 8px; }
-    #pagePreview .list { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 10px; }
-    #pagePreview .thumb { box-sizing: border-box; position: relative; display:flex; width: 100%; height: 96px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; align-items: center; justify-content: center; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto; }
-    #pagePreview .thumb img { display:block; width: 100%; height: 100%; object-fit: contain; }
-    #pagePreview .thumb .label { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,0.5); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-    #pagePreview .thumb .del { position: absolute; right: 6px; top: 6px; background: transparent; color: #fff; border: none; border-radius: 4px; width: 24px; height: 24px; padding: 0; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; }
-    #pagePreview .footer { flex: 0 0 auto; display:flex; justify-content:center; }
-    #pagePreview .footer button { height: 28px; padding: 0 10px; border: none; border-radius: 6px; background: rgba(255,255,255,0.15); color: #fff; cursor: pointer; }
-    #pagePreview .list::-webkit-scrollbar { width: 10px; }
-    #pagePreview .list::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); border-radius: 8px; }
-    #pagePreview .list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 8px; }
-    #pagePreview .list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: #000000;
+    }
+
+    * {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #board {
+      flex: 1;
+      position: relative;
+      background: rgba(0, 0, 0, 0.02);
+      overflow: hidden;
+    }
+
+    #board .canvas-container {
+      position: absolute;
+      inset: 0;
+    }
+
+    #toolbar {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      height: 68px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      background: rgba(20, 20, 20, 0.9);
+      color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    .rect-btn {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      width: 56px;
+      height: 56px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #ddd;
+    }
+
+    .rect-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .rect-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .rect-btn i {
+      font-size: 20px;
+    }
+
+    .rect-btn span {
+      font-size: 11px;
+    }
+
+    #toolbar input[type=color] {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
+
+    #toolbar input[type=range] {
+      width: 160px;
+    }
+
+    #rightCtrl {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      background: rgba(20, 20, 20, 0.9);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    .rect-btn.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    #leftCtrl {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      background: rgba(20, 20, 20, 0.9);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    #eraseCursor {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    .file {
+      display: none;
+    }
+
+    .popup {
+      position: fixed;
+      z-index: 999;
+      background: rgba(30, 35, 40, 0.95);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      display: none;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .popup label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .popup input[type=color] {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
+
+    .popup input[type=range] {
+      width: 160px;
+    }
+
+    .popup button {
+      height: 28px;
+      padding: 0 8px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .popup button.active {
+      background: #0ea5e9;
+    }
+
+    #selTools {
+      position: absolute;
+      display: none;
+      background: rgba(30, 35, 40, 0.95);
+      color: #fff;
+      padding: 6px 8px;
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      gap: 8px;
+      align-items: center;
+    }
+
+    #selTools button {
+      height: 28px;
+      padding: 0 8px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #pagePreview {
+      position: fixed;
+      right: 12px;
+      top: 12px;
+      bottom: 96px;
+      display: none;
+      background: rgba(20, 20, 20, 0.95);
+      color: #fff;
+      padding: 8px;
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      z-index: 999;
+      width: 168px;
+      box-sizing: border-box;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #pagePreview .list {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #pagePreview .thumb {
+      box-sizing: border-box;
+      position: relative;
+      display: flex;
+      width: 100%;
+      height: 96px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      overflow: hidden;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      flex: 0 0 auto;
+    }
+
+    #pagePreview .thumb img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    #pagePreview .thumb .label {
+      position: absolute;
+      left: 6px;
+      top: 6px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    #pagePreview .thumb .del {
+      position: absolute;
+      right: 6px;
+      top: 6px;
+      background: transparent;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pagePreview .footer {
+      flex: 0 0 auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    #pagePreview .footer button {
+      height: 28px;
+      padding: 0 10px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #pagePreview .list::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    #pagePreview .list::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+
+    #pagePreview .list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 8px;
+    }
+
+    #pagePreview .list::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <div id="board"></div>
-      <div id="toolbar">
-        <button id="modeDraw" class="rect-btn"><i class="ri-pencil-line"></i><span>批注</span></button>
-        <button id="modeErase" class="rect-btn"><i class="ri-eraser-line"></i><span>橡皮</span></button>
-        <button id="modeSelect" class="rect-btn"><i class="ri-cursor-line"></i><span>选择</span></button>
-        <button id="modePan" class="rect-btn"><i class="ri-drag-move-2-line"></i><span>漫游</span></button>
-        <button id="toggleTwoFinger" class="rect-btn"><i class="ri-fingerprint-line"></i><span>手势</span></button>
-        <button id="boardSettings" class="rect-btn"><i class="ri-settings-2-line"></i><span>设置</span></button>
-      </div>
-      <div id="popup" class="popup">
-        <div id="penSettings" style="display:flex; gap:12px; align-items:center;">
-          <label>颜色 <input id="penColor" type="color" value="#ffffff"></label>
-          <div id="penPalette" style="display:flex; gap:6px; align-items:center;">
-            <button data-color="#000000" style="width:28px; padding:0; background:#000000;"></button>
-            <button data-color="#ffffff" style="width:28px; padding:0; background:#ffffff;"></button>
-            <button data-color="#ff3b30" style="width:28px; padding:0; background:#ff3b30;"></button>
-            <button data-color="#ff9f0a" style="width:28px; padding:0; background:#ff9f0a;"></button>
-            <button data-color="#34c759" style="width:28px; padding:0; background:#34c759;"></button>
-            <button data-color="#0a84ff" style="width:28px; padding:0; background:#0a84ff;"></button>
-            <button data-color="#5856d6" style="width:28px; padding:0; background:#5856d6;"></button>
-          </div>
-          <label>粗细 <input id="penWidth" type="range" min="1" max="30" value="6"></label>
+    <div id="toolbar">
+      <button id="modeDraw" class="rect-btn"><i class="ri-pencil-line"></i><span>批注</span></button>
+      <button id="modeErase" class="rect-btn"><i class="ri-eraser-line"></i><span>橡皮</span></button>
+      <button id="modeSelect" class="rect-btn"><i class="ri-cursor-line"></i><span>选择</span></button>
+      <button id="modePan" class="rect-btn"><i class="ri-drag-move-2-line"></i><span>漫游</span></button>
+      <button id="toggleTwoFinger" class="rect-btn"><i class="ri-fingerprint-line"></i><span>手势</span></button>
+      <button id="boardSettings" class="rect-btn"><i class="ri-settings-2-line"></i><span>设置</span></button>
+      <div class="spacer"></div>
+      <button id="undoBtn" class="rect-btn disabled"><i class="ri-arrow-go-back-line"></i><span>撤销</span></button>
+      <button id="redoBtn" class="rect-btn disabled"><i class="ri-arrow-go-forward-line"></i><span>恢复</span></button>
+    </div>
+    <div id="popup" class="popup">
+      <div id="penSettings" style="display:flex; gap:12px; align-items:center;">
+        <label>颜色 <input id="penColor" type="color" value="#ffffff"></label>
+        <div id="penPalette" style="display:flex; gap:6px; align-items:center;">
+          <button data-color="#000000" style="width:28px; padding:0; background:#000000;"></button>
+          <button data-color="#ffffff" style="width:28px; padding:0; background:#ffffff;"></button>
+          <button data-color="#ff3b30" style="width:28px; padding:0; background:#ff3b30;"></button>
+          <button data-color="#ff9f0a" style="width:28px; padding:0; background:#ff9f0a;"></button>
+          <button data-color="#34c759" style="width:28px; padding:0; background:#34c759;"></button>
+          <button data-color="#0a84ff" style="width:28px; padding:0; background:#0a84ff;"></button>
+          <button data-color="#5856d6" style="width:28px; padding:0; background:#5856d6;"></button>
         </div>
-        <div id="eraserSettings" style="display:none; gap:12px; align-items:center;">
-          <label>橡皮大小 <input id="eraseSize" type="range" min="20" max="200" value="80"></label>
-          <button id="clearPage">清页</button>
-        </div>
-        <div id="boardSettingsPanel" style="display:none; gap:12px; align-items:center;">
-          <button id="bgWhite">背景 白</button>
-          <button id="bgDark">背景 暗黑</button>
-          <button id="bgDeepGreen">背景 深绿</button>
-        </div>
-        <div id="savePanel" style="display:none; gap:12px; align-items:center;">
-          <button id="exportPNG"><i class="ri-image-line"></i> 导出PNG</button>
-          <button id="exportJSON"><i class="ri-file-list-3-line"></i> 导出JSON</button>
-          <button id="importJSON"><i class="ri-upload-2-line"></i> 导入JSON</button>
-          <input id="importFile" class="file" type="file" accept=".wbjson,application/json">
+        <div id="penWidths" style="display:flex; gap:10px; align-items:center;">
+          <button data-penw="3" style="width:12px;height:12px;border-radius:50%;background:#fff"></button>
+          <button data-penw="6" class="active"
+            style="width:16px;height:16px;border-radius:50%;background:#fff"></button>
+          <button data-penw="12" style="width:22px;height:22px;border-radius:50%;background:#fff"></button>
         </div>
       </div>
+      <div id="eraserSettings" style="display:none; gap:12px; align-items:center;">
+        <div id="eraseSizes" style="display:flex; gap:6px; align-items:center;">
+          <button data-erasesz="40" style="width:16px;height:16px;border-radius:50%;background:#fff"></button>
+          <button data-erasesz="80" class="active"
+            style="width:22px;height:22px;border-radius:50%;background:#fff"></button>
+          <button data-erasesz="140" style="width:28px;height:28px;border-radius:50%;background:#fff"></button>
+        </div>
+        <button id="invertErase">反向擦除</button>
+        <button id="clearPage">清页</button>
+      </div>
+      <div id="boardSettingsPanel" style="display:none; gap:12px; align-items:center;">
+        <button id="bgWhite">背景 白</button>
+        <button id="bgDark">背景 暗黑</button>
+        <button id="bgDeepGreen">背景 深绿</button>
+      </div>
+      <div id="savePanel" style="display:none; gap:12px; align-items:center;">
+        <button id="exportPNG"><i class="ri-image-line"></i> 导出PNG</button>
+        <button id="exportJSON"><i class="ri-file-list-3-line"></i> 导出JSON</button>
+        <button id="importJSON"><i class="ri-upload-2-line"></i> 导入JSON</button>
+        <input id="importFile" class="file" type="file" accept=".wbjson,application/json">
+      </div>
+    </div>
     <div id="leftCtrl">
       <button id="btnClose" class="rect-btn"><i class="ri-close-line"></i><span>关闭</span></button>
-      <button id="btnMin" class="rect-btn"><i class="ri-subtract-line"></i><span>最小化</span></button>
+      <button id="btnMin" class="rect-btn"><i class="ri-subtract-line"></i><span>收起</span></button>
       <button id="btnSave" class="rect-btn"><i class="ri-save-3-line"></i><span>保存</span></button>
     </div>
     <div id="rightCtrl">
@@ -101,7 +391,7 @@
       <div id="pagePreview"></div>
     </div>
   </div>
-  <script>
+  <script type="text/plain">
     async function loadScript(src, type = 'text/javascript') {
       return new Promise((resolve, reject) => {
         const s = document.createElement('script');
@@ -119,6 +409,7 @@
       const showMinParam = params.get('showMinimize');
       const showSaveParam = params.get('showSave');
       const persistKey = params.get('persistKey');
+      const persistFile = params.get('persistFile');
       if (!fabric || typeof fabric.Canvas !== 'function') {
         const candidates = [
           // './node_modules/fabric/dist/index.min.js',
@@ -128,7 +419,7 @@
         ];
         let ok = false;
         for (const p of candidates) {
-          try { await loadScript(p); ok = true; break; } catch {}
+          try { await loadScript(p); ok = true; break; } catch { }
         }
         fabric = ok ? window.fabric : null;
       }
@@ -136,590 +427,759 @@
         alert('Fabric.js 加载失败，请安装依赖或检查路径');
         return;
       }
-    const board = document.getElementById('board');
-    const el = document.createElement('canvas');
-    el.style.position = 'absolute'; el.style.inset = '0';
-    board.appendChild(el);
-    const canvas = new fabric.Canvas(el, {
-      isDrawingMode: true,
-      selection: false,
-      backgroundColor: 'transparent',
-      preserveObjectStacking: true
-    });
-    const canvasEl = (typeof canvas.getElement === 'function') ? canvas.getElement() : (canvas.lowerCanvasEl || null);
-
-    function fit() {
-      const r = board.getBoundingClientRect();
-      const w = Math.floor(r.width);
-      const h = Math.floor(r.height);
-      if (typeof canvas.setDimensions === 'function') {
-        canvas.setDimensions({ width: w, height: h });
-      } else {
-        if (typeof canvas.setWidth === 'function') canvas.setWidth(w);
-        else if (canvasEl) canvasEl.width = w;
-        if (typeof canvas.setHeight === 'function') canvas.setHeight(h);
-        else if (canvasEl) canvasEl.height = h;
-      }
-      if (typeof canvas.requestRenderAll === 'function') canvas.requestRenderAll();
-      else if (typeof canvas.renderAll === 'function') canvas.renderAll();
-    }
-    window.addEventListener('resize', fit);
-    window.addEventListener('load', fit);
-    setTimeout(fit, 0);
-
-    const state = {
-      mode: 'draw',
-      twoFingerPan: false,
-      eraseSize: 80,
-      pages: [],
-      pageIndex: 0,
-      bgColor: '#121212',
-      pageThumbs: []
-    };
-    const popup = document.getElementById('popup');
-    const penSettings = document.getElementById('penSettings');
-    const eraserSettings = document.getElementById('eraserSettings');
-    const savePanel = document.getElementById('savePanel');
-    function showPopup(which, anchorEl) {
-      penSettings.style.display = which === 'pen' ? 'flex' : 'none';
-      eraserSettings.style.display = which === 'eraser' ? 'flex' : 'none';
-      boardSettingsPanel.style.display = which === 'board' ? 'flex' : 'none';
-      savePanel.style.display = which === 'save' ? 'flex' : 'none';
-      popup.style.display = 'flex';
+      let erase2d = null;
       try {
-        const defaultId = which === 'pen' ? 'modeDraw' : (which === 'eraser' ? 'modeErase' : (which === 'board' ? 'boardSettings' : 'btnSave'));
-        const rect = anchorEl ? anchorEl.getBoundingClientRect() : document.getElementById(defaultId).getBoundingClientRect();
-        const px = Math.max(12, rect.left);
-        const ph = popup.offsetHeight || 48;
-        const py = Math.max(12, rect.top - ph - 20);
-        popup.style.left = px + 'px';
-        popup.style.top = py + 'px';
-      } catch {}
-    }
-    function hidePopup() { popup.style.display = 'none'; }
-    document.addEventListener('mousedown', (e) => {
-      try {
-        if (popup.style.display === 'flex') {
-          const within = popup.contains(e.target) || document.getElementById('modeDraw').contains(e.target) || document.getElementById('modeErase').contains(e.target);
-          if (!within) hidePopup();
+        const mod = await import('./erase2d/erase2d-brush.js');
+        erase2d = mod;
+        if (mod && mod.EraserBrush && !fabric.EraserBrush) {
+          fabric.EraserBrush = mod.EraserBrush;
         }
-      } catch {}
-    });
-
-    let currentBrush = null;
-    function setMode(m) {
-      state.mode = m;
-      document.getElementById('modeDraw').classList.toggle('active', m==='draw');
-      document.getElementById('modeSelect').classList.toggle('active', m==='select');
-      document.getElementById('modePan').classList.toggle('active', m==='pan');
-      document.getElementById('modeErase').classList.toggle('active', m==='erase');
-      if (m === 'draw') {
-        canvas.isDrawingMode = true;
-        canvas.selection = false;
-        canvas.getObjects().forEach(o => o.selectable = false);
-        if (!(currentBrush instanceof fabric.PencilBrush)) {
-          try { currentBrush = new fabric.PencilBrush(canvas); } catch { try { currentBrush = new fabric.PencilBrush({ canvas }); } catch {} }
-          if (!currentBrush) currentBrush = new fabric.PencilBrush(canvas);
-          currentBrush.color = penColor.value;
-          currentBrush.width = Number(penWidth.value);
-          currentBrush.decimate = 2;
-        }
-        canvas.freeDrawingBrush = currentBrush;
-        hidePopup();
-      } else if (m === 'select') {
-        canvas.isDrawingMode = false;
-        canvas.selection = true;
-        canvas.skipTargetFind = false;
-        canvas.getObjects().forEach(o => {
-          const isEraser = (o.isEraser === true) || (o.globalCompositeOperation === 'destination-out');
-          o.selectable = !isEraser;
-          o.evented = !isEraser;
-          o.lockMovementX = false;
-          o.lockMovementY = false;
-        });
-        hidePopup();
-      } else if (m === 'pan') {
-        canvas.isDrawingMode = false;
-        canvas.selection = false;
-        canvas.getObjects().forEach(o => o.selectable = false);
-        canvas.skipTargetFind = true;
-        hidePopup();
-      } else if (m === 'erase') {
-        canvas.selection = false;
-        canvas.skipTargetFind = true;
-        canvas.getObjects().forEach(o => { o.selectable = false; o.erasable = true; });
-        try { canvas.discardActiveObject(); } catch {}
-        let eBrush = null;
-        try { if (fabric && fabric.EraserBrush) eBrush = new fabric.EraserBrush(canvas); } catch {}
-        if (eBrush) {
-          eBrush.width = Number(state.eraseSize) || 80;
-          canvas.freeDrawingBrush = eBrush;
-          canvas.isDrawingMode = true;
-        } else {
-          canvas.isDrawingMode = false;
-        }
-        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
-        showPopup('eraser');
-      }
-    }
-
-    let brush = null;
-    try { brush = new fabric.PencilBrush(canvas); } catch { try { brush = new fabric.PencilBrush({ canvas }); } catch {} }
-    if (!brush) brush = new fabric.PencilBrush(canvas);
-    brush.color = '#ffffff';
-    brush.width = 6;
-    brush.decimate = 2;
-    canvas.freeDrawingBrush = brush;
-
-    const penColor = document.getElementById('penColor');
-    const penWidth = document.getElementById('penWidth');
-    const eraseSize = document.getElementById('eraseSize');
-    const clearPageBtn = document.getElementById('clearPage');
-    const boardSettingsBtn = document.getElementById('boardSettings');
-    const boardSettingsPanel = document.getElementById('boardSettingsPanel');
-    const btnClose = document.getElementById('btnClose');
-    const btnMin = document.getElementById('btnMin');
-    const btnSave = document.getElementById('btnSave');
-    const penPalette = document.getElementById('penPalette');
-    const paletteBtns = penPalette ? penPalette.querySelectorAll('button[data-color]') : [];
-    function updatePenPaletteSelection() {
-      try {
-        const cur = String(penColor.value || '').toLowerCase();
-        paletteBtns.forEach((b) => {
-          const c = String(b.getAttribute('data-color') || '').toLowerCase();
-          b.style.outline = c === cur ? '2px solid #fff' : 'none';
-        });
-      } catch {}
-    }
-    penColor.addEventListener('input', () => { canvas.freeDrawingBrush.color = penColor.value; });
-    penColor.addEventListener('input', () => { updatePenPaletteSelection(); });
-    penWidth.addEventListener('input', () => { canvas.freeDrawingBrush.width = Number(penWidth.value); });
-    paletteBtns.forEach((b) => {
-      b.addEventListener('click', () => {
-        const c = b.getAttribute('data-color');
-        if (!c) return;
-        penColor.value = c;
-        try { canvas.freeDrawingBrush.color = c; } catch {}
-        updatePenPaletteSelection();
-      });
-    });
-    eraseSize.addEventListener('input', () => {
-      state.eraseSize = Number(eraseSize.value);
-      if (eraseCursor) resizeEraseCursor(state.eraseSize);
-      try {
-        if (state.mode === 'erase' && fabric && fabric.EraserBrush && canvas.freeDrawingBrush && (canvas.freeDrawingBrush instanceof fabric.EraserBrush)) {
-          canvas.freeDrawingBrush.width = state.eraseSize;
-        }
-      } catch {}
-    });
-    clearPageBtn.addEventListener('click', () => {
-      const bg = canvas.backgroundColor;
-      canvas.clear();
-      if (bg) setBackgroundColor(bg);
-      setMode('draw');
-      state.pages[state.pageIndex] = null;
-      if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
-      try { hideSelTools(); } catch {}
-      try { hidePopup(); } catch {}
-      try { updateEraseCursorVis(); } catch {}
-    });
-
-    const btnDraw = document.getElementById('modeDraw');
-    const btnErase = document.getElementById('modeErase');
-    const btnPan = document.getElementById('modePan');
-    document.getElementById('modeDraw').addEventListener('click', (ev) => {
-      if (state.mode !== 'draw') { setMode('draw'); hidePopup(); }
-      else { if (popup.style.display === 'flex') hidePopup(); else showPopup('pen', btnDraw); }
-      updateEraseCursorVis();
-    });
-    document.getElementById('modeSelect').addEventListener('click', () => { hidePopup(); setMode('select'); updateEraseCursorVis(); });
-    document.getElementById('modeErase').addEventListener('click', (ev) => {
-      if (state.mode !== 'erase') { setMode('erase'); hidePopup(); }
-      else { if (popup.style.display === 'flex') hidePopup(); else showPopup('eraser', btnErase); }
-      updateEraseCursorVis();
-    });
-    boardSettingsBtn.addEventListener('click', (ev) => {
-      if (popup.style.display === 'flex' && boardSettingsPanel.style.display === 'flex') { hidePopup(); }
-      else { showPopup('board', boardSettingsBtn); }
-    });
-    if (btnClose) btnClose.style.display = (showCloseParam === '0') ? 'none' : 'inline-flex';
-    if (btnMin) btnMin.style.display = (showMinParam === '0') ? 'none' : 'inline-flex';
-    if (btnSave) btnSave.style.display = (showSaveParam === '0') ? 'none' : 'inline-flex';
-    if (btnClose) btnClose.addEventListener('click', () => { try { if (window.annotateAPI && typeof window.annotateAPI.close === 'function') { window.annotateAPI.close(); } else { window.close(); } } catch {} });
-    if (btnMin) btnMin.addEventListener('click', () => { try { if (window.annotateAPI && typeof window.annotateAPI.minimize === 'function') { window.annotateAPI.minimize(); } } catch {} });
-    if (btnSave) btnSave.addEventListener('click', () => { if (popup.style.display === 'flex' && savePanel.style.display === 'flex') { hidePopup(); } else { showPopup('save', btnSave); } });
-    btnPan.addEventListener('click', () => { setMode('pan'); hidePopup(); updateEraseCursorVis(); });
-    document.getElementById('toggleTwoFinger').addEventListener('click', () => {
-      state.twoFingerPan = !state.twoFingerPan;
-      document.getElementById('toggleTwoFinger').classList.toggle('active', state.twoFingerPan);
-    });
-
-    function savePageSnapshot() {
-      try {
-        state.pages[state.pageIndex] = canvas.toJSON();
-        try {
-          const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 });
-          state.pageThumbs[state.pageIndex] = url;
-        } catch {}
-      } catch {}
-    }
-    function getTotalPages() { return Math.max(state.pages.length, state.pageIndex + 1); }
-    function updatePageLabel() { document.getElementById('pageLabel').textContent = `${state.pageIndex + 1}/${getTotalPages()}`; }
-    function savePackIfNeeded() {
-      try {
-        if (!persistKey) return;
-        const pack = { pages: state.pages, bg: state.bgColor };
-        localStorage.setItem('wb.persist.' + persistKey, JSON.stringify(pack));
-      } catch {}
-    }
-    function loadPackIfAny() {
-      try {
-        if (!persistKey) return false;
-        const raw = localStorage.getItem('wb.persist.' + persistKey);
-        if (!raw) return false;
-        const obj = JSON.parse(raw);
-        if (!obj || !Array.isArray(obj.pages)) return false;
-        state.pages = obj.pages;
-        state.pageThumbs = new Array(state.pages.length).fill(null);
-        if (obj.bg) state.bgColor = obj.bg;
-        return true;
-      } catch { return false; }
-    }
-    function loadPageSnapshot(i) {
-      const data = state.pages[i];
-      canvas.clear();
-      if (data) {
-        canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); setTimeout(() => { fit(); if (canvas.requestRenderAll) canvas.requestRenderAll(); }, 0); });
-      } else {
-        try { setBackgroundColor(state.bgColor); } catch {}
-        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
-      }
-      updatePageLabel();
-      try {
-        if (!state.pageThumbs[i]) {
-          const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 });
-          state.pageThumbs[i] = url;
-        }
-      } catch {}
-      savePackIfNeeded();
-    }
-    document.getElementById('prevPage').addEventListener('click', () => {
-      savePageSnapshot();
-      if (state.pageIndex > 0) state.pageIndex--; 
-      loadPageSnapshot(state.pageIndex);
-    });
-    document.getElementById('nextPage').addEventListener('click', () => {
-      savePageSnapshot();
-      if (state.pageIndex >= state.pages.length - 1) state.pages.push(null);
-      state.pageIndex++;
-      loadPageSnapshot(state.pageIndex);
-    });
-    if (!loadPackIfAny()) { state.pages.push(null); state.pageThumbs.push(null); }
-    loadPageSnapshot(0);
-    setInterval(() => { try { savePageSnapshot(); savePackIfNeeded(); } catch {} }, 3000);
-
-    function download(filename, content, mime) {
-      const a = document.createElement('a');
-      a.download = filename;
-      a.href = URL.createObjectURL(new Blob([content], { type: mime }));
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }
-    document.getElementById('exportPNG').addEventListener('click', () => {
-      const url = canvas.toDataURL({ format: 'png', multiplier: 1 });
-      const a = document.createElement('a');
-      a.download = `annotation-page-${state.pageIndex+1}.png`;
-      a.href = url;
-      a.click();
-    });
-    document.getElementById('exportJSON').addEventListener('click', () => {
-      const json = JSON.stringify(canvas.toJSON());
-      download(`annotation-page-${state.pageIndex+1}.wbjson`, json, 'application/json');
-    });
-    document.getElementById('importJSON').addEventListener('click', () => {
-      document.getElementById('importFile').value = '';
-      document.getElementById('importFile').click();
-    });
-    document.getElementById('importFile').addEventListener('change', (e) => {
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try { const data = JSON.parse(String(reader.result || '{}')); canvas.clear(); canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); }); } catch {}
-      };
-      reader.readAsText(f);
-    });
-
-    const eraseCursor = document.createElement('div');
-    eraseCursor.id = 'eraseCursor';
-    board.appendChild(eraseCursor);
-    function resizeEraseCursor(size) {
-      const px = Math.max(10, Math.floor(Number(size) || 80));
-      eraseCursor.style.width = px + 'px';
-      eraseCursor.style.height = px + 'px';
-    }
-    resizeEraseCursor(state.eraseSize);
-    eraseCursor.style.display = 'none';
-    const updateEraseCursorVis = () => { const useBrush = !!(fabric && fabric.EraserBrush && canvas.isDrawingMode && (canvas.freeDrawingBrush instanceof fabric.EraserBrush)); eraseCursor.style.display = (state.mode === 'erase' && !useBrush) ? 'block' : 'none'; };
-    canvas.on('path:created', (e) => {
-      try {
-        const p = e.path;
-        if (!p) return;
-        if (state.mode === 'draw') {
-          p.erasable = true;
-        } else if (state.mode === 'erase' && fabric && fabric.EraserBrush) {
-          p.selectable = false;
-          p.evented = false;
-          p.excludeFromExport = true;
-          p.isEraser = true;
-        }
-      } catch {}
-    });
-
-    
-
-    function intersectsRect(obj, rx, ry, rw, rh) {
-      const b = obj.getBoundingRect(false, true);
-      return !(b.left > rx + rw || b.left + b.width < rx || b.top > ry + rh || b.top + b.height < ry);
-    }
-    function stampEraseAtCanvas(x, y) {
-      try {
-        const size = Number(state.eraseSize) || 80;
-        const r = new fabric.Rect({ left: x - size/2, top: y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false });
-        r.globalCompositeOperation = 'destination-out';
-        r.isEraser = true;
-        r.excludeFromExport = false;
-        canvas.add(r);
-        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
-      } catch {}
-    }
-
-    let draggingErase = false; let draggingPan = false; let lastScreenX = 0; let lastScreenY = 0;
-    function getPointerScreen(opt) {
-      try {
-        const e = opt && opt.e ? opt.e : opt;
-        const rect = canvas.upperCanvasEl.getBoundingClientRect();
-        const cx = (e && (e.clientX != null ? e.clientX : (e.touches && e.touches[0] && e.touches[0].clientX))) || 0;
-        const cy = (e && (e.clientY != null ? e.clientY : (e.touches && e.touches[0] && e.touches[0].clientY))) || 0;
-        const x = cx - rect.left;
-        const y = cy - rect.top;
-        return { x, y };
-      } catch { return { x: 0, y: 0 }; }
-    }
-    function getPointerCanvas(opt) {
-      try {
-        const p = getPointerScreen(opt);
-        if (fabric && fabric.util && fabric.Point && typeof fabric.util.invertTransform === 'function' && typeof fabric.util.transformPoint === 'function') {
-          const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]);
-          const tp = fabric.util.transformPoint(new fabric.Point(p.x, p.y), inv);
-          return { x: tp.x, y: tp.y };
-        }
-        return p;
-      } catch { return { x: 0, y: 0 }; }
-    }
-    canvas.on('mouse:down', (opt) => {
-      const e = opt.e;
-      if (state.mode === 'erase' && e.button === 0) {
-        if (!(fabric && fabric.EraserBrush)) {
-          const p = getPointerCanvas(opt);
-          stampEraseAtCanvas(p.x, p.y);
-          draggingErase = true;
-          e.preventDefault(); e.stopPropagation();
-        }
-      }
-      if ((state.mode === 'pan' && e.button === 0) || (state.twoFingerPan && e.button === 1)) { draggingPan = true; const sp = getPointerScreen(opt); lastScreenX = sp.x; lastScreenY = sp.y; }
-    });
-    canvas.on('mouse:move', (opt) => {
-      const e = opt.e;
-      const sp = getPointerScreen(opt);
-      resizeEraseCursor(state.eraseSize);
-      const half = (Number(state.eraseSize) || 80) / 2;
-      eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`;
-      if (draggingErase && !(fabric && fabric.EraserBrush)) { const p = getPointerCanvas(opt); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
-      if (draggingPan) {
-        const dx = (typeof e.movementX === 'number') ? e.movementX : (sp.x - lastScreenX);
-        const dy = (typeof e.movementY === 'number') ? e.movementY : (sp.y - lastScreenY);
-        lastScreenX = sp.x; lastScreenY = sp.y;
-        if (fabric && fabric.Point && typeof canvas.relativePan === 'function') {
-          canvas.relativePan(new fabric.Point(dx, dy));
-        } else {
-          const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt);
-        }
-      }
-    });
-    canvas.on('mouse:up', () => { draggingErase = false; draggingPan = false; });
-
-    canvas.on('mouse:wheel', (opt) => {
-      const e = opt.e; let delta = e.deltaY; let zoom = canvas.getZoom(); zoom *= 0.999 ** delta;
-      zoom = Math.max(0.2, Math.min(3, zoom));
-      const p = typeof canvas.getPointer === 'function' ? canvas.getPointer(e) : { x: e.offsetX, y: e.offsetY };
-      canvas.zoomToPoint(new fabric.Point(p.x, p.y), zoom);
-      resizeEraseCursor(state.eraseSize);
-      opt.e.preventDefault(); opt.e.stopPropagation();
-    });
-
-    canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
-      if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); }
-      else if (state.twoFingerPan && e.touches.length === 2) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); }
-      else if (state.mode === 'erase' && e.touches.length >= 1) { if (!(fabric && fabric.EraserBrush)) { const p = touchPointToCanvas(e.touches[0]); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); } }
-    }, { passive: false });
-    canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
-      if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) {
-        const sp = getPointerScreen({ e });
-        const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y;
-        if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); }
-        else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); }
-        e.preventDefault();
-      } else if (state.mode === 'erase' && e.touches.length >= 1) {
-        if (!(fabric && fabric.EraserBrush)) { const p = touchPointToCanvas(e.touches[0]); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); }
-      }
-    }, { passive: false });
-    canvas.upperCanvasEl.addEventListener('touchend', () => { draggingPan = false; }, { passive: false });
-
-    const selTools = document.createElement('div');
-    selTools.id = 'selTools';
-    selTools.innerHTML = '<button id="toolClone"><i class="ri-file-copy-2-line"></i> 克隆</button><button id="toolDelete"><i class="ri-delete-bin-6-line"></i> 删除</button><button id="toolCloneNew"><i class="ri-pages-line"></i> 克隆到新页面</button>';
-    board.appendChild(selTools);
-    function positionSelTools(obj) {
-      try {
-        const br = obj.getBoundingRect(false, true);
-        const vt = canvas.viewportTransform || [1,0,0,1,0,0];
-        const tl = fabric.util.transformPoint(new fabric.Point(br.left, br.top), vt);
-        const brp = fabric.util.transformPoint(new fabric.Point(br.left + br.width, br.top + br.height), vt);
-        const left = Math.max(8, Math.min(tl.x, brp.x));
-        const top = Math.min(board.getBoundingClientRect().height - 40, Math.max(tl.y, brp.y) + 6);
-        selTools.style.left = left + 'px';
-        selTools.style.top = top + 'px';
-      } catch {}
-    }
-    function hideSelTools() { selTools.style.display = 'none'; }
-    function showSelTools(obj) { positionSelTools(obj); selTools.style.display = 'flex'; }
-    canvas.on('selection:created', (e) => { const o = e.selected && e.selected[0]; if (o) showSelTools(o); });
-    canvas.on('selection:updated', (e) => { const o = e.selected && e.selected[0]; if (o) showSelTools(o); });
-    canvas.on('selection:cleared', () => hideSelTools());
-    canvas.on('object:moving', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
-    canvas.on('object:scaling', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
-    canvas.on('object:rotating', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
-    canvas.on('after:render', () => { const o = canvas.getActiveObject(); if (o && selTools.style.display === 'flex') positionSelTools(o); });
-    async function cloneObject(o) {
-      try {
-        if (!o) return null;
-        let target = o;
-        if (target.type === 'activeSelection' && typeof target.toGroup === 'function') {
-          try { target = target.toGroup(); } catch {}
-        }
-        if (typeof target.clone !== 'function') return null;
-        if (target.clone.length > 0) {
-          return await new Promise((resolve) => { try { target.clone((cl) => resolve(cl)); } catch { resolve(null); } });
-        } else {
-          const res = target.clone();
-          if (res && typeof res.then === 'function') { return await res; }
-          return res || null;
-        }
-      } catch { return null; }
-    }
-    selTools.querySelector('#toolClone').addEventListener('click', async () => {
-      const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; cl.left = (o.left||0) + 10; cl.top = (o.top||0) + 10; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
-    });
-    selTools.querySelector('#toolDelete').addEventListener('click', () => { const o = canvas.getActiveObject(); if (!o) return; canvas.remove(o); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools(); });
-    selTools.querySelector('#toolCloneNew').addEventListener('click', async () => {
-      const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; savePageSnapshot(); if (state.pageIndex >= state.pages.length - 1) state.pages.push(null); state.pageIndex++; loadPageSnapshot(state.pageIndex); cl.left = 40; cl.top = 40; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools();
-    });
-
-    function updateBgButtonsActive() {
-      const c = state.bgColor || canvas.backgroundColor || 'transparent';
-      document.getElementById('bgWhite').classList.toggle('active', c === '#ffffff');
-      document.getElementById('bgDark').classList.toggle('active', c === '#121212');
-      document.getElementById('bgDeepGreen').classList.toggle('active', c === '#0b3d2e');
-    }
-    function setBackgroundColor(color) {
-      state.bgColor = color;
-      try { canvas.setBackgroundColor(color, () => { updateBgButtonsActive(); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }); }
-      catch { canvas.backgroundColor = color; updateBgButtonsActive(); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); }
-    }
-    document.getElementById('bgWhite').addEventListener('click', () => setBackgroundColor('#ffffff'));
-    document.getElementById('bgDark').addEventListener('click', () => setBackgroundColor('#121212'));
-    document.getElementById('bgDeepGreen').addEventListener('click', () => setBackgroundColor('#0b3d2e'));
-
-    setMode('draw');
-    updateEraseCursorVis();
-    updateBgButtonsActive();
-
-    const pagePreview = document.getElementById('pagePreview');
-    function deletePage(i) {
-      try {
-        if (state.pages.length <= 1) { state.pages = [null]; state.pageThumbs = [null]; state.pageIndex = 0; loadPageSnapshot(0); return; }
-        state.pages.splice(i, 1);
-        state.pageThumbs.splice(i, 1);
-        if (state.pageIndex >= state.pages.length) state.pageIndex = state.pages.length - 1;
-        loadPageSnapshot(state.pageIndex);
-        buildPagePreview();
-      } catch {}
-    }
-    function buildPagePreview() {
-      try {
-        pagePreview.innerHTML = '';
-        const list = document.createElement('div'); list.className = 'list';
-        const count = Math.max(state.pages.length, state.pageIndex + 1);
-        for (let i = 0; i < count; i++) {
-          const d = document.createElement('div'); d.className = 'thumb';
-          const img = document.createElement('img'); img.src = state.pageThumbs[i] || '';
-          const lab = document.createElement('span'); lab.className = 'label'; lab.textContent = String(i + 1);
-          const del = document.createElement('button'); del.className = 'del'; del.innerHTML = '<i class="ri-delete-bin-6-line"></i>'; del.addEventListener('click', (ev) => { ev.stopPropagation(); deletePage(i); });
-          d.appendChild(img); d.appendChild(lab); d.appendChild(del);
-          d.addEventListener('click', () => { savePageSnapshot(); state.pageIndex = i; loadPageSnapshot(i); hidePagePreview(); });
-          list.appendChild(d);
-        }
-        pagePreview.appendChild(list);
-        const f = document.createElement('div'); f.className = 'footer';
-        const btn = document.createElement('button'); btn.innerHTML = '<i class="ri-arrow-down-s-line"></i> 收起'; btn.addEventListener('click', () => hidePagePreview());
-        f.appendChild(btn);
-        pagePreview.appendChild(f);
-      } catch {}
-    }
-    function showPagePreview() { try { buildPagePreview(); pagePreview.style.display = 'flex'; } catch {} }
-    function hidePagePreview() { pagePreview.style.display = 'none'; }
-    document.getElementById('pageLabel').addEventListener('click', () => { if (pagePreview.style.display === 'flex') hidePagePreview(); else showPagePreview(); });
-    document.addEventListener('mousedown', (e) => { const vis = pagePreview.style.display === 'flex'; if (vis) { const within = pagePreview.contains(e.target) || document.getElementById('pageLabel').contains(e.target); if (!within) hidePagePreview(); } });
-
-    const perTouchBrushes = {};
-    function touchPointToCanvas(tp) {
-      const rect = canvas.upperCanvasEl.getBoundingClientRect();
-      const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top;
-      const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]);
-      const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv);
-      return { x: pt.x, y: pt.y };
-    }
-    canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
-      if (state.mode === 'draw' && !state.twoFingerPan && e.touches.length > 1) {
-        e.preventDefault();
-        for (let i = 0; i < e.touches.length; i++) {
-          const t = e.touches[i]; const id = t.identifier;
-          if (!perTouchBrushes[id]) { const b = new fabric.PencilBrush(canvas); b.color = penColor.value; b.width = Number(penWidth.value); b.decimate = 2; perTouchBrushes[id] = b; }
-          const p = touchPointToCanvas(t); try { perTouchBrushes[id].onMouseDown(p); } catch {}
-        }
-      }
-    }, { passive: false });
-    canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
-      if (state.mode === 'draw' && !state.twoFingerPan && e.touches.length > 1) {
-        e.preventDefault();
-        for (let i = 0; i < e.touches.length; i++) {
-          const t = e.touches[i]; const id = t.identifier; const p = touchPointToCanvas(t); try { if (perTouchBrushes[id]) perTouchBrushes[id].onMouseMove(p); } catch {}
-        }
-      }
-    }, { passive: false });
-    canvas.upperCanvasEl.addEventListener('touchend', (e) => {
-      if (state.mode === 'draw' && !state.twoFingerPan) {
-        try {
-          if (e.changedTouches) {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-              const t = e.changedTouches[i]; const id = t.identifier; try { if (perTouchBrushes[id]) perTouchBrushes[id].onMouseUp(); } catch {} delete perTouchBrushes[id];
-            }
+      } catch { }
+      if (!fabric.EraserBrush) {
+        class EraserBrush extends fabric.PencilBrush {
+          constructor(canvas) {
+            super(canvas);
+            this.inverted = false;
           }
-        } catch {}
+          _setBrushStyles(ctx = this.canvas.contextTop) {
+            super._setBrushStyles(ctx);
+            ctx.strokeStyle = 'black';
+          }
+          createPath(pathData) {
+            const path = super.createPath(pathData);
+            const alpha = new fabric.Color(this.color).getAlpha();
+            path.set(this.inverted ? {
+              globalCompositeOperation: 'source-over',
+              stroke: 'white'
+            } : {
+              globalCompositeOperation: 'destination-out',
+              stroke: 'black',
+              opacity: alpha
+            });
+            return path;
+          }
+        }
+        fabric.EraserBrush = EraserBrush;
       }
-    }, { passive: false });
+      const board = document.getElementById('board');
+      const el = document.createElement('canvas');
+      el.style.position = 'absolute'; el.style.inset = '0';
+      board.appendChild(el);
+      const canvas = new fabric.Canvas(el, {
+        isDrawingMode: true,
+        selection: false,
+        backgroundColor: 'transparent',
+        preserveObjectStacking: true
+      });
+      const canvasEl = (typeof canvas.getElement === 'function') ? canvas.getElement() : (canvas.lowerCanvasEl || null);
+
+      function fit() {
+        const r = board.getBoundingClientRect();
+        const w = Math.floor(r.width);
+        const h = Math.floor(r.height);
+        if (typeof canvas.setDimensions === 'function') {
+          canvas.setDimensions({ width: w, height: h });
+        } else {
+          if (typeof canvas.setWidth === 'function') canvas.setWidth(w);
+          else if (canvasEl) canvasEl.width = w;
+          if (typeof canvas.setHeight === 'function') canvas.setHeight(h);
+          else if (canvasEl) canvasEl.height = h;
+        }
+        if (typeof canvas.requestRenderAll === 'function') canvas.requestRenderAll();
+        else if (typeof canvas.renderAll === 'function') canvas.renderAll();
+      }
+      window.addEventListener('resize', fit);
+      window.addEventListener('load', fit);
+      setTimeout(fit, 0);
+
+      const state = {
+        mode: 'draw',
+        twoFingerPan: false,
+        eraseSize: 80,
+        pages: [],
+        pageIndex: 0,
+        bgColor: '#121212',
+        pageThumbs: [],
+        pageHistories: [],
+        pageHistoryIndex: []
+      };
+      const popup = document.getElementById('popup');
+      const penSettings = document.getElementById('penSettings');
+      const eraserSettings = document.getElementById('eraserSettings');
+      const savePanel = document.getElementById('savePanel');
+      function showPopup(which, anchorEl) {
+        penSettings.style.display = which === 'pen' ? 'flex' : 'none';
+        eraserSettings.style.display = which === 'eraser' ? 'flex' : 'none';
+        boardSettingsPanel.style.display = which === 'board' ? 'flex' : 'none';
+        savePanel.style.display = which === 'save' ? 'flex' : 'none';
+        popup.style.display = 'flex';
+        try {
+          const defaultId = which === 'pen' ? 'modeDraw' : (which === 'eraser' ? 'modeErase' : (which === 'board' ? 'boardSettings' : 'btnSave'));
+          const rect = anchorEl ? anchorEl.getBoundingClientRect() : document.getElementById(defaultId).getBoundingClientRect();
+          const px = Math.max(12, rect.left);
+          const ph = popup.offsetHeight || 48;
+          const py = Math.max(12, rect.top - ph - 20);
+          popup.style.left = px + 'px';
+          popup.style.top = py + 'px';
+        } catch { }
+      }
+      function hidePopup() { popup.style.display = 'none'; }
+      document.addEventListener('mousedown', (e) => {
+        try {
+          if (popup.style.display === 'flex') {
+            const within = popup.contains(e.target) || document.getElementById('modeDraw').contains(e.target) || document.getElementById('modeErase').contains(e.target);
+            if (!within) hidePopup();
+          }
+        } catch { }
+      });
+
+      let currentBrush = null;
+      function setMode(m) {
+        state.mode = m;
+        document.getElementById('modeDraw').classList.toggle('active', m === 'draw');
+        document.getElementById('modeSelect').classList.toggle('active', m === 'select');
+        document.getElementById('modePan').classList.toggle('active', m === 'pan');
+        document.getElementById('modeErase').classList.toggle('active', m === 'erase');
+        if (m === 'draw') {
+          canvas.isDrawingMode = true;
+          canvas.selection = false;
+          canvas.getObjects().forEach(o => o.selectable = false);
+          if (!(currentBrush instanceof fabric.PencilBrush)) {
+            try { currentBrush = new fabric.PencilBrush(canvas); } catch { try { currentBrush = new fabric.PencilBrush({ canvas }); } catch { } }
+            if (!currentBrush) currentBrush = new fabric.PencilBrush(canvas);
+            currentBrush.color = penColor.value;
+            currentBrush.width = currentPenWidth;
+            currentBrush.decimate = 2;
+          }
+          canvas.freeDrawingBrush = currentBrush;
+          hidePopup();
+        } else if (m === 'select') {
+          canvas.isDrawingMode = false;
+          canvas.selection = true;
+          canvas.skipTargetFind = false;
+          canvas.getObjects().forEach(o => {
+            const isEraser = (o.isEraser === true) || (o.globalCompositeOperation === 'destination-out');
+            o.selectable = !isEraser;
+            o.evented = !isEraser;
+            o.lockMovementX = false;
+            o.lockMovementY = false;
+          });
+          hidePopup();
+        } else if (m === 'pan') {
+          canvas.isDrawingMode = false;
+          canvas.selection = false;
+          canvas.getObjects().forEach(o => o.selectable = false);
+          canvas.skipTargetFind = true;
+          hidePopup();
+        } else if (m === 'erase') {
+          canvas.selection = false;
+          canvas.skipTargetFind = true;
+          canvas.getObjects().forEach(o => { o.selectable = false; o.erasable = true; });
+          try { canvas.discardActiveObject(); } catch { }
+          let eBrush = null;
+          try { if (fabric && fabric.EraserBrush) eBrush = new fabric.EraserBrush(canvas); } catch { }
+          if (eBrush) {
+            eBrush.width = Number(state.eraseSize) || 80;
+            eBrush.strokeLineCap = 'round';
+            eBrush.strokeLineJoin = 'round';
+            eBrush.inverted = eraseInverted;
+            eBrush.shadow = null;
+            canvas.freeDrawingBrush = eBrush;
+            canvas.isDrawingMode = true;
+          } else {
+            canvas.isDrawingMode = false;
+          }
+          if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+          showPopup('eraser');
+        }
+      }
+
+      function getCurrentHistory() {
+        if (!state.pageHistories[state.pageIndex]) state.pageHistories[state.pageIndex] = [];
+        if (typeof state.pageHistoryIndex[state.pageIndex] !== 'number') state.pageHistoryIndex[state.pageIndex] = -1;
+        return { arr: state.pageHistories[state.pageIndex], idxRef: state.pageHistoryIndex, i: state.pageIndex };
+      }
+      function getCanvasJSON() {
+        try { return JSON.stringify(canvas.toJSON()); } catch { return null; }
+      }
+      function updateUndoRedoUI() {
+        const { arr, idxRef, i } = getCurrentHistory();
+        const canUndo = (idxRef[i] > 0);
+        const canRedo = (idxRef[i] >= 0 && idxRef[i] < arr.length - 1);
+        undoBtn.classList.toggle('disabled', !canUndo);
+        redoBtn.classList.toggle('disabled', !canRedo);
+      }
+      function recordHistory() {
+        try {
+          const { arr, idxRef, i } = getCurrentHistory();
+          const snap = getCanvasJSON();
+          if (!snap) return;
+          if (idxRef[i] >= 0 && idxRef[i] < arr.length - 1) arr.splice(idxRef[i] + 1);
+          arr.push(snap);
+          idxRef[i] = arr.length - 1;
+          if (arr.length > 50) { arr.splice(0, arr.length - 50); idxRef[i] = arr.length - 1; }
+          updateUndoRedoUI();
+        } catch { }
+      }
+      let restoring = false;
+      async function restoreFromHistory(toIndex) {
+        try {
+          const { arr, idxRef, i } = getCurrentHistory();
+          const json = arr[toIndex];
+          if (!json) return;
+          restoring = true;
+          canvas.clear();
+          canvas.loadFromJSON(JSON.parse(json), () => {
+            try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch { }
+            try { setMode(state.mode); } catch { }
+            try { if (state.mode === 'erase' && typeof fabric !== 'undefined' && fabric.EraserBrush) { if (!(canvas.freeDrawingBrush instanceof fabric.EraserBrush)) { const eb = new fabric.EraserBrush(canvas); eb.width = Number(state.eraseSize) || 80; eb.strokeLineCap = 'round'; eb.strokeLineJoin = 'round'; eb.inverted = false; eb.shadow = null; canvas.freeDrawingBrush = eb; } canvas.isDrawingMode = true; canvas.selection = false; canvas.skipTargetFind = true; } } catch { }
+            try { fit(); } catch { }
+            if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+            restoring = false;
+            idxRef[i] = toIndex;
+            updateUndoRedoUI();
+          });
+        } catch { restoring = false; }
+      }
+      function undo() { const { idxRef, i } = getCurrentHistory(); if (idxRef[i] > 0) restoreFromHistory(idxRef[i] - 1); }
+      function redo() { const { arr, idxRef, i } = getCurrentHistory(); if (idxRef[i] >= 0 && idxRef[i] < arr.length - 1) restoreFromHistory(idxRef[i] + 1); }
+
+
+      let brush = null;
+      try { brush = new fabric.PencilBrush(canvas); } catch { try { brush = new fabric.PencilBrush({ canvas }); } catch { } }
+      if (!brush) brush = new fabric.PencilBrush(canvas);
+      brush.color = '#ffffff';
+      brush.width = 6;
+      brush.decimate = 2;
+      canvas.freeDrawingBrush = brush;
+
+      const penColor = document.getElementById('penColor');
+      const penWidths = document.getElementById('penWidths');
+      const eraseSizes = document.getElementById('eraseSizes');
+      const clearPageBtn = document.getElementById('clearPage');
+      const boardSettingsBtn = document.getElementById('boardSettings');
+      const boardSettingsPanel = document.getElementById('boardSettingsPanel');
+      const btnClose = document.getElementById('btnClose');
+      const btnMin = document.getElementById('btnMin');
+      const btnSave = document.getElementById('btnSave');
+      const undoBtn = document.getElementById('undoBtn');
+      const redoBtn = document.getElementById('redoBtn');
+      const penPalette = document.getElementById('penPalette');
+      const paletteBtns = penPalette ? penPalette.querySelectorAll('button[data-color]') : [];
+      function updatePenPaletteSelection() {
+        try {
+          const cur = String(penColor.value || '').toLowerCase();
+          paletteBtns.forEach((b) => {
+            const c = String(b.getAttribute('data-color') || '').toLowerCase();
+            b.style.outline = c === cur ? '2px solid #fff' : 'none';
+          });
+        } catch { }
+      }
+      penColor.addEventListener('input', () => { canvas.freeDrawingBrush.color = penColor.value; });
+      penColor.addEventListener('input', () => { updatePenPaletteSelection(); });
+      let currentPenWidth = 6;
+      const penWidthButtons = penWidths ? penWidths.querySelectorAll('button[data-penw]') : [];
+      penWidthButtons.forEach((b) => {
+        b.addEventListener('click', () => {
+          const v = Number(b.getAttribute('data-penw'));
+          currentPenWidth = v;
+          penWidthButtons.forEach(x => x.classList.toggle('active', x === b));
+          try { if (state.mode === 'draw' && canvas.freeDrawingBrush) canvas.freeDrawingBrush.width = v; } catch { }
+        });
+      });
+      paletteBtns.forEach((b) => {
+        b.addEventListener('click', () => {
+          const c = b.getAttribute('data-color');
+          if (!c) return;
+          penColor.value = c;
+          try { canvas.freeDrawingBrush.color = c; } catch { }
+          updatePenPaletteSelection();
+        });
+      });
+      const eraseSizeButtons = eraseSizes ? eraseSizes.querySelectorAll('button[data-erasesz]') : [];
+      eraseSizeButtons.forEach((b) => {
+        b.addEventListener('click', () => {
+          const v = Number(b.getAttribute('data-erasesz'));
+          state.eraseSize = v;
+          eraseSizeButtons.forEach(x => x.classList.toggle('active', x === b));
+          resizeEraseCursor(state.eraseSize);
+          try {
+            if (state.mode === 'erase' && fabric && fabric.EraserBrush && canvas.freeDrawingBrush && (canvas.freeDrawingBrush instanceof fabric.EraserBrush)) {
+              canvas.freeDrawingBrush.width = state.eraseSize;
+            }
+          } catch { }
+        });
+      });
+      let eraseInverted = false;
+      const invertEraseBtn = document.getElementById('invertErase');
+      if (invertEraseBtn) invertEraseBtn.addEventListener('click', () => {
+        eraseInverted = !eraseInverted;
+        invertEraseBtn.classList.toggle('active', eraseInverted);
+        try {
+          if (state.mode === 'erase' && canvas.freeDrawingBrush && (canvas.freeDrawingBrush instanceof fabric.EraserBrush)) {
+            canvas.freeDrawingBrush.inverted = eraseInverted;
+          }
+        } catch { }
+      });
+
+      clearPageBtn.addEventListener('click', () => {
+        const bg = canvas.backgroundColor;
+        canvas.clear();
+        if (bg) setBackgroundColor(bg);
+        setMode('draw');
+        state.pages[state.pageIndex] = null;
+        if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+        try { hideSelTools(); } catch { }
+        try { hidePopup(); } catch { }
+        try { updateEraseCursorVis(); } catch { }
+        try { recordHistory(); } catch { }
+      });
+
+      const btnDraw = document.getElementById('modeDraw');
+      const btnErase = document.getElementById('modeErase');
+      const btnPan = document.getElementById('modePan');
+      document.getElementById('modeDraw').addEventListener('click', (ev) => {
+        if (state.mode !== 'draw') { setMode('draw'); hidePopup(); }
+        else { if (popup.style.display === 'flex') hidePopup(); else showPopup('pen', btnDraw); }
+        updateEraseCursorVis();
+      });
+      document.getElementById('modeSelect').addEventListener('click', () => { hidePopup(); setMode('select'); updateEraseCursorVis(); });
+      document.getElementById('modeErase').addEventListener('click', (ev) => {
+        if (state.mode !== 'erase') { setMode('erase'); hidePopup(); }
+        else { if (popup.style.display === 'flex') hidePopup(); else showPopup('eraser', btnErase); }
+        updateEraseCursorVis();
+      });
+      boardSettingsBtn.addEventListener('click', (ev) => {
+        if (popup.style.display === 'flex' && boardSettingsPanel.style.display === 'flex') { hidePopup(); }
+        else { showPopup('board', boardSettingsBtn); }
+      });
+      if (btnClose) btnClose.style.display = (showCloseParam === '0') ? 'none' : 'inline-flex';
+      if (btnMin) btnMin.style.display = (showMinParam === '0') ? 'none' : 'inline-flex';
+      if (btnSave) btnSave.style.display = (showSaveParam === '0') ? 'none' : 'inline-flex';
+      if (btnClose) btnClose.addEventListener('click', () => { try { if (window.annotateAPI && typeof window.annotateAPI.close === 'function') { window.annotateAPI.close(); } else { window.close(); } } catch { } });
+      if (btnMin) btnMin.addEventListener('click', () => {
+        try {
+          savePageSnapshot(); savePackIfNeeded();
+          const raw = JSON.stringify({ pages: state.pages, bg: state.bgColor });
+          if (window.annotateAPI && typeof window.annotateAPI.saveJSON === 'function') {
+            window.annotateAPI.saveJSON(persistFile, raw);
+          }
+          if (window.annotateAPI && typeof window.annotateAPI.close === 'function') {
+            window.annotateAPI.close();
+          } else { window.close(); }
+        } catch { }
+      });
+      if (btnSave) btnSave.addEventListener('click', () => { if (popup.style.display === 'flex' && savePanel.style.display === 'flex') { hidePopup(); } else { showPopup('save', btnSave); } });
+      btnPan.addEventListener('click', () => { setMode('pan'); hidePopup(); updateEraseCursorVis(); });
+      undoBtn.addEventListener('click', () => { undo(); });
+      redoBtn.addEventListener('click', () => { redo(); });
+      document.getElementById('toggleTwoFinger').addEventListener('click', () => {
+        state.twoFingerPan = !state.twoFingerPan;
+        document.getElementById('toggleTwoFinger').classList.toggle('active', state.twoFingerPan);
+      });
+
+      function savePageSnapshot() {
+        try {
+          state.pages[state.pageIndex] = canvas.toJSON();
+          try {
+            const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 });
+            state.pageThumbs[state.pageIndex] = url;
+          } catch { }
+        } catch { }
+      }
+      function getTotalPages() { return Math.max(state.pages.length, state.pageIndex + 1); }
+      function updatePageLabel() { document.getElementById('pageLabel').textContent = `${state.pageIndex + 1}/${getTotalPages()}`; }
+      function savePackIfNeeded() {
+        try {
+          const pack = { pages: state.pages, bg: state.bgColor };
+          if (persistFile && window.annotateAPI && typeof window.annotateAPI.saveJSON === 'function') {
+            window.annotateAPI.saveJSON(persistFile, JSON.stringify(pack));
+          } else if (persistKey) {
+            localStorage.setItem('wb.persist.' + persistKey, JSON.stringify(pack));
+          }
+        } catch { }
+      }
+      async function loadPackIfAny() {
+        try {
+          let raw = null;
+          if (persistFile && window.annotateAPI && typeof window.annotateAPI.loadJSON === 'function') {
+            raw = await window.annotateAPI.loadJSON(persistFile);
+          } else if (persistKey) {
+            raw = localStorage.getItem('wb.persist.' + persistKey);
+          }
+          if (!raw) return false;
+          const obj = JSON.parse(raw);
+          if (!obj || !Array.isArray(obj.pages)) return false;
+          state.pages = obj.pages;
+          state.pageThumbs = new Array(state.pages.length).fill(null);
+          if (obj.bg) state.bgColor = obj.bg;
+          return true;
+        } catch { return false; }
+      }
+      function loadPageSnapshot(i) {
+        const data = state.pages[i];
+        canvas.clear();
+        if (data) {
+          restoring = true;
+          canvas.loadFromJSON(data, () => { try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch { } canvas.renderAll(); setMode(state.mode); try { if (state.mode === 'erase' && typeof fabric !== 'undefined' && fabric.EraserBrush) { if (!(canvas.freeDrawingBrush instanceof fabric.EraserBrush)) { const eb = new fabric.EraserBrush(canvas); eb.width = Number(state.eraseSize) || 80; eb.strokeLineCap = 'round'; eb.strokeLineJoin = 'round'; eb.inverted = false; eb.shadow = null; canvas.freeDrawingBrush = eb; } canvas.isDrawingMode = true; canvas.selection = false; canvas.skipTargetFind = true; } } catch { } setTimeout(() => { fit(); if (canvas.requestRenderAll) canvas.requestRenderAll(); }, 0); restoring = false; const { arr, idxRef } = getCurrentHistory(); arr.length = 0; const snap = getCanvasJSON(); if (snap) { arr.push(snap); const pi = state.pageIndex; idxRef[pi] = 0; } updateUndoRedoUI(); });
+        } else {
+          try { setBackgroundColor(state.bgColor); } catch { }
+          if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+          try {
+            if (state.mode === 'erase' && typeof fabric !== 'undefined' && fabric.EraserBrush) {
+              if (!(canvas.freeDrawingBrush instanceof fabric.EraserBrush)) {
+                const eb = new fabric.EraserBrush(canvas);
+                eb.width = Number(state.eraseSize) || 80;
+                eb.strokeLineCap = 'round';
+                eb.strokeLineJoin = 'round';
+                eb.inverted = false;
+                eb.shadow = null;
+                canvas.freeDrawingBrush = eb;
+              }
+              canvas.isDrawingMode = true; canvas.selection = false; canvas.skipTargetFind = true;
+            }
+          } catch { }
+          const { arr, idxRef } = getCurrentHistory(); arr.length = 0; const snap = getCanvasJSON(); if (snap) { arr.push(snap); const pi = state.pageIndex; idxRef[pi] = 0; } updateUndoRedoUI();
+        }
+        updatePageLabel();
+        try {
+          if (!state.pageThumbs[i]) {
+            const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 });
+            state.pageThumbs[i] = url;
+          }
+        } catch { }
+        savePackIfNeeded();
+      }
+      document.getElementById('prevPage').addEventListener('click', () => {
+        savePageSnapshot();
+        if (state.pageIndex > 0) state.pageIndex--;
+        loadPageSnapshot(state.pageIndex);
+      });
+      document.getElementById('nextPage').addEventListener('click', () => {
+        savePageSnapshot();
+        if (state.pageIndex >= state.pages.length - 1) state.pages.push(null);
+        state.pageIndex++;
+        loadPageSnapshot(state.pageIndex);
+      });
+      if (!(await loadPackIfAny())) { state.pages.push(null); state.pageThumbs.push(null); }
+      loadPageSnapshot(0);
+      setInterval(() => { try { savePageSnapshot(); savePackIfNeeded(); } catch { } }, 3000);
+
+      function download(filename, content, mime) {
+        const a = document.createElement('a');
+        a.download = filename;
+        a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }
+      document.getElementById('exportPNG').addEventListener('click', () => {
+        const url = canvas.toDataURL({ format: 'png', multiplier: 1 });
+        const a = document.createElement('a');
+        a.download = `annotation-page-${state.pageIndex + 1}.png`;
+        a.href = url;
+        a.click();
+      });
+      document.getElementById('exportJSON').addEventListener('click', () => {
+        const json = JSON.stringify(canvas.toJSON());
+        download(`annotation-page-${state.pageIndex + 1}.wbjson`, json, 'application/json');
+      });
+      document.getElementById('importJSON').addEventListener('click', () => {
+        document.getElementById('importFile').value = '';
+        document.getElementById('importFile').click();
+      });
+      document.getElementById('importFile').addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try { const data = JSON.parse(String(reader.result || '{}')); canvas.clear(); canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); }); } catch { }
+        };
+        reader.readAsText(f);
+      });
+
+      const eraseCursor = document.createElement('div');
+      eraseCursor.id = 'eraseCursor';
+      board.appendChild(eraseCursor);
+      function resizeEraseCursor(size) {
+        const px = Math.max(10, Math.floor(Number(size) || 80));
+        eraseCursor.style.width = px + 'px';
+        eraseCursor.style.height = px + 'px';
+        eraseCursor.style.borderRadius = '50%';
+        eraseCursor.style.border = '2px dashed #ffd166';
+        eraseCursor.style.boxShadow = '0 0 0 1px #000, 0 0 0 3px #fff';
+        eraseCursor.style.mixBlendMode = 'difference';
+        eraseCursor.style.zIndex = '1000';
+      }
+      resizeEraseCursor(state.eraseSize);
+      eraseCursor.style.display = 'none';
+      const updateEraseCursorVis = () => { eraseCursor.style.display = (state.mode === 'erase') ? 'block' : 'none'; };
+      canvas.on('path:created', (e) => {
+        try {
+          const p = e.path;
+          if (!p) return;
+          if (state.mode === 'draw') {
+            p.erasable = true;
+            setTimeout(() => { if (!restoring) { try { recordHistory(); } catch { } updateUndoRedoUI(); } }, 0);
+          } else if (state.mode === 'erase' && fabric && fabric.EraserBrush) {
+            p.selectable = false;
+            p.evented = false;
+            p.isEraser = true;
+            setTimeout(() => { if (!restoring) { try { recordHistory(); } catch { } updateUndoRedoUI(); } }, 0);
+          }
+        } catch { }
+      });
+
+
+
+      function intersectsRect(obj, rx, ry, rw, rh) {
+        const b = obj.getBoundingRect(false, true);
+        return !(b.left > rx + rw || b.left + b.width < rx || b.top > ry + rh || b.top + b.height < ry);
+      }
+      let squareEraseRects = [];
+      function stampEraseAtCanvas(x, y) {
+        try {
+          const size = Number(state.eraseSize) || 80;
+          const r = new fabric.Rect({ left: x - size / 2, top: y - size / 2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false });
+          r.globalCompositeOperation = 'destination-out';
+          r.isEraser = true;
+          canvas.add(r);
+          squareEraseRects.push(r);
+          if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+        } catch { }
+      }
+
+
+      let draggingErase = false; let draggingPan = false; let lastScreenX = 0; let lastScreenY = 0;
+      function getPointerScreen(opt) {
+        try {
+          const e = opt && opt.e ? opt.e : opt;
+          const rect = canvas.upperCanvasEl.getBoundingClientRect();
+          const cx = (e && (e.clientX != null ? e.clientX : (e.touches && e.touches[0] && e.touches[0].clientX))) || 0;
+          const cy = (e && (e.clientY != null ? e.clientY : (e.touches && e.touches[0] && e.touches[0].clientY))) || 0;
+          const x = cx - rect.left;
+          const y = cy - rect.top;
+          return { x, y };
+        } catch { return { x: 0, y: 0 }; }
+      }
+      function getPointerCanvas(opt) {
+        try {
+          const p = getPointerScreen(opt);
+          if (fabric && fabric.util && fabric.Point && typeof fabric.util.invertTransform === 'function' && typeof fabric.util.transformPoint === 'function') {
+            const inv = fabric.util.invertTransform(canvas.viewportTransform || [1, 0, 0, 1, 0, 0]);
+            const tp = fabric.util.transformPoint(new fabric.Point(p.x, p.y), inv);
+            return { x: tp.x, y: tp.y };
+          }
+          return p;
+        } catch { return { x: 0, y: 0 }; }
+      }
+      canvas.on('mouse:down', (opt) => {
+        const e = opt.e;
+        if (state.mode === 'erase' && e.button === 0) {
+          if (!(fabric && fabric.EraserBrush)) {
+            const p = getPointerCanvas(opt);
+            stampEraseAtCanvas(p.x, p.y);
+            draggingErase = true;
+            e.preventDefault(); e.stopPropagation();
+          }
+        }
+        if ((state.mode === 'pan' && e.button === 0) || (state.twoFingerPan && e.button === 1)) { draggingPan = true; const sp = getPointerScreen(opt); lastScreenX = sp.x; lastScreenY = sp.y; }
+      });
+      canvas.on('mouse:move', (opt) => {
+        const e = opt.e;
+        const sp = getPointerScreen(opt);
+        resizeEraseCursor(state.eraseSize);
+        const half = (Number(state.eraseSize) || 80) / 2;
+        eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`;
+        if (draggingErase && !(fabric && fabric.EraserBrush)) { const p = getPointerCanvas(opt); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); e.stopPropagation(); }
+        if (draggingPan) {
+          const dx = (typeof e.movementX === 'number') ? e.movementX : (sp.x - lastScreenX);
+          const dy = (typeof e.movementY === 'number') ? e.movementY : (sp.y - lastScreenY);
+          lastScreenX = sp.x; lastScreenY = sp.y;
+          if (fabric && fabric.Point && typeof canvas.relativePan === 'function') {
+            canvas.relativePan(new fabric.Point(dx, dy));
+          } else {
+            const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt);
+          }
+        }
+      });
+      canvas.on('mouse:up', () => { if (state.mode === 'erase' && !restoring) { try { recordHistory(); } catch { } } draggingErase = false; draggingPan = false; updateUndoRedoUI(); });
+
+      canvas.on('mouse:wheel', (opt) => {
+        const e = opt.e; let delta = e.deltaY; let zoom = canvas.getZoom(); zoom *= 0.999 ** delta;
+        zoom = Math.max(0.2, Math.min(3, zoom));
+        const p = typeof canvas.getPointer === 'function' ? canvas.getPointer(e) : { x: e.offsetX, y: e.offsetY };
+        canvas.zoomToPoint(new fabric.Point(p.x, p.y), zoom);
+        resizeEraseCursor(state.eraseSize);
+        opt.e.preventDefault(); opt.e.stopPropagation();
+      });
+
+      canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
+        if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); }
+        else if (state.twoFingerPan && e.touches.length >= 2) { draggingPan = true; const sp = getPointerScreen({ e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); }
+        else if (state.mode === 'erase' && e.touches.length >= 1) { if (!(fabric && fabric.EraserBrush)) { const p = touchPointToCanvas(e.touches[0]); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); } }
+      }, { passive: false });
+      canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
+        if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) {
+          const sp = getPointerScreen({ e });
+          const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y;
+          if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); }
+          else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); }
+          e.preventDefault();
+        } else if (state.mode === 'erase' && e.touches.length >= 1) {
+          if (state.twoFingerPan && e.touches.length >= 2) { e.preventDefault(); }
+          else if (!(fabric && fabric.EraserBrush)) { const p = touchPointToCanvas(e.touches[0]); stampEraseAtCanvas(p.x, p.y); e.preventDefault(); }
+        }
+      }, { passive: false });
+      canvas.upperCanvasEl.addEventListener('touchend', (e) => { draggingPan = false; if ((state.mode === 'draw' || state.mode === 'erase') && !restoring) { try { recordHistory(); } catch { } } updateUndoRedoUI(); }, { passive: false });
+
+      const selTools = document.createElement('div');
+      selTools.id = 'selTools';
+      selTools.innerHTML = '<button id="toolClone"><i class="ri-file-copy-2-line"></i> 克隆</button><button id="toolDelete"><i class="ri-delete-bin-6-line"></i> 删除</button><button id="toolCloneNew"><i class="ri-pages-line"></i> 克隆到新页面</button>';
+      board.appendChild(selTools);
+      function positionSelTools(obj) {
+        try {
+          const br = obj.getBoundingRect(false, true);
+          const vt = canvas.viewportTransform || [1, 0, 0, 1, 0, 0];
+          const tl = fabric.util.transformPoint(new fabric.Point(br.left, br.top), vt);
+          const brp = fabric.util.transformPoint(new fabric.Point(br.left + br.width, br.top + br.height), vt);
+          const left = Math.max(8, Math.min(tl.x, brp.x));
+          const top = Math.min(board.getBoundingClientRect().height - 40, Math.max(tl.y, brp.y) + 6);
+          selTools.style.left = left + 'px';
+          selTools.style.top = top + 'px';
+        } catch { }
+      }
+      function hideSelTools() { selTools.style.display = 'none'; }
+      function showSelTools(obj) { positionSelTools(obj); selTools.style.display = 'flex'; }
+      canvas.on('selection:created', (e) => { const o = e.selected && e.selected[0]; if (o) showSelTools(o); });
+      canvas.on('selection:updated', (e) => { const o = e.selected && e.selected[0]; if (o) showSelTools(o); });
+      canvas.on('selection:cleared', () => hideSelTools());
+      canvas.on('object:moving', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
+      canvas.on('object:scaling', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
+      canvas.on('object:rotating', (e) => { const o = e.target; if (o && selTools.style.display === 'flex') positionSelTools(o); });
+      canvas.on('after:render', () => { const o = canvas.getActiveObject(); if (o && selTools.style.display === 'flex') positionSelTools(o); });
+      canvas.on('object:modified', () => { if (!restoring) { try { recordHistory(); } catch { } } updateUndoRedoUI(); });
+      async function cloneObject(o) {
+        try {
+          if (!o) return null;
+          let target = o;
+          if (target.type === 'activeSelection' && typeof target.toGroup === 'function') {
+            try { target = target.toGroup(); } catch { }
+          }
+          if (typeof target.clone !== 'function') return null;
+          if (target.clone.length > 0) {
+            return await new Promise((resolve) => { try { target.clone((cl) => resolve(cl)); } catch { resolve(null); } });
+          } else {
+            const res = target.clone();
+            if (res && typeof res.then === 'function') { return await res; }
+            return res || null;
+          }
+        } catch { return null; }
+      }
+      selTools.querySelector('#toolClone').addEventListener('click', async () => {
+        const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; cl.left = (o.left || 0) + 10; cl.top = (o.top || 0) + 10; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); try { recordHistory(); } catch { }
+      });
+      selTools.querySelector('#toolDelete').addEventListener('click', () => { const o = canvas.getActiveObject(); if (!o) return; canvas.remove(o); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools(); try { recordHistory(); } catch { } });
+      selTools.querySelector('#toolCloneNew').addEventListener('click', async () => {
+        const o = canvas.getActiveObject(); if (!o) return; const cl = await cloneObject(o); if (!cl) return; savePageSnapshot(); if (state.pageIndex >= state.pages.length - 1) state.pages.push(null); state.pageIndex++; loadPageSnapshot(state.pageIndex); cl.left = 40; cl.top = 40; canvas.add(cl); canvas.setActiveObject(cl); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); hideSelTools(); try { recordHistory(); } catch { }
+      });
+
+      function updateBgButtonsActive() {
+        const c = state.bgColor || canvas.backgroundColor || 'transparent';
+        document.getElementById('bgWhite').classList.toggle('active', c === '#ffffff');
+        document.getElementById('bgDark').classList.toggle('active', c === '#121212');
+        document.getElementById('bgDeepGreen').classList.toggle('active', c === '#0b3d2e');
+      }
+      function setBackgroundColor(color) {
+        state.bgColor = color;
+        try { canvas.setBackgroundColor(color, () => { updateBgButtonsActive(); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); try { recordHistory(); } catch { } }); }
+        catch { canvas.backgroundColor = color; updateBgButtonsActive(); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); try { recordHistory(); } catch { } }
+      }
+      document.getElementById('bgWhite').addEventListener('click', () => setBackgroundColor('#ffffff'));
+      document.getElementById('bgDark').addEventListener('click', () => setBackgroundColor('#121212'));
+      document.getElementById('bgDeepGreen').addEventListener('click', () => setBackgroundColor('#0b3d2e'));
+
+      setMode('draw');
+      updateEraseCursorVis();
+      updateBgButtonsActive();
+
+      const pagePreview = document.getElementById('pagePreview');
+      function deletePage(i) {
+        try {
+          if (state.pages.length <= 1) { state.pages = [null]; state.pageThumbs = [null]; state.pageIndex = 0; loadPageSnapshot(0); return; }
+          state.pages.splice(i, 1);
+          state.pageThumbs.splice(i, 1);
+          if (state.pageIndex >= state.pages.length) state.pageIndex = state.pages.length - 1;
+          loadPageSnapshot(state.pageIndex);
+          buildPagePreview();
+        } catch { }
+      }
+      function buildPagePreview() {
+        try {
+          pagePreview.innerHTML = '';
+          const list = document.createElement('div'); list.className = 'list';
+          const count = Math.max(state.pages.length, state.pageIndex + 1);
+          for (let i = 0; i < count; i++) {
+            const d = document.createElement('div'); d.className = 'thumb';
+            const img = document.createElement('img'); img.src = state.pageThumbs[i] || '';
+            const lab = document.createElement('span'); lab.className = 'label'; lab.textContent = String(i + 1);
+            const del = document.createElement('button'); del.className = 'del'; del.innerHTML = '<i class="ri-delete-bin-6-line"></i>'; del.addEventListener('click', (ev) => { ev.stopPropagation(); deletePage(i); });
+            d.appendChild(img); d.appendChild(lab); d.appendChild(del);
+            d.addEventListener('click', () => { savePageSnapshot(); state.pageIndex = i; loadPageSnapshot(i); hidePagePreview(); });
+            list.appendChild(d);
+          }
+          pagePreview.appendChild(list);
+          const f = document.createElement('div'); f.className = 'footer';
+          const btn = document.createElement('button'); btn.innerHTML = '<i class="ri-arrow-down-s-line"></i> 收起'; btn.addEventListener('click', () => hidePagePreview());
+          f.appendChild(btn);
+          pagePreview.appendChild(f);
+        } catch { }
+      }
+      function showPagePreview() { try { buildPagePreview(); pagePreview.style.display = 'flex'; } catch { } }
+      function hidePagePreview() { pagePreview.style.display = 'none'; }
+      document.getElementById('pageLabel').addEventListener('click', () => { if (pagePreview.style.display === 'flex') hidePagePreview(); else showPagePreview(); });
+      document.addEventListener('mousedown', (e) => { const vis = pagePreview.style.display === 'flex'; if (vis) { const within = pagePreview.contains(e.target) || document.getElementById('pageLabel').contains(e.target); if (!within) hidePagePreview(); } });
+
+      const perTouchBrushes = {};
+      function touchPointToCanvas(tp) {
+        const rect = canvas.upperCanvasEl.getBoundingClientRect();
+        const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top;
+        const inv = fabric.util.invertTransform(canvas.viewportTransform || [1, 0, 0, 1, 0, 0]);
+        const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv);
+        return { x: pt.x, y: pt.y };
+      }
+      canvas.upperCanvasEl.addEventListener('touchstart', (e) => {
+        if (state.mode === 'draw' && !state.twoFingerPan && e.touches.length > 1) {
+          e.preventDefault();
+          for (let i = 0; i < e.touches.length; i++) {
+            const t = e.touches[i]; const id = t.identifier;
+            if (!perTouchBrushes[id]) { const b = new fabric.PencilBrush(canvas); b.color = penColor.value; b.width = currentPenWidth; b.decimate = 2; perTouchBrushes[id] = b; }
+            const p = touchPointToCanvas(t); try { perTouchBrushes[id].onMouseDown(p); } catch { }
+          }
+        }
+      }, { passive: false });
+      canvas.upperCanvasEl.addEventListener('touchmove', (e) => {
+        if (state.mode === 'draw' && !state.twoFingerPan && e.touches.length > 1) {
+          e.preventDefault();
+          for (let i = 0; i < e.touches.length; i++) {
+            const t = e.touches[i]; const id = t.identifier; const p = touchPointToCanvas(t); try { if (perTouchBrushes[id]) perTouchBrushes[id].onMouseMove(p); } catch { }
+          }
+        }
+      }, { passive: false });
+      canvas.upperCanvasEl.addEventListener('touchend', (e) => {
+        if (state.mode === 'draw' && !state.twoFingerPan) {
+          try {
+            if (e.changedTouches) {
+              for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i]; const id = t.identifier; try { if (perTouchBrushes[id]) perTouchBrushes[id].onMouseUp(); } catch { } delete perTouchBrushes[id];
+              }
+            }
+          } catch { }
+        }
+      }, { passive: false });
     })();
-  </script>
+
+</script>
+  <script type="module" src="./js/whiteboard-main.js"></script>
 </body>
+
 </html>

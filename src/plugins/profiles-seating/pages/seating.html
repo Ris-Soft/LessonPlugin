@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>档案-座次表</title>
+    <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+    <link rel="stylesheet" href="../../../renderer/settings.css" />
+    <style>
+      :root { --panel: rgba(255,255,255,0.06); }
+      html, body { height: 100%; overflow: hidden; }
+      body { margin: 0; background: #0b1520; }
+      .wrap { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: auto 1fr; height: 100vh; padding-bottom: 88px; box-sizing: border-box; }
+      .top { grid-column: 1 / -1; padding: 12px 16px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+      .podium { border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px; padding: 10px 16px; color: var(--muted); }
+      .right { position: relative; overflow: hidden; }
+      .grid-wrap { height: calc(100% - 8px); margin: 4px 16px 16px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 8px; overflow: auto; background: rgba(255,255,255,0.03); }
+      .grid-layout { display: grid; grid-template-columns: 88px 1fr; grid-template-rows: auto 1fr; gap: 8px; }
+      .grid { display: grid; gap: 6px; }
+      .cell { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; min-height: 64px; display: flex; align-items: center; justify-content: center; position: relative; }
+      .cell.aisle { background: rgba(255,255,255,0.02); border-style: dashed; }
+      .cell.selected { outline: 2px solid rgba(255,255,255,0.25); }
+      .cell .name { font-weight: 600; }
+      .cell .menu { position: absolute; right: 6px; top: 6px; display: none; }
+      .cell:hover .menu { display: block; }
+      .menu button { margin-left: 6px; }
+      .sidebar { border-right: 1px solid rgba(255,255,255,0.06); padding: 12px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+      .sidebar h3 { margin: 4px 0 8px; font-size: 14px; color: var(--muted); }
+      .list { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow: auto; max-height: 60vh; }
+      .list::-webkit-scrollbar { width: 10px; height: 10px; }
+      .list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+      .list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 8px; }
+      .list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
+      .item { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 8px 10px; cursor: grab; -webkit-user-drag: element; user-select: none; }
+      
+      .item:active { cursor: grabbing; }
+      .headers { display: grid; gap: 6px; margin-bottom: 6px; }
+      #col-headers, #row-headers { position: relative; }
+      .row-header, .col-header { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 6px 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; }
+      .row-header.aisle, .col-header.aisle { background: rgba(255,255,255,0.02); border-style: dashed; }
+      .row-header.selected, .col-header.selected { outline: 2px solid rgba(255,255,255,0.25); }
+      .header-actions { display: flex; gap: 6px; }
+      .bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 16px; display: flex; justify-content: flex-end; align-items: center; }
+      .btn[disabled] { opacity: 0.5; pointer-events: none; }
+      .grid-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+      .grid-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+      .grid-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 8px; }
+      .grid-wrap::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
+      #markMenu { position: fixed; z-index: 10; background: rgba(20,20,20,0.95); color: #fff; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); padding: 6px 8px; display: none; }
+      #markMenu .btn { margin: 4px 6px; }
+      .wrap.no-sidebar { grid-template-columns: 1fr; }
+      .wrap.no-sidebar .sidebar { display: none; }
+      .side-label { color: var(--muted); font-weight: 600; }
+      .add-col-header, .add-row-header, .add-col-cell, .add-row-cell { background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.25); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+      .add-col-header button, .add-row-header button, .add-col-cell button, .add-row-cell button { display:flex; align-items:center; justify-content:center; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="side-label">左</div>
+        <div class="podium">讲台</div>
+        <div class="side-label">右</div>
+      </div>
+      <div class="sidebar">
+        <h3><i class="ri-user-unfollow-line"></i> 无座学生</h3>
+        <div id="free-list" class="list"></div>
+      </div>
+      <div class="right">
+        <div class="grid-wrap">
+          <div class="grid-layout">
+            <div></div>
+            <div id="col-headers" class="headers"></div>
+            <div id="row-headers" class="headers"></div>
+            <div id="grid" class="grid"></div>
+          </div>
+          <div id="markMenu"><button id="mark-normal-menu" class="btn secondary"><i class="ri-layout-grid-line"></i> 标记为新排</button><button id="mark-aisle-menu" class="btn secondary"><i class="ri-subtract-line"></i> 标记为过道</button><button id="delete-menu" class="btn danger"><i class="ri-delete-bin-line"></i> 删除</button></div>
+        </div>
+        <div class="bottom">
+          <div style="display:flex; gap:8px;">
+            <button id="btn-mark-aisle" class="btn secondary"><i class="ri-subtract-line"></i> 标记为过道</button>
+            <button id="btn-mark-normal" class="btn secondary"><i class="ri-layout-grid-line"></i> 标记为新排</button>
+            <button id="btn-delete" class="btn danger" style="display:none"><i class="ri-delete-bin-line"></i> 删除选中</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let channel = '';
+      let caller = '';
+      let students = [];
+      let config = { rows: [], cols: [], seats: {} };
+      let selectedRowIndex = -1;
+      let selectedColIndex = -1;
+      let showFreeList = true;
+      let skipNextRefresh = false;
+
+      function seatKey(ri, ci) { const r = config.rows[ri]?.id; const c = config.cols[ci]?.id; return r && c ? `${r}-${c}` : ''; }
+      function isAisleRow(i) { return (config.rows[i]?.type || '') === 'aisle'; }
+      function isAisleCol(i) { return (config.cols[i]?.type || '') === 'aisle'; }
+      function occupantNameAt(ri, ci) { const k = seatKey(ri, ci); const o = config.seats[k]; return o && typeof o === 'object' ? (o.name || '') : ''; }
+      function setOccupantAt(ri, ci, name) { const k = seatKey(ri, ci); if (!k) return; if (!name) { delete config.seats[k]; return; } config.seats[k] = { name }; }
+
+      async function loadStudents() {
+        let list = [];
+        if (window.lowbarAPI?.pluginCall) {
+          let res = await window.lowbarAPI.pluginCall?.('profiles.students', 'getStudents');
+          res = res?.result || res;
+          list = Array.isArray(res?.students) ? res.students : [];
+        } else if (window.pluginAPI?.configGet) {
+          await window.pluginAPI?.configEnsureDefaults('profiles', { students: [] });
+          const arr = await window.pluginAPI?.configGet('profiles', 'students');
+          list = Array.isArray(arr) ? arr : [];
+        }
+        students = list.map(s => ({ ...s, name: String(s?.name || '') }));
+        renderFreeList();
+      }
+
+      async function loadConfig() {
+        if (window.lowbarAPI?.pluginCall) {
+          let res = await window.lowbarAPI.pluginCall?.(caller, 'getConfig');
+          res = res?.result || res;
+          const cfg = res?.config || {};
+          config.rows = Array.isArray(cfg.rows) ? cfg.rows : [];
+          config.cols = Array.isArray(cfg.cols) ? cfg.cols : [];
+          config.seats = typeof cfg.seats === 'object' && cfg.seats ? cfg.seats : {};
+          
+        } else {
+          await window.pluginAPI?.configEnsureDefaults('profiles.seating', { rows: [], cols: [], seats: {}, backgroundStatus: '默认' });
+          const all = await window.pluginAPI?.configGetAll?.('profiles.seating');
+          config.rows = Array.isArray(all?.rows) ? all.rows : [];
+          config.cols = Array.isArray(all?.cols) ? all.cols : [];
+          config.seats = typeof all?.seats === 'object' && all.seats ? all.seats : {};
+          
+        }
+        renderHeaders();
+        renderGrid();
+        renderFreeList();
+      }
+
+      
+
+      function renderHeaders() {
+        const colH = document.getElementById('col-headers');
+        const rowH = document.getElementById('row-headers');
+        colH.style.gridTemplateColumns = `repeat(${config.cols.length}, 1fr) 64px`;
+        rowH.style.gridTemplateRows = `repeat(${config.rows.length}, 64px) 64px`;
+        colH.innerHTML = '';
+        rowH.innerHTML = '';
+        const colDisplay = [];
+        let colNum = 0;
+        for (let ci = 0; ci < config.cols.length; ci++) { if ((config.cols[ci]?.type || 'col') !== 'aisle') { colNum++; colDisplay[ci] = colNum; } else { colDisplay[ci] = null; } }
+        config.cols.forEach((col, ci) => {
+          const d = document.createElement('div');
+          d.className = `col-header${col.type==='aisle' ? ' aisle' : ''}`;
+          const t = document.createElement('div'); t.textContent = col.type==='aisle' ? '|' : String(colDisplay[ci] || '');
+          d.appendChild(t);
+          d.addEventListener('click', (ev) => { selectedColIndex = ci; selectedRowIndex = -1; highlightSelection(); showMarkMenuAtEvent(ev, 'col', ci); });
+          d.draggable = true;
+          d.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/col-index', String(ci)); });
+          d.addEventListener('dragover', (e) => { e.preventDefault(); });
+          d.addEventListener('drop', (e) => { const from = parseInt(e.dataTransfer.getData('text/col-index')); if (Number.isFinite(from)) { const to = ci; const item = config.cols.splice(from,1)[0]; config.cols.splice(to,0,item); renderHeaders(); renderGrid(); }});
+          colH.appendChild(d);
+        });
+        const addColHeader = document.createElement('div');
+        addColHeader.className = 'add-col-header';
+        const addColBtn = document.createElement('button');
+        addColBtn.className = 'btn secondary';
+        addColBtn.innerHTML = '<i class="ri-add-line"></i>';
+        addColBtn.addEventListener('click', insertColRight);
+        addColHeader.appendChild(addColBtn);
+        colH.appendChild(addColHeader);
+        const rowDisplay = [];
+        let rowNum = 0;
+        for (let ri = 0; ri < config.rows.length; ri++) { if ((config.rows[ri]?.type || 'row') !== 'aisle') { rowNum++; rowDisplay[ri] = rowNum; } else { rowDisplay[ri] = null; } }
+        config.rows.forEach((row, ri) => {
+          const d = document.createElement('div');
+          d.className = `row-header${row.type==='aisle' ? ' aisle' : ''}`;
+          const t = document.createElement('div'); t.textContent = row.type==='aisle' ? '—' : String(rowDisplay[ri] || '');
+          d.appendChild(t);
+          d.addEventListener('click', (ev) => { selectedRowIndex = ri; selectedColIndex = -1; highlightSelection(); showMarkMenuAtEvent(ev, 'row', ri); });
+          d.draggable = true;
+          d.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/row-index', String(ri)); });
+          d.addEventListener('dragover', (e) => { e.preventDefault(); });
+          d.addEventListener('drop', (e) => { const from = parseInt(e.dataTransfer.getData('text/row-index')); if (Number.isFinite(from)) { const to = ri; const item = config.rows.splice(from,1)[0]; config.rows.splice(to,0,item); renderHeaders(); renderGrid(); }});
+          rowH.appendChild(d);
+        });
+        const addRowHeader = document.createElement('div');
+        addRowHeader.className = 'add-row-header';
+        const addRowBtn = document.createElement('button');
+        addRowBtn.className = 'btn secondary';
+        addRowBtn.innerHTML = '<i class="ri-add-line"></i>';
+        addRowBtn.addEventListener('click', insertRowDown);
+        addRowHeader.appendChild(addRowBtn);
+        rowH.appendChild(addRowHeader);
+        highlightSelection();
+      }
+
+      function renderGrid() {
+        const g = document.getElementById('grid');
+        g.style.gridTemplateColumns = `repeat(${config.cols.length}, 1fr) 64px`;
+        g.style.gridTemplateRows = `repeat(${config.rows.length}, 64px) 64px`;
+        g.innerHTML = '';
+        for (let ri = 0; ri < config.rows.length; ri++) {
+          for (let ci = 0; ci < config.cols.length; ci++) {
+            const cell = document.createElement('div');
+            const aisle = isAisleRow(ri) || isAisleCol(ci);
+            const selected = (ri === selectedRowIndex) || (ci === selectedColIndex);
+            cell.className = `cell${aisle ? ' aisle' : ''}${selected ? ' selected' : ''}`;
+            cell.dataset.ri = String(ri);
+            cell.dataset.ci = String(ci);
+            const name = occupantNameAt(ri, ci);
+            const span = document.createElement('span'); span.className = 'name'; span.textContent = name || '';
+            cell.appendChild(span);
+            const menu = document.createElement('div'); menu.className = 'menu';
+            const btnSwap = document.createElement('button'); btnSwap.className = 'btn secondary'; btnSwap.innerHTML = '<i class="ri-swap-line"></i> 调位';
+            btnSwap.addEventListener('click', () => beginSwap(ri, ci));
+            const btnRemove = document.createElement('button'); btnRemove.className = 'btn danger'; btnRemove.innerHTML = '<i class="ri-close-line"></i> 移除';
+            btnRemove.addEventListener('click', () => { setOccupantAt(ri, ci, ''); renderGrid(); renderFreeList(); });
+            menu.appendChild(btnSwap); menu.appendChild(btnRemove);
+            cell.appendChild(menu);
+            cell.draggable = !!name;
+            cell.addEventListener('dragstart', (e) => { const nm = occupantNameAt(ri, ci); if (nm) { e.dataTransfer.setData('text/student', nm); e.dataTransfer.setData('text/plain', nm); e.dataTransfer.setData('text', nm); e.dataTransfer.setData('Text', nm); e.dataTransfer.setData('text/from', `${ri},${ci}`); e.dataTransfer.effectAllowed = 'copyMove'; } });
+            cell.addEventListener('dragenter', (e) => { e.preventDefault(); });
+            cell.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); try { e.dataTransfer.dropEffect = 'move'; } catch {} });
+            cell.addEventListener('drop', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              let nm = String(e.dataTransfer.getData('text/student')||'');
+              if (!nm) nm = String(e.dataTransfer.getData('text/plain')||'');
+              if (!nm) nm = String(e.dataTransfer.getData('text')||'');
+              if (!nm) nm = String(e.dataTransfer.getData('Text')||'');
+              const from = String(e.dataTransfer.getData('text/from')||'');
+              const toRi = ri, toCi = ci;
+              if (nm) {
+                if (from) {
+                  const parts = from.split(',');
+                  if (parts.length === 2) {
+                    const fri = parseInt(parts[0]); const fci = parseInt(parts[1]);
+                    const prev = occupantNameAt(toRi, toCi);
+                    setOccupantAt(toRi, toCi, nm);
+                    setOccupantAt(fri, fci, prev);
+                  }
+                } else {
+                  setOccupantAt(toRi, toCi, nm);
+                }
+                renderGrid(); renderFreeList();
+              }
+            });
+            g.appendChild(cell);
+          }
+          const addColCell = document.createElement('div');
+          addColCell.className = 'add-col-cell';
+          
+          g.appendChild(addColCell);
+        }
+        const addRowCell = document.createElement('div');
+        addRowCell.className = 'add-row-cell';
+        addRowCell.style.gridColumn = '1 / -1';
+        g.appendChild(addRowCell);
+      }
+
+      function renderFreeList() {
+        const box = document.getElementById('free-list');
+        box.innerHTML = '';
+        const assigned = new Set(Object.values(config.seats).map(v => String(v?.name||''))).
+          add('');
+        const free = students.filter(s => !assigned.has(String(s.name || '')));
+        if (!showFreeList) { updateFreeListVisibility(); return; } else { updateFreeListVisibility(); }
+        free.forEach(s => {
+          const d = document.createElement('div'); d.className = 'item'; d.textContent = s.name || '';
+          d.setAttribute('draggable','true');
+          d.addEventListener('dragstart', (e) => { const nm = String(s.name||''); e.dataTransfer.setData('text/student', nm); e.dataTransfer.setData('text/plain', nm); e.dataTransfer.setData('text', nm); e.dataTransfer.setData('Text', nm); try { e.dataTransfer.effectAllowed = 'copy'; } catch {} try { e.dataTransfer.setDragImage(d, 10, 10); } catch {} });
+          box.appendChild(d);
+        });
+      }
+
+      function updateFreeListVisibility() {
+        const wrap = document.querySelector('.wrap');
+        const sidebar = document.querySelector('.sidebar');
+        if (!wrap || !sidebar) return;
+        if (!showFreeList) { wrap.classList.add('no-sidebar'); sidebar.style.display = 'none'; }
+        else { wrap.classList.remove('no-sidebar'); sidebar.style.display = 'flex'; }
+      }
+
+      let swapFrom = null;
+      function beginSwap(ri, ci) { swapFrom = { ri, ci }; }
+      function applySwap(toRi, toCi) {
+        if (!swapFrom) return;
+        const fromName = occupantNameAt(swapFrom.ri, swapFrom.ci);
+        const toName = occupantNameAt(toRi, toCi);
+        setOccupantAt(swapFrom.ri, swapFrom.ci, toName);
+        setOccupantAt(toRi, toCi, fromName);
+        swapFrom = null;
+        renderGrid(); renderFreeList();
+      }
+
+      document.addEventListener('click', (e) => {
+        if (!swapFrom) return;
+        const t = e.target;
+        const cell = t && (t.closest && t.closest('.cell'));
+        if (cell) { const ri = parseInt(cell.dataset.ri); const ci = parseInt(cell.dataset.ci); applySwap(ri, ci); }
+      });
+
+      function insertColRight() {
+        const idx = config.cols.length - 1;
+        const next = { id: `c${Date.now()}`, label: '新列', type: 'col' };
+        config.cols.splice(idx + 1, 0, next);
+        renderHeaders(); renderGrid();
+      }
+      function insertRowDown() {
+        const idx = config.rows.length - 1;
+        const next = { id: `r${Date.now()}`, label: '新排', type: 'row' };
+        config.rows.splice(idx + 1, 0, next);
+        renderHeaders(); renderGrid();
+      }
+      function markAisle() {
+        if (selectedRowIndex >= 0) { config.rows[selectedRowIndex].type = 'aisle'; renderHeaders(); renderGrid(); }
+        if (selectedColIndex >= 0) { config.cols[selectedColIndex].type = 'aisle'; renderHeaders(); renderGrid(); }
+      }
+      function markNormal() {
+        if (selectedRowIndex >= 0) { config.rows[selectedRowIndex].type = 'row'; renderHeaders(); renderGrid(); }
+        if (selectedColIndex >= 0) { config.cols[selectedColIndex].type = 'col'; renderHeaders(); renderGrid(); }
+      }
+      function deleteSelected() {
+        if (selectedRowIndex >= 0) {
+          const ri = selectedRowIndex;
+          const names = [];
+          for (let ci = 0; ci < config.cols.length; ci++) { const nm = occupantNameAt(ri, ci); if (nm) names.push(nm); delete config.seats[seatKey(ri, ci)]; }
+          if (names.length) alert(`删除前存在学生：${names.join('、')}，请重新分配`);
+          config.rows.splice(ri, 1);
+          selectedRowIndex = -1;
+          renderHeaders(); renderGrid(); renderFreeList();
+          return;
+        }
+        if (selectedColIndex >= 0) {
+          const ci = selectedColIndex;
+          const names = [];
+          for (let ri = 0; ri < config.rows.length; ri++) { const nm = occupantNameAt(ri, ci); if (nm) names.push(nm); delete config.seats[seatKey(ri, ci)]; }
+          if (names.length) alert(`删除前存在学生：${names.join('、')}，请重新分配`);
+          config.cols.splice(ci, 1);
+          selectedColIndex = -1;
+          renderHeaders(); renderGrid(); renderFreeList();
+        }
+        updateDeleteButton();
+      }
+
+      function updateDeleteButton() {
+        const btn = document.getElementById('btn-delete');
+        const hasSel = selectedRowIndex >= 0 || selectedColIndex >= 0;
+        if (!btn) return;
+        btn.disabled = !hasSel;
+        btn.style.display = hasSel ? 'inline-flex' : 'none';
+      }
+
+      function highlightSelection() {
+        // 标记选中的表头
+        document.querySelectorAll('.row-header').forEach((el, idx) => { el.classList.toggle('selected', idx === selectedRowIndex); });
+        document.querySelectorAll('.col-header').forEach((el, idx) => { el.classList.toggle('selected', idx === selectedColIndex); });
+        // 网格在渲染时已为选中的行/列添加 .selected
+        renderGrid();
+      }
+
+      function showMarkMenuAtEvent(ev, type, index) {
+        const menu = document.getElementById('markMenu');
+        if (!menu) return;
+        menu.style.display = 'block';
+        const vw = window.innerWidth || 1200;
+        const vh = window.innerHeight || 800;
+        const mw = menu.offsetWidth || 160;
+        const mh = menu.offsetHeight || 60;
+        const x = Math.min(Math.max(8, ev.clientX), vw - mw - 8);
+        const y = Math.min(Math.max(8, ev.clientY + 6), vh - mh - 8);
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        const applyNormal = () => { if (type==='row') { config.rows[index].type = 'row'; } else { config.cols[index].type = 'col'; } renderHeaders(); renderGrid(); hideMarkMenu(); };
+        const applyAisle = () => { if (type==='row') { config.rows[index].type = 'aisle'; } else { config.cols[index].type = 'aisle'; } renderHeaders(); renderGrid(); hideMarkMenu(); };
+        const btnN = document.getElementById('mark-normal-menu');
+        const btnA = document.getElementById('mark-aisle-menu');
+        const btnD = document.getElementById('delete-menu');
+        btnN.onclick = applyNormal;
+        btnA.onclick = applyAisle;
+        btnD.onclick = () => { if (type==='row') { selectedRowIndex = index; selectedColIndex = -1; } else { selectedColIndex = index; selectedRowIndex = -1; } deleteSelected(); hideMarkMenu(); };
+        const onDoc = (e) => { if (!menu.contains(e.target)) { hideMarkMenu(); document.removeEventListener('mousedown', onDoc); } };
+        document.addEventListener('mousedown', onDoc);
+      }
+      function hideMarkMenu() { const menu = document.getElementById('markMenu'); if (menu) menu.style.display = 'none'; }
+
+      async function saveAll() {
+        if (window.lowbarAPI?.pluginCall) {
+          await window.lowbarAPI.pluginCall?.(caller, 'saveConfig', { rows: config.rows, cols: config.cols, seats: config.seats });
+          skipNextRefresh = true;
+          await loadConfig();
+        } else if (window.pluginAPI?.configSet) {
+          await window.pluginAPI?.configSet('profiles.seating', 'rows', config.rows);
+          await window.pluginAPI?.configSet('profiles.seating', 'cols', config.cols);
+          await window.pluginAPI?.configSet('profiles.seating', 'seats', config.seats);
+          await loadConfig();
+        }
+      }
+
+      function toggleFreeList() { showFreeList = !showFreeList; renderFreeList(); }
+
+      function bindBottom() {
+        document.getElementById('btn-mark-aisle')?.addEventListener('click', markAisle);
+        document.getElementById('btn-mark-normal')?.addEventListener('click', markNormal);
+      }
+
+      (async function init() {
+        try { const u = new URL(window.location.href); channel = String(u.searchParams.get('channel')||''); caller = String(u.searchParams.get('caller')||''); } catch {}
+        bindBottom();
+        if (window.lowbarAPI) {
+          window.lowbarAPI.subscribe?.(channel);
+          window.lowbarAPI.onEvent?.((name, payload) => {
+            if (name !== channel) return;
+            if (payload?.type === 'update') {
+              if (payload.target === 'refresh') { if (skipNextRefresh) { skipNextRefresh = false; } else { loadConfig(); } }
+              if (payload.target === 'seating.save') { saveAll(); }
+              if (payload.target === 'freeList.toggle') { toggleFreeList(); }
+            }
+          });
+        }
+        await loadStudents();
+        await loadConfig();
+      })();
+    </script>
+  </body>
+</html>
