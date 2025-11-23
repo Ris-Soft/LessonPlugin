@@ -238,8 +238,7 @@ class AutomationManager {
       } else {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.desktop';
         shortcutPath = path.join(desktop, safeFile);
-        const execBin = process.env.APPIMAGE || process.execPath;
-        const execLine = `Exec=${execBin} LessonPlugin://task/${encodeURIComponent(protoText)}`;
+        const execLine = `Exec=xdg-open "LessonPlugin://task/${encodeURIComponent(protoText)}"`;
         const iconLine = pngOk ? `Icon=${pngPath}` : '';
         const content = `[Desktop Entry]\nType=Application\nName=${name}\n${execLine}\n${iconLine}\nTerminal=false\nCategories=Utility;\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
