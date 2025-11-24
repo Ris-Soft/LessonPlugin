@@ -81,8 +81,7 @@ const functions = {
   onLowbarEvent: async (payload = {}) => {
     try {
       if (!payload || typeof payload !== 'object') return true;
-      // 广播原始事件到 Webview（开发者可直接在前端订阅处理）
-      try { pluginApi.emit(state.eventChannel, payload); } catch {}
+      
       if (payload.type === 'click') {
         // 七个悬浮窗入口
         if (payload.id === 'listen') {
@@ -137,6 +136,8 @@ const functions = {
           emitUpdate('centerItems', state.defaultCenterItems);
         } else if (payload.id === 'carousel-toggle-cn') {
           pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'toggle-cn' });
+        } else if (payload.id === 'open-carousel-settings' || payload.id === 'carousel-settings') {
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'settings' });
         } else if (payload.id === 'allwords-sort-time') {
           pluginApi.emit(state.eventChannel, { type: 'control', action: 'allwords', cmd: 'sort-time' });
         } else if (payload.id === 'allwords-sort-alpha') {
@@ -162,9 +163,11 @@ const functions = {
           // 总结页退出：返回首页并恢复默认底栏
           emitUpdate('backgroundUrl', state.backgroundHome);
           emitUpdate('centerItems', state.defaultCenterItems);
+        } else if (payload.id === 'check-start') {
+          // 从预览底栏触发检查开始，由轮播页执行跳转
+          pluginApi.emit(state.eventChannel, { type: 'control', action: 'carousel', cmd: 'start-check' });
         }
       } else if (payload.type === 'left.click') {
-        try { pluginApi.emit(state.eventChannel, payload); } catch {}
         if (payload.id === 'go-home') {
           emitUpdate('floatingUrl', null);
           emitUpdate('backgroundUrl', state.backgroundHome);

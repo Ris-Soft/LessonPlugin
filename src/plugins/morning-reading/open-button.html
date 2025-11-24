@@ -16,7 +16,7 @@
   <script>
     window.pluginAPI?.ui.ensureStyles();
     const btn = document.getElementById('btn-open');
-    let dragging = false; let sx=0, sy=0; let bx=0, by=0; let moved=false; let justDragged=false;
+    let dragging = false; let sx=0, sy=0; let bx=0, by=0; let moved=false; let justDragged=false; let rafScheduled = false; let nextX = 0, nextY = 0;
     btn.addEventListener('click',async(e)=>{ if (dragging || moved || justDragged) return; try{ await window.pluginAPI?.call('morning.reading','openBoard',[]); window.pluginAPI?.windowControl('close'); }catch{} });
     const onDown = async (e)=>{
       try{
@@ -29,21 +29,27 @@
         await window.pluginAPI?.call('morning.reading','setOpenButtonDragging',[true]);
       }catch{}
     };
-    const onMove = async (e)=>{
+    const onMove = (e)=>{
       if(!dragging) return;
       const dx = e.screenX - sx; const dy = e.screenY - sy;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
-      const nx = Math.floor(bx + dx); const ny = Math.floor(by + dy);
-      await window.pluginAPI?.call('morning.reading','moveOpenButtonTo',[nx,ny]);
+      nextX = Math.floor(bx + dx); nextY = Math.floor(by + dy);
+      if (!rafScheduled) {
+        rafScheduled = true;
+        requestAnimationFrame(() => {
+          rafScheduled = false;
+          const x = nextX; const y = nextY;
+          try { window.pluginAPI?.call('morning.reading','moveOpenButtonTo',[x,y]); } catch {}
+        });
+      }
     };
     const onUp = async (e)=>{
       try { btn.releasePointerCapture?.(e.pointerId); } catch {}
       dragging=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); }
       try{ await window.pluginAPI?.call('morning.reading','snapOpenButton',[]); await window.pluginAPI?.call('morning.reading','setOpenButtonDragging',[false]); }catch{}
+      try { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); } catch {}
     };
-    btn.addEventListener('pointerdown', onDown);
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    btn.addEventListener('pointerdown', (e)=>{ onDown(e); try { window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, { once: true }); } catch {} });
   </script>
 </body>
 </html>

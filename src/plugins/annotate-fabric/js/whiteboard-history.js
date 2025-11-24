@@ -4,7 +4,20 @@ export function createHistory(canvas, state, undoBtn, redoBtn, setMode, fitFn, b
     if (typeof state.pageHistoryIndex[state.pageIndex] !== 'number') state.pageHistoryIndex[state.pageIndex] = -1;
     return { arr: state.pageHistories[state.pageIndex], idxRef: state.pageHistoryIndex, i: state.pageIndex };
   }
-  function getCanvasJSON() { try { return JSON.stringify(canvas.toJSON()); } catch { return null; } }
+  function getCanvasJSON() {
+    try {
+      const base = canvas.toJSON();
+      const bg = canvas.backgroundColor || state.bgColor || '#121212';
+      const pack = {
+        data: base,
+        backgroundColor: bg,
+        viewportTransform: Array.isArray(canvas.viewportTransform) ? canvas.viewportTransform.slice() : null,
+        width: typeof canvas.getWidth === 'function' ? canvas.getWidth() : null,
+        height: typeof canvas.getHeight === 'function' ? canvas.getHeight() : null,
+      };
+      return JSON.stringify(pack);
+    } catch { return null; }
+  }
   function updateUndoRedoUI() {
     const { arr, idxRef, i } = getCurrentHistory();
     const canUndo = (idxRef[i] > 0);
@@ -18,6 +31,10 @@ export function createHistory(canvas, state, undoBtn, redoBtn, setMode, fitFn, b
       const snap = getCanvasJSON();
       if (!snap) return;
       if (idxRef[i] >= 0 && idxRef[i] < arr.length - 1) arr.splice(idxRef[i] + 1);
+      if (arr.length > 0) {
+        const last = arr[arr.length - 1];
+        if (typeof last === 'string' && last === snap) { updateUndoRedoUI(); return; }
+      }
       arr.push(snap);
       idxRef[i] = arr.length - 1;
       if (arr.length > 50) { arr.splice(0, arr.length - 50); idxRef[i] = arr.length - 1; }
@@ -32,12 +49,33 @@ export function createHistory(canvas, state, undoBtn, redoBtn, setMode, fitFn, b
       if (!json) return;
       restoring = true;
       canvas.clear();
-      canvas.loadFromJSON(JSON.parse(json), () => {
+      let parsed = null;
+      try { parsed = JSON.parse(json); } catch { parsed = null; }
+      const dataForCanvas = parsed && parsed.data && parsed.data.objects ? parsed.data : parsed;
+      if (!dataForCanvas) { restoring = false; return; }
+      canvas.loadFromJSON(dataForCanvas, () => {
         try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch {}
         try { setMode(state.mode); } catch {}
         try { if (state.mode === 'erase') { canvas.isDrawingMode = true; canvas.selection = false; canvas.skipTargetFind = true; } } catch {}
+        try {
+          const defaultBg = state.bgColor || canvas.backgroundColor || '#121212';
+          const toBg = (parsed && parsed.backgroundColor) ? parsed.backgroundColor : defaultBg;
+          const applyBg = (!toBg || toBg === 'transparent') ? defaultBg : toBg;
+          try { canvas.setBackgroundColor(applyBg, () => {}); }
+          catch { canvas.backgroundColor = applyBg; }
+        } catch {}
+        try {
+          if (parsed && parsed.viewportTransform && typeof canvas.setViewportTransform === 'function') {
+            canvas.setViewportTransform(parsed.viewportTransform);
+          }
+        } catch {}
         try { fitFn(board, canvas); } catch {}
         if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+        try {
+          const pi = i;
+          state.pages[pi] = canvas.toJSON();
+          try { const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 }); state.pageThumbs[pi] = url; } catch {}
+        } catch {}
         restoring = false;
         idxRef[i] = toIndex;
         updateUndoRedoUI();

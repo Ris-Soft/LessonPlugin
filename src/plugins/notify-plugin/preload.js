@@ -11,6 +11,8 @@
       },
       // 控制运行窗口显示/隐藏（空闲隐藏，有通知显示）
       setVisible: (visible) => ipcRenderer.invoke('notify:setVisible', !!visible),
+      // 空闲时销毁运行窗口以避免影响其它窗口拖动
+      destroyRuntime: () => ipcRenderer.invoke('notify:destroyRuntime'),
       // 运行窗口订阅主进程广播的配置更新，实现设置实时生效
       onConfigUpdate: (handler) => {
         try { ipcRenderer.on('notify:config:update', (_e, cfg) => handler && handler(cfg)); } catch {}

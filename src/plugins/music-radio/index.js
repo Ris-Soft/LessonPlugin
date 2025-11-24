@@ -10,7 +10,10 @@ const state = {
     settings: '',
     about: '',
     player: ''
-  }
+  },
+  currentFloatingUrl: null,
+  playlist: [],
+  currentIndex: -1
 };
 
 const functions = {
@@ -29,15 +32,16 @@ const functions = {
         eventChannel: state.eventChannel,
         subscribeTopics: [state.eventChannel],
         callerPluginId: 'radio.music',
+        width: 1680,
+        height: 960,
         floatingSizePercent: 60,
         floatingWidth: 860,
         floatingHeight: 520,
         centerItems: [
-          { id: 'tab-recommend', text: '推荐', icon: 'ri-thumb-up-line' },
+          // { id: 'tab-recommend', text: '推荐', icon: 'ri-thumb-up-line' },
           { id: 'tab-search', text: '搜索', icon: 'ri-search-line' },
-          { id: 'tab-player', text: '播放器', icon: 'ri-music-2-line' },
-          { id: 'tab-settings', text: '设置', icon: 'ri-settings-3-line' },
-          { id: 'tab-about', text: '关于', icon: 'ri-information-line' }
+          // { id: 'tab-settings', text: '设置', icon: 'ri-settings-3-line' },
+          // { id: 'tab-about', text: '关于', icon: 'ri-information-line' }
         ],
         leftItems: [],
         backgroundUrl: url.pathToFileURL(bgFile).href,
@@ -52,7 +56,74 @@ const functions = {
       state.pages.about = url.pathToFileURL(aboutFile).href;
 
       await pluginApi.call('ui.lowbar', 'openTemplate', [params]);
+      state.currentFloatingUrl = null;
       return true;
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  httpProxy: async (targetUrl = '', options = {}) => {
+    try {
+      const u = String(targetUrl || '').trim();
+      if (!u) return { ok: false, error: 'empty url' };
+      const parsed = new url.URL(u);
+      const wl = new Set(['search.kuwo.cn', 'newlyric.kuwo.cn']);
+      if (!wl.has(parsed.host)) return { ok: false, error: 'domain not allowed' };
+      const http = require('http');
+      const https = require('https');
+      const zlib = require('zlib');
+      const method = String(options.method || 'GET').toUpperCase();
+      const rawHeaders = options.headers && typeof options.headers === 'object' ? options.headers : {};
+      const headers = {};
+      for (const k of Object.keys(rawHeaders)) {
+        const lk = k.toLowerCase();
+        if (lk === 'host' || lk === 'referer' || lk === 'origin') continue;
+        headers[k] = rawHeaders[k];
+      }
+      if (!headers['Accept-Encoding']) headers['Accept-Encoding'] = 'gzip, deflate';
+      if (!headers['User-Agent']) headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+      if (!headers['Accept-Language']) headers['Accept-Language'] = 'zh-CN,zh;q=0.9';
+      const body = options.body;
+      async function fetchOnce(href){
+        const reqMod = href.startsWith('https:') ? https : http;
+        return await new Promise((resolve, reject) => {
+          const req = reqMod.request(href, { method, headers }, (res) => {
+            const chunks = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => {
+              try {
+                const status = res.statusCode || 0;
+                const redirect = status >= 300 && status < 400 && res.headers && res.headers.location;
+                const raw = Buffer.concat(chunks);
+                resolve({ status, headers: res.headers, contentBuffer: raw, redirect });
+              } catch (e) { reject(e); }
+            });
+          });
+          req.on('error', reject);
+          if (body && method !== 'GET' && method !== 'HEAD') {
+            if (Buffer.isBuffer(body)) req.write(body);
+            else req.write(String(body));
+          }
+          req.end();
+        });
+      }
+      let href = u; let redirects = 0;
+      while (redirects < 5) {
+        const r = await fetchOnce(href);
+        if (r.redirect) {
+          const nextUrl = new url.URL(r.redirect, href).href;
+          const nextParsed = new url.URL(nextUrl);
+          if (!wl.has(nextParsed.host)) return { ok: false, error: 'redirect domain not allowed', status: r.status };
+          href = nextUrl; redirects += 1; continue;
+        }
+        let buf = r.contentBuffer;
+        const enc = (r.headers['content-encoding']||'').toLowerCase();
+        if (enc.includes('gzip')) buf = zlib.gunzipSync(buf);
+        else if (enc.includes('deflate')) buf = zlib.inflateSync(buf);
+        const content = buf.toString('utf8');
+        return { ok: true, status: r.status, headers: r.headers, content };
+      }
+      return { ok: false, error: 'too many redirects' };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -62,45 +133,27 @@ const functions = {
       const q = String(keyword || '').trim();
       if (!q) return { ok: false, error: 'empty keyword' };
       const rn = 20;
-      const https = require('https');
-      const zlib = require('zlib');
       const buildUrl = (pn) => `https://search.kuwo.cn/r.s?all=${encodeURIComponent(q)}&pn=${pn}&rn=${rn}&vipver=100&ft=music&encoding=utf8&rformat=json&vermerge=1&mobi=1`;
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Referer': 'https://www.kuwo.cn/',
-        'Origin': 'https://www.kuwo.cn',
-        'Accept-Encoding': 'gzip, deflate'
-      };
       async function fetchJson(urlStr){
-        return await new Promise((resolve, reject) => {
-          https.get(urlStr, { headers }, (res) => {
-            const chunks = [];
-            res.on('data', (c) => chunks.push(c));
-            res.on('end', () => {
-              try {
-                let buf = Buffer.concat(chunks);
-                const enc = (res.headers['content-encoding']||'').toLowerCase();
-                if (enc.includes('gzip')) buf = zlib.gunzipSync(buf);
-                else if (enc.includes('deflate')) buf = zlib.inflateSync(buf);
-                let txt = buf.toString('utf8');
-                // 某些情况下返回含无效前后缀，尝试截取 JSON
-                if (txt.trim()[0] !== '{') {
-                  const s = txt.indexOf('{'); const e = txt.lastIndexOf('}');
-                  if (s >= 0 && e > s) txt = txt.slice(s, e+1);
-                }
-                const json = JSON.parse(txt);
-                resolve(json);
-              } catch (e) { reject(e); }
-            });
-          }).on('error', reject);
-        });
+        const res = await functions.httpProxy(urlStr, { method: 'GET', headers: { 'Accept': 'application/json, text/plain, */*' } });
+        const rawTxt = String(res && res.content ? res.content : '');
+        let txt = rawTxt;
+        if (txt.trim()[0] !== '{') {
+          const s = txt.indexOf('{'); const e = txt.lastIndexOf('}');
+          if (s >= 0 && e > s) txt = txt.slice(s, e+1);
+        }
+        let obj = null;
+        try { obj = JSON.parse(txt); } catch {}
+        return { obj, raw: rawTxt };
       }
-      let data = await fetchJson(buildUrl(page));
+      let dat = await fetchJson(buildUrl(page));
+      let data = dat.obj;
+      let raw = dat.raw;
       let list = Array.isArray(data?.abslist) ? data.abslist : [];
       if (!list.length) {
-        // 兼容某些地区 pn=1 起始
-        data = await fetchJson(buildUrl(page === 0 ? 1 : page));
+        dat = await fetchJson(buildUrl(page === 0 ? 1 : page));
+        data = dat.obj;
+        raw = dat.raw;
         list = Array.isArray(data?.abslist) ? data.abslist : [];
       }
       const items = list.map((item) => {
@@ -113,7 +166,7 @@ const functions = {
         return { id, title, artist: item.ARTIST || '', album: item.ALBUM || '', duration: item.DURATION || 0, cover };
       });
       const hasMore = (data?.PN || (page||0)) * (data?.RN || rn) < (data?.TOTAL || 0);
-      return { ok: true, items, hasMore };
+      return { ok: true, items, hasMore, raw };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -168,7 +221,7 @@ const functions = {
       return { ok: false, error: e?.message || String(e) };
     }
   },
-  setBackgroundMusic: async ({ music, album, title, artist }) => {
+  setBackgroundMusic: async ({ music, album, title, artist, id }) => {
     try {
       const bgFile = path.join(__dirname, 'background', 'amll.html');
       const u = new url.URL(url.pathToFileURL(bgFile).href);
@@ -176,7 +229,166 @@ const functions = {
       if (album) u.searchParams.set('album', String(album));
       if (title) u.searchParams.set('title', String(title));
       if (artist) u.searchParams.set('artist', String(artist));
+      if (id) u.searchParams.set('id', String(id));
+      u.searchParams.set('channel', state.eventChannel);
       pluginApi.emit(state.eventChannel, { type: 'update', target: 'backgroundUrl', value: u.href });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  enqueueTail: async (item = {}) => {
+    try {
+      const it = {
+        id: String(item.id||''),
+        title: String(item.title||''),
+        artist: String(item.artist||''),
+        album: String(item.album||''),
+        cover: String(item.cover||''),
+        duration: Number(item.duration||0) || 0
+      };
+      if (!it.id) return { ok: false, error: 'invalid item' };
+      state.playlist.push(it);
+      pluginApi.emit(state.eventChannel, { type: 'update', target: 'playlist', value: { length: state.playlist.length } });
+      return { ok: true, length: state.playlist.length };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  enqueueNext: async (item = {}) => {
+    try {
+      const it = {
+        id: String(item.id||''),
+        title: String(item.title||''),
+        artist: String(item.artist||''),
+        album: String(item.album||''),
+        cover: String(item.cover||''),
+        duration: Number(item.duration||0) || 0
+      };
+      if (!it.id) return { ok: false, error: 'invalid item' };
+      const pos = state.currentIndex >= 0 ? state.currentIndex + 1 : state.playlist.length;
+      state.playlist.splice(pos, 0, it);
+      pluginApi.emit(state.eventChannel, { type: 'update', target: 'playlist', value: { length: state.playlist.length } });
+      return { ok: true, length: state.playlist.length, pos };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  playNow: async (item = {}) => {
+    try {
+      const id = String(item.id||'');
+      if (!id) return { ok: false, error: 'invalid item id' };
+      const meta = {
+        id,
+        title: String(item.title||''),
+        artist: String(item.artist||''),
+        album: String(item.album||''),
+        cover: String(item.cover||''),
+        duration: Number(item.duration||0) || 0
+      };
+      // push into playlist and mark current
+      state.playlist.push(meta);
+      state.currentIndex = state.playlist.length - 1;
+      pluginApi.emit(state.eventChannel, { type: 'update', target: 'playlist', value: { length: state.playlist.length } });
+      const g = await functions.getKuwoPlayUrl(id, 'standard');
+      if (!g || !g.ok || !g.url) return { ok: false, error: g?.error || 'resolve failed' };
+      await functions.setBackgroundMusic({ music: g.url, album: meta.cover, title: meta.title, artist: meta.artist, id: meta.id });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  nextTrack: async () => {
+    try {
+      const nextIdx = state.currentIndex >= 0 ? state.currentIndex + 1 : (state.playlist.length ? 0 : -1);
+      if (nextIdx < 0 || nextIdx >= state.playlist.length) return { ok: false, error: 'no next track' };
+      state.currentIndex = nextIdx;
+      const meta = state.playlist[nextIdx];
+      const g = await functions.getKuwoPlayUrl(meta.id, 'standard');
+      if (!g || !g.ok || !g.url) return { ok: false, error: g?.error || 'resolve failed' };
+      await functions.setBackgroundMusic({ music: g.url, album: meta.cover, title: meta.title, artist: meta.artist, id: meta.id });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  prevTrack: async () => {
+    try {
+      const prevIdx = state.currentIndex > 0 ? state.currentIndex - 1 : -1;
+      if (prevIdx < 0 || prevIdx >= state.playlist.length) return { ok: false, error: 'no previous track' };
+      state.currentIndex = prevIdx;
+      const meta = state.playlist[prevIdx];
+      const g = await functions.getKuwoPlayUrl(meta.id, 'standard');
+      if (!g || !g.ok || !g.url) return { ok: false, error: g?.error || 'resolve failed' };
+      await functions.setBackgroundMusic({ music: g.url, album: meta.cover, title: meta.title, artist: meta.artist, id: meta.id });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  getPlaylist: async () => {
+    try {
+      const total = state.playlist.reduce((acc, it) => acc + (Number(it.duration)||0), 0);
+      return { ok: true, items: state.playlist.slice(), currentIndex: state.currentIndex, totalSecs: total };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  removeIndex: async (idx = 0) => {
+    try {
+      const i = Math.floor(Number(idx)||0);
+      if (i < 0 || i >= state.playlist.length) return { ok: false, error: 'index out of range' };
+      state.playlist.splice(i, 1);
+      if (state.currentIndex === i) state.currentIndex = Math.min(state.currentIndex, state.playlist.length - 1);
+      else if (state.currentIndex > i) state.currentIndex -= 1;
+      pluginApi.emit(state.eventChannel, { type: 'update', target: 'playlist', value: { length: state.playlist.length } });
+      return { ok: true, length: state.playlist.length };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  fetchKuwoLyrics: async (id, isLyricx = true) => {
+    try {
+      const https = require('https');
+      const http = require('http');
+      const zlib = require('zlib');
+      const bufKey = Buffer.from('yeelion');
+      function buildParams(mid, lrcx){
+        let params = `user=12345,web,web,web&requester=localhost&req=1&rid=MUSIC_${String(mid)}`;
+        if (lrcx) params += '&lrcx=1';
+        const src = Buffer.from(params);
+        const out = Buffer.alloc(src.length * 2);
+        let k = 0;
+        for (let i=0;i<src.length;){ for (let j=0;j<bufKey.length && i<src.length; j++, i++){ out[k++] = bufKey[j] ^ src[i]; } }
+        return out.slice(0, k).toString('base64');
+      }
+      async function inflateAsync(buf){ return await new Promise((resolve, reject) => zlib.inflate(buf, (e, r) => e ? reject(e) : resolve(r))); }
+      function requestRaw(u){ return new Promise((resolve, reject) => { const lib = u.startsWith('https') ? https : http; const req = lib.get(u, (res) => { const chunks=[]; res.on('data',(c)=>chunks.push(c)); res.on('end',()=>resolve(Buffer.concat(chunks))); }).on('error', reject); req.setTimeout(15000, () => { try{req.destroy(new Error('timeout'));}catch{} }); }); }
+      const api = `http://newlyric.kuwo.cn/newlyric.lrc?${buildParams(id, !!isLyricx)}`;
+      const raw = await requestRaw(api);
+      const head = raw.toString('utf8', 0, 12);
+      if (!head.startsWith('tp=content')) return { ok: false, error: 'no content' };
+      const start = raw.indexOf('\r\n\r\n');
+      const inflated = await inflateAsync(raw.slice(start + 4));
+      if (!isLyricx) return { ok: true, format: 'plain', dataBase64: Buffer.from(inflated).toString('base64') };
+      const base = Buffer.from(inflated.toString('utf8'), 'base64');
+      const out = Buffer.alloc(base.length * 2);
+      let k = 0;
+      for (let i=0;i<base.length;){ for (let j=0;j<bufKey.length && i<base.length; j++, i++){ out[k++] = base[i] ^ bufKey[j]; } }
+      return { ok: true, format: 'lrcx', dataBase64: out.slice(0, k).toString('base64') };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+  playIndex: async (idx = 0) => {
+    try {
+      const i = Math.floor(Number(idx)||0);
+      if (i < 0 || i >= state.playlist.length) return { ok: false, error: 'index out of range' };
+      state.currentIndex = i;
+      const meta = state.playlist[i];
+      const g = await functions.getKuwoPlayUrl(meta.id, 'standard');
+      if (!g || !g.ok || !g.url) return { ok: false, error: g?.error || 'resolve failed' };
+      await functions.setBackgroundMusic({ music: g.url, album: meta.cover, title: meta.title, artist: meta.artist });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
@@ -347,27 +559,35 @@ const functions = {
   onLowbarEvent: async (payload = {}) => {
     try {
       if (!payload || typeof payload !== 'object') return true;
+      if (payload.type === 'update' && payload.target === 'floatingUrl') {
+        state.currentFloatingUrl = payload.value || null;
+      }
       if (payload.type === 'click') {
         if (payload.id === 'tab-recommend') {
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: 'center' });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 860, height: 520 } });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.recommend });
+          state.currentFloatingUrl = state.pages.recommend;
         } else if (payload.id === 'tab-search') {
-          pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: 'center' });
-          pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 860, height: 520 } });
-          pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.search });
-        } else if (payload.id === 'tab-player') {
-          pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: 'center' });
-          pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 1024, height: 640 } });
-          pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.player });
+          if (state.currentFloatingUrl === state.pages.search) {
+            pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: null });
+            state.currentFloatingUrl = null;
+          } else {
+            pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: 'center' });
+            pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 860, height: 520 } });
+            pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.search });
+            state.currentFloatingUrl = state.pages.search;
+          }
         } else if (payload.id === 'tab-settings') {
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: 'center' });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 720, height: 520 } });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.settings });
+          state.currentFloatingUrl = state.pages.settings;
         } else if (payload.id === 'tab-about') {
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: 'center' });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 640, height: 400 } });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.about });
+          state.currentFloatingUrl = state.pages.about;
         }
       }
       return true;

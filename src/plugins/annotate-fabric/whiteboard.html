@@ -600,7 +600,18 @@
         return { arr: state.pageHistories[state.pageIndex], idxRef: state.pageHistoryIndex, i: state.pageIndex };
       }
       function getCanvasJSON() {
-        try { return JSON.stringify(canvas.toJSON()); } catch { return null; }
+        try {
+          const base = canvas.toJSON();
+          const bg = canvas.backgroundColor || state.bgColor || '#121212';
+          const pack = {
+            data: base,
+            backgroundColor: bg,
+            viewportTransform: Array.isArray(canvas.viewportTransform) ? canvas.viewportTransform.slice() : null,
+            width: typeof canvas.getWidth === 'function' ? canvas.getWidth() : null,
+            height: typeof canvas.getHeight === 'function' ? canvas.getHeight() : null,
+          };
+          return JSON.stringify(pack);
+        } catch { return null; }
       }
       function updateUndoRedoUI() {
         const { arr, idxRef, i } = getCurrentHistory();
@@ -615,6 +626,7 @@
           const snap = getCanvasJSON();
           if (!snap) return;
           if (idxRef[i] >= 0 && idxRef[i] < arr.length - 1) arr.splice(idxRef[i] + 1);
+          if (arr.length > 0) { const last = arr[arr.length - 1]; if (typeof last === 'string' && last === snap) { updateUndoRedoUI(); return; } }
           arr.push(snap);
           idxRef[i] = arr.length - 1;
           if (arr.length > 50) { arr.splice(0, arr.length - 50); idxRef[i] = arr.length - 1; }
@@ -629,12 +641,24 @@
           if (!json) return;
           restoring = true;
           canvas.clear();
-          canvas.loadFromJSON(JSON.parse(json), () => {
+          let parsed = null; try { parsed = JSON.parse(json); } catch { parsed = null; }
+          const dataForCanvas = parsed && parsed.data && parsed.data.objects ? parsed.data : parsed;
+          if (!dataForCanvas) { restoring = false; return; }
+          canvas.loadFromJSON(dataForCanvas, () => {
             try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch { }
             try { setMode(state.mode); } catch { }
             try { if (state.mode === 'erase' && typeof fabric !== 'undefined' && fabric.EraserBrush) { if (!(canvas.freeDrawingBrush instanceof fabric.EraserBrush)) { const eb = new fabric.EraserBrush(canvas); eb.width = Number(state.eraseSize) || 80; eb.strokeLineCap = 'round'; eb.strokeLineJoin = 'round'; eb.inverted = false; eb.shadow = null; canvas.freeDrawingBrush = eb; } canvas.isDrawingMode = true; canvas.selection = false; canvas.skipTargetFind = true; } } catch { }
+            try {
+              const defaultBg = state.bgColor || canvas.backgroundColor || '#121212';
+              const toBg = (parsed && parsed.backgroundColor) ? parsed.backgroundColor : defaultBg;
+              const applyBg = (!toBg || toBg === 'transparent') ? defaultBg : toBg;
+              try { canvas.setBackgroundColor(applyBg, () => {}); }
+              catch { canvas.backgroundColor = applyBg; }
+            } catch { }
+            try { if (parsed && parsed.viewportTransform && typeof canvas.setViewportTransform === 'function') { canvas.setViewportTransform(parsed.viewportTransform); } } catch { }
             try { fit(); } catch { }
             if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll();
+            try { const pi = i; state.pages[pi] = canvas.toJSON(); try { const url = canvas.toDataURL({ format: 'png', multiplier: 0.2 }); state.pageThumbs[pi] = url; } catch { } } catch { }
             restoring = false;
             idxRef[i] = toIndex;
             updateUndoRedoUI();
@@ -917,15 +941,8 @@
         try {
           const p = e.path;
           if (!p) return;
-          if (state.mode === 'draw') {
-            p.erasable = true;
-            setTimeout(() => { if (!restoring) { try { recordHistory(); } catch { } updateUndoRedoUI(); } }, 0);
-          } else if (state.mode === 'erase' && fabric && fabric.EraserBrush) {
-            p.selectable = false;
-            p.evented = false;
-            p.isEraser = true;
-            setTimeout(() => { if (!restoring) { try { recordHistory(); } catch { } updateUndoRedoUI(); } }, 0);
-          }
+          if (state.mode === 'draw') { p.erasable = true; }
+          else if (state.mode === 'erase' && fabric && fabric.EraserBrush) { p.selectable = false; p.evented = false; p.isEraser = true; }
         } catch { }
       });
 
@@ -1002,7 +1019,7 @@
           }
         }
       });
-      canvas.on('mouse:up', () => { if (state.mode === 'erase' && !restoring) { try { recordHistory(); } catch { } } draggingErase = false; draggingPan = false; updateUndoRedoUI(); });
+      canvas.on('mouse:up', () => { if ((state.mode === 'erase' || state.mode === 'draw' || draggingPan) && !restoring) { try { recordHistory(); } catch { } } draggingErase = false; draggingPan = false; updateUndoRedoUI(); });
 
       canvas.on('mouse:wheel', (opt) => {
         const e = opt.e; let delta = e.deltaY; let zoom = canvas.getZoom(); zoom *= 0.999 ** delta;
@@ -1010,6 +1027,8 @@
         const p = typeof canvas.getPointer === 'function' ? canvas.getPointer(e) : { x: e.offsetX, y: e.offsetY };
         canvas.zoomToPoint(new fabric.Point(p.x, p.y), zoom);
         resizeEraseCursor(state.eraseSize);
+        try { if (!restoring) recordHistory(); } catch { }
+        updateUndoRedoUI();
         opt.e.preventDefault(); opt.e.stopPropagation();
       });
 
@@ -1113,6 +1132,27 @@
           buildPagePreview();
         } catch { }
       }
+      async function genThumbForPage(i, imgEl) {
+        try {
+          if (state.pageThumbs[i]) { if (imgEl) imgEl.src = state.pageThumbs[i]; return; }
+          const raw = state.pages[i]; if (!raw) { state.pageThumbs[i] = ''; if (imgEl) imgEl.src = ''; return; }
+          const parsed = (typeof raw === 'object') ? raw : null;
+          const dataForCanvas = parsed && parsed.data && parsed.data.objects ? parsed.data : raw;
+          const bgColor = (parsed && parsed.backgroundColor) ? parsed.backgroundColor : (state.bgColor || '#121212');
+          const el = document.createElement('canvas');
+          let sc = null; try { sc = new fabric.StaticCanvas(el); } catch { sc = null; }
+          if (!sc) { state.pageThumbs[i] = ''; if (imgEl) imgEl.src = ''; return; }
+          const w = Math.max(64, (typeof canvas.getWidth === 'function' ? canvas.getWidth() : 800));
+          const h = Math.max(64, (typeof canvas.getHeight === 'function' ? canvas.getHeight() : 600));
+          try { if (typeof sc.setDimensions === 'function') sc.setDimensions({ width: w, height: h }); else { if (typeof sc.setWidth === 'function') sc.setWidth(w); if (typeof sc.setHeight === 'function') sc.setHeight(h); } } catch { }
+          try { sc.setBackgroundColor(bgColor, () => {}); } catch { sc.backgroundColor = bgColor; }
+          await new Promise((resolve) => { try { sc.loadFromJSON(dataForCanvas, () => resolve()); } catch { resolve(); } });
+          try { sc.renderAll(); } catch {}
+          let url = ''; try { url = sc.toDataURL({ format: 'png', multiplier: 0.2 }); } catch { url = ''; }
+          state.pageThumbs[i] = url; if (imgEl) imgEl.src = url;
+          try { if (typeof sc.dispose === 'function') sc.dispose(); } catch { }
+        } catch { }
+      }
       function buildPagePreview() {
         try {
           pagePreview.innerHTML = '';
@@ -1121,6 +1161,7 @@
           for (let i = 0; i < count; i++) {
             const d = document.createElement('div'); d.className = 'thumb';
             const img = document.createElement('img'); img.src = state.pageThumbs[i] || '';
+            genThumbForPage(i, img);
             const lab = document.createElement('span'); lab.className = 'label'; lab.textContent = String(i + 1);
             const del = document.createElement('button'); del.className = 'del'; del.innerHTML = '<i class="ri-delete-bin-6-line"></i>'; del.addEventListener('click', (ev) => { ev.stopPropagation(); deletePage(i); });
             d.appendChild(img); d.appendChild(lab); d.appendChild(del);

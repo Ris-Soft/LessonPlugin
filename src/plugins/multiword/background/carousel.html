@@ -106,14 +106,39 @@
     const timeLeftEl = document.getElementById('timeLeft');
     const pageInfoEl = document.getElementById('pageInfo');
     let words = []; let pages = []; let pageIdx = 0; let paused = false; let pageRemain = 0; let showCn = (qs.get('showcn') || '1') !== '0';
+    function nonEmptyPages() { try { return (Array.isArray(pages) ? pages.filter(p => Array.isArray(p) && p.length > 0) : []); } catch { return []; } }
     const shufflePreview = (qs.get('shuffle') || '0') === '1';
     function computePageRemain() {
       try {
-        const len = (pages[pageIdx] || []).length;
+        const arr = nonEmptyPages();
+        const cur = Math.max(0, Math.min(arr.length - 1, pageIdx));
+        const len = (arr[cur] || []).length;
         return Math.max(0, len * pageSec);
       } catch { return pageSec; }
     }
     let serverBase = '';
+    function updateLowbarButtons() {
+      try {
+        const items = [
+          { id: 'carousel-prev', text: '上一页', icon: 'ri-skip-back-line' },
+          { id: 'carousel-pause', text: (paused ? '继续' : '暂停'), icon: (paused ? 'ri-play-circle-line' : 'ri-pause-circle-line') },
+          { id: 'carousel-next', text: '下一页', icon: 'ri-skip-forward-line' },
+          { id: 'carousel-toggle-cn', text: '中文开关', icon: 'ri-translate' },
+          { id: 'open-carousel-settings', text: '轮播设置', icon: 'ri-settings-3-line' },
+          { id: 'carousel-stop', text: '结束轮播', icon: 'ri-stop-circle-line' }
+        ];
+        if (previewMode) items.push({ id:'check-start', text:'开始检查', icon:'ri-checkbox-line' });
+        api().emitEvent(CH, { type: 'update', target: 'centerItems', value: items });
+      } catch { }
+    }
+    function triggerWave() {
+      try {
+        const wave = document.createElement('div');
+        wave.className = 'wave';
+        document.body.appendChild(wave);
+        wave.addEventListener('animationend', () => { try { document.body.removeChild(wave); } catch {} });
+      } catch {}
+    }
 
     function applyFontSizes() {
       try {
@@ -163,7 +188,7 @@
         const rectStage = stageEl.getBoundingClientRect();
         const maxBottom = rectStage.top + rectStage.height - stagePaddingBottom;
         const overflow = rectGrid.bottom > maxBottom;
-        if (overflow || newSize < pageSize) {
+        if (overflow || newSize !== pageSize) {
           const flatIndex = pageIdx * pageSize;
           pageSize = newSize;
           pages = [];
@@ -235,8 +260,8 @@
       adjustPageSizeToFit();
       updatePageIndicator();
     }
-    function prevPage() { pageIdx = Math.max(0, pageIdx - 1); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); }
-    function nextPage() { pageIdx = Math.min(pages.length - 1, pageIdx + 1); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); }
+    function prevPage() { const arr = nonEmptyPages(); pageIdx = Math.max(0, Math.min(arr.length - 1, pageIdx - 1)); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); triggerWave(); }
+    function nextPage() { const arr = nonEmptyPages(); pageIdx = Math.max(0, Math.min(arr.length - 1, pageIdx + 1)); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); triggerWave(); }
 
     let tickHandle = null;
     function startLoop() {
@@ -247,7 +272,8 @@
         pageRemain = Math.max(0, pageRemain - 1);
         timeLeftEl.textContent = fmt(pageRemain);
         if (pageRemain <= 0) {
-          const lastPage = (pageIdx >= pages.length - 1);
+          const arr = nonEmptyPages();
+          const lastPage = (pageIdx >= arr.length - 1);
           if (lastPage) {
             if (previewMode) {
               // 预览模式：最后一页结束后停止并播放退场音效
@@ -255,7 +281,7 @@
 
             } else {
               // 常规模式：返回第一页并继续
-              pageIdx = 0; renderPage(); updatePageIndicator();
+              pageIdx = 0; renderPage(); updatePageIndicator(); triggerWave();
               pageRemain = computePageRemain();
             }
           } else {
@@ -275,8 +301,26 @@
           const cmd = String(payload.cmd || '');
           if (cmd === 'prev') prevPage();
           else if (cmd === 'next') nextPage();
-          else if (cmd === 'pause') paused = !paused;
+          else if (cmd === 'pause') { paused = !paused; updateLowbarButtons(); }
           else if (cmd === 'stop') { if (tickHandle) clearInterval(tickHandle); }
+          else if (cmd === 'settings') {
+            try {
+              const float = new URL('../../../plugins/multiword/float/carousel-font.html', window.location.href).href;
+              const u = new URL(float);
+              u.searchParams.set('server', String(serverBase||''));
+              u.searchParams.set('wordsize', String(wordFontSize||''));
+              u.searchParams.set('cnsize', String(cnFontSize||''));
+              api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 740, height: 520 } });
+              api().emitEvent(CH, { type:'update', target:'floatingUrl', value: u.href });
+            } catch {}
+          }
+          else if (cmd === 'start-check') {
+            const toUrl = (page, params = {}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k, v]) => base.searchParams.set(k, String(v))); return base.href; };
+            const bg = new URL('../../../plugins/multiword/background/checker.html', window.location.href).href;
+            const params = { selected: selectedParam, server: serverBase };
+            try { api().emitEvent(CH, { type: 'update', target: 'backgroundUrl', value: toUrl(bg, params) }); } catch { }
+            return;
+          }
           else if (cmd === 'set-font') {
             const wf = parseInt(String(payload.wordsize || ''), 10);
             const cf = parseInt(String(payload.cnsize || ''), 10);
@@ -320,17 +364,17 @@
           else if (id === 'carousel-next') nextPage();
           else if (id === 'carousel-pause') paused = !paused;
           else if (id === 'carousel-stop') { if (tickHandle) clearInterval(tickHandle); }
-            else if (id === 'open-carousel-settings' || id === 'carousel-settings') {
-              try {
-                const float = new URL('../../../plugins/multiword/float/carousel-font.html', window.location.href).href;
-                const u = new URL(float);
-                u.searchParams.set('server', String(serverBase||''));
-                u.searchParams.set('wordsize', String(wordFontSize||''));
-                u.searchParams.set('cnsize', String(cnFontSize||''));
-                api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 740, height: 520 } });
-                api().emitEvent(CH, { type:'update', target:'floatingUrl', value: u.href });
-              } catch {}
-            }
+          else if (id === 'open-carousel-settings' || id === 'carousel-settings') {
+            try {
+              const float = new URL('../../../plugins/multiword/float/carousel-font.html', window.location.href).href;
+              const u = new URL(float);
+              u.searchParams.set('server', String(serverBase||''));
+              u.searchParams.set('wordsize', String(wordFontSize||''));
+              u.searchParams.set('cnsize', String(cnFontSize||''));
+              api().emitEvent(CH, { type:'update', target:'floatingBounds', value: { width: 740, height: 520 } });
+              api().emitEvent(CH, { type:'update', target:'floatingUrl', value: u.href });
+            } catch {}
+          }
           else if (id === 'carousel-toggle-cn') {
             showCn = !showCn;
             const newSize = calcPageSize();
@@ -357,7 +401,8 @@
     } catch { }
     function updatePageIndicator() {
       try {
-        const total = Math.max(0, pages.length || 0);
+        const arr = nonEmptyPages();
+        const total = Math.max(0, arr.length || 0);
         if (!total) { pageInfoEl.textContent = '--/--'; return; }
         const cur = Math.max(1, Math.min(total, (pageIdx || 0) + 1));
         pageInfoEl.textContent = String(cur) + '/' + String(total);
@@ -373,12 +418,17 @@
           for (let i = 0; i < words.length; i += pageSize) pages.push(words.slice(i, i + pageSize));
           pageIdx = Math.max(0, Math.min(pages.length - 1, Math.floor(flatIndex / Math.max(1, pageSize))));
           renderPage();
+          triggerWave();
         }
       });
     } catch { }
 
     (async function init() { await fetchWords(); applyFontSizes(); startLoop(); })();
   </script>
+  <style>
+    .wave { position: fixed; left:50%; top:50%; transform: translate(-50%,-50%) scale(1); width: 20px; height: 20px; border-radius: 999px; background: rgba(80,140,255,.18); border: 1px solid rgba(80,140,255,.35); filter: blur(0.5px); pointer-events: none; z-index: 9999; animation: ripple 680ms ease-out forwards; }
+    @keyframes ripple { 0% { transform: translate(-50%,-50%) scale(1); opacity: .9; } 100% { transform: translate(-50%,-50%) scale(90); opacity: 0; } }
+  </style>
 </body>
 
 </html>

@@ -114,7 +114,7 @@
 
   const next = async () => {
     const n = state.queue.shift();
-    if (!n) { state.active = false; try { window.notifyAPI?.setVisible(false); } catch {}; return; }
+    if (!n) { state.active = false; try { window.notifyAPI?.destroyRuntime?.(); } catch {}; return; }
     state.active = true;
     await showNotification(n);
     state.active = false;

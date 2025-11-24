@@ -9,7 +9,7 @@
       html, body { height: 100%; overflow: hidden; }
       body { margin: 0; background: transparent; display:flex; align-items:center; justify-content:center; overflow: hidden; }
       .root { width: 100%; height: 100%; position: relative; display:flex; align-items:center; justify-content:center; overflow: hidden; }
-      .center-btn { width: 50px; height: 50px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(20,28,40,0.62); border: 1px solid rgba(255,255,255,0.30); cursor: pointer; position: relative; z-index: 3; }
+      .center-btn { width: 50px; height: 50px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: rgba(20,28,40,0.62); border: 1px solid rgba(255,255,255,0.30); cursor: pointer; position: relative; z-index: 3; touch-action: none; }
       .center-btn i { font-size: 22px; color: #ffffff; }
       .center-btn:active { transform: scale(0.96); }
       .ring { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index: 2; }
@@ -175,20 +175,28 @@
       let inactivityTimer = null;
       function resetInactivityTimer(){ try { if (inactivityTimer) clearTimeout(inactivityTimer); inactivityTimer = setTimeout(() => { if (expanded) setExpanded(false); }, 30000); } catch {} }
 
-      let dragging = false; let startScreenX = 0; let startScreenY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false; let rafScheduled = false; let nextX = 0; let nextY = 0; let boundsReady = false;
+      let dragging = false; let startScreenX = 0; let startScreenY = 0; let lastScreenX = 0; let lastScreenY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false; let rafScheduled = false; let nextX = 0; let nextY = 0; let boundsReady = false;
       function onPointerDown(e){
-        dragging = true; moved = false; boundsReady = false; startScreenX = e.screenX; startScreenY = e.screenY;
+        dragging = true; moved = false; boundsReady = false; startScreenX = e.screenX; startScreenY = e.screenY; lastScreenX = startScreenX; lastScreenY = startScreenY;
         try { window.compassAPI.pluginCall('screen.compass','setDragging',[true]); } catch {}
         try { center.setPointerCapture(e.pointerId); } catch {}
         window.compassAPI.getBounds().then((raw)=>{
           const b = (raw && raw.result) ? raw.result : raw;
           startWinX = (b && typeof b.x==='number')? b.x:0; startWinY = (b && typeof b.y==='number')? b.y:0; boundsReady = true;
+          const dx0 = lastScreenX - startScreenX; const dy0 = lastScreenY - startScreenY;
+          nextX = startWinX + dx0; nextY = startWinY + dy0;
+          if (!rafScheduled) { rafScheduled = true; requestAnimationFrame(()=>{ rafScheduled=false; window.compassAPI.moveTo(nextX, nextY); }); }
         });
       }
       function onPointerMove(e){
         if (!dragging) return;
-        if (!boundsReady) { startScreenX = e.screenX; startScreenY = e.screenY; return; }
-        const dx = e.screenX - startScreenX, dy = e.screenY - startScreenY;
+        try {
+          const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+          if (evs && evs.length) { const le = evs[evs.length-1]; lastScreenX = le.screenX; lastScreenY = le.screenY; }
+          else { lastScreenX = e.screenX; lastScreenY = e.screenY; }
+        } catch { lastScreenX = e.screenX; lastScreenY = e.screenY; }
+        if (!boundsReady) { return; }
+        const dx = lastScreenX - startScreenX, dy = lastScreenY - startScreenY;
         if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
         nextX = startWinX + dx; nextY = startWinY + dy;
         if (!rafScheduled) {
@@ -197,9 +205,11 @@
         }
       }
       function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; boundsReady=false; rafScheduled=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); try { window.compassAPI.pluginCall('screen.compass','setDragging',[false]); } catch {} }
+      function onPointerCancel(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; boundsReady=false; rafScheduled=false; moved=false; }
       center.addEventListener('pointerdown', onPointerDown);
       center.addEventListener('pointermove', onPointerMove);
       center.addEventListener('pointerup', onPointerUp);
+      center.addEventListener('pointercancel', onPointerCancel);
 
       const iconEl = center.querySelector('i');
       function updateCenterIcon(){ try { iconEl.className = expanded ? 'ri-close-line' : 'ri-compass-3-line'; } catch {} }

@@ -1133,7 +1133,7 @@ ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
       if (enabled) {
         const execPath = process.env.APPIMAGE || process.execPath;
         const iconPng = path.join(app.getAppPath(), 'logo.png');
-        const lines = [
+  const lines = [
           '[Desktop Entry]',
           'Type=Application',
           'Name=LessonPlugin',
@@ -1220,18 +1220,19 @@ function ensureLinuxProtocolRegistration() {
       '[Desktop Entry]',
       'Type=Application',
       'Name=LessonPlugin',
-      `Exec="${execPath}" %u`,
+    `Exec=${execPath} %u`,
       fs.existsSync(iconPng) ? `Icon=${iconPng}` : '',
       'Terminal=false',
       'Categories=Utility;',
       'MimeType=x-scheme-handler/lessonplugin;x-scheme-handler/LessonPlugin;'
     ].filter(Boolean).join('\n');
-    fs.writeFileSync(filePath, lines, 'utf-8');
-    try {
-      const spawn = require('child_process').spawn;
-      spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/lessonplugin'], { shell: true });
-      spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/LessonPlugin'], { shell: true });
-    } catch {}
+  fs.writeFileSync(filePath, lines, 'utf-8');
+  try {
+    const spawn = require('child_process').spawn;
+    spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/lessonplugin'], { shell: true });
+    spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/LessonPlugin'], { shell: true });
+    try { spawn('update-desktop-database', [appsDir], { shell: true }); } catch {}
+  } catch {}
   } catch {}
 }
 

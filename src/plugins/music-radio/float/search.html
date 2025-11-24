@@ -6,53 +6,42 @@
   <title>搜索</title>
   <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
   <style>
-    html, body { height: 100%; margin: 0; background: #181818; color: #e6e6e6; font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; }
+    html, body { height: 100%; margin: 0; background: #181818; color: #e6e6e6; font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; user-select: none; -webkit-user-select: none; -ms-user-select: none; }
     .wrap { height: 100%; display: flex; flex-direction: column; }
     header { padding: 12px 16px; font-weight: 600; border-bottom: 1px solid #2a2a2a; }
     .content { padding: 16px; display: flex; gap: 8px; }
     input { flex: 1; padding: 10px 12px; border-radius: 6px; border: 1px solid #2a2a2a; background: #101010; color: #e6e6e6; }
+    input:focus { outline: none; box-shadow: none; border-color: #3a3a3a; }
     button { padding: 10px 16px; border-radius: 6px; border: 1px solid #2a2a2a; background: #202020; color: #e6e6e6; cursor: pointer; }
+    button:focus { outline: none; box-shadow: none; border-color: #3a3a3a; }
+    .scroll { flex: 1; overflow: auto; }
+    .scroll::-webkit-scrollbar { width: 10px; }
+    .scroll::-webkit-scrollbar-track { background: #151515; }
+    .scroll::-webkit-scrollbar-thumb { background: #2e2e2e; border-radius: 6px; border: 2px solid #151515; }
     .result { padding: 8px 16px; color: #a0a0a0; display:flex; flex-direction:column; gap:8px; }
-    .item { display:flex; gap:12px; align-items:center; padding:8px; border:1px solid #2a2a2a; border-radius:8px; cursor:pointer; }
+    .item { display:flex; gap:12px; align-items:flex-start; padding:12px; border:1px solid #2a2a2a; border-radius:8px; cursor:pointer; margin-bottom:10px; }
     .item:hover { background:#202020; }
     .item img { width:56px; height:56px; object-fit:cover; border-radius:6px; }
     .item .meta { display:flex; flex-direction:column; }
     .item .meta .title { color:#e6e6e6; }
     .item .meta .artist { color:#9a9a9a; font-size:12px; }
+    .controls { display:flex; gap:8px; margin-left:auto; }
+    .controls button { padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid #2a2a2a; background:transparent; color:#e6e6e6; cursor:pointer; }
+    .controls i { margin-right:6px; color:#c0c0c0; }
+    .menu { margin: -6px 16px 10px 72px; padding:8px; border:1px dashed #2a2a2a; border-radius:8px; display:none; background:#1a1a1a; }
+    .menu .actions { display:flex; gap:10px; }
+    .menu .actions button { padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid #2a2a2a; background:#262626; color:#e6e6e6; cursor:pointer; }
+    .menu .actions i { margin-right:6px; color:#c0c0c0; }
   </style>
   <script>
-    async function fetchKuwoPage(q, pn){
-      const apiUrl = `https://search.kuwo.cn/r.s?all=${encodeURIComponent(q)}&pn=${pn}&rn=20&vipver=100&ft=music&encoding=utf8&rformat=json&vermerge=1&mobi=1`;
-      const proxyRes = await window.lowbarAPI.pluginCall('radio.music', 'kuwoProxy', [apiUrl]);
-      if (!proxyRes || !proxyRes.ok) return null;
-      try {
-        const txt = String(proxyRes.content || '');
-        const s = txt.indexOf('{'); const e = txt.lastIndexOf('}');
-        const jsonStr = (s>=0 && e>s) ? txt.slice(s, e+1) : txt;
-        return JSON.parse(jsonStr);
-      } catch { return null; }
-    }
-    async function doSearch(){
-      const q = document.getElementById('q').value.trim();
+    let currentPage = 0;
+    let currentQuery = '';
+    let hasMore = false;
+    let loading = false;
+    let openMenu = null;
+    function renderItems(items){
       const r = document.getElementById('result');
-      r.innerHTML = '';
-      r.style.display = 'block';
-      if (!q) { r.textContent = '请输入关键词'; return; }
-      let data = await fetchKuwoPage(q, 0);
-      let list = (data && Array.isArray(data.abslist)) ? data.abslist : [];
-      if (!list.length) {
-        data = await fetchKuwoPage(q, 1);
-        list = (data && Array.isArray(data.abslist)) ? data.abslist : [];
-      }
-      if (!list.length) { r.textContent = '未找到结果'; return; }
-      for (const item of list) {
-        const id = String(item.MUSICRID||'').replace('MUSIC_','');
-        const cover = item.web_albumpic_short ? `https://img3.kuwo.cn/star/albumcover/${String(item.web_albumpic_short).replace('120/','256/')}` : (item.web_artistpic_short ? `https://star.kuwo.cn/star/starheads/${String(item.web_artistpic_short).replace('120/','500/')}` : '');
-        const rawTitle = item.SONGNAME || '';
-        const title = rawTitle.includes('-') ? rawTitle.split('-').slice(0,-1).join('-').trim() : rawTitle;
-        const artist = item.ARTIST || '';
-        const album = item.ALBUM || '';
-        const it = { id, cover, title, artist, album };
+      for (const it of items) {
         const el = document.createElement('div'); el.className = 'item';
         const img = document.createElement('img'); img.src = it.cover || '';
         const meta = document.createElement('div'); meta.className = 'meta';
@@ -60,24 +49,98 @@
         const a = document.createElement('div'); a.className = 'artist'; a.textContent = (it.artist||'') + (it.album? ' · ' + it.album : '');
         meta.appendChild(t); meta.appendChild(a);
         el.appendChild(img); el.appendChild(meta);
-        el.onclick = async () => {
-          const g = await window.lowbarAPI.pluginCall('radio.music', 'getKuwoPlayUrl', [it.id, 'standard']);
-          if (!g || !g.ok) { alert('获取播放地址失败'); return; }
-          await window.lowbarAPI.pluginCall('radio.music', 'setBackgroundMusic', [{ music: g.url, album: it.cover, title: it.title, artist: it.artist }]);
+        const ctrl = document.createElement('div'); ctrl.className = 'controls';
+        const btnTail = document.createElement('button'); btnTail.innerHTML = '<i class="ri-play-list-2-line"></i>';
+        const btnPlay = document.createElement('button'); btnPlay.innerHTML = '<i class="ri-play-fill"></i>';
+        const btnNext = document.createElement('button'); btnNext.innerHTML = '<i class="ri-skip-forward-fill"></i>';
+        function hideFloating(){ try { window.lowbarAPI.emitEvent('radio.music', { type:'update', target:'floatingUrl', value: null }); } catch {} }
+        btnTail.onclick = async (e) => { e.stopPropagation(); await window.lowbarAPI.pluginCall('radio.music', 'enqueueTail', [it]); hideFloating(); };
+        btnPlay.onclick = async (e) => { e.stopPropagation(); const r = await window.lowbarAPI.pluginCall('radio.music', 'playNow', [it]); if (!(r && (r.result ? r.result.ok : r.ok))) alert('播放失败'); hideFloating(); };
+        btnNext.onclick = async (e) => { e.stopPropagation(); await window.lowbarAPI.pluginCall('radio.music', 'enqueueNext', [it]); hideFloating(); };
+        ctrl.appendChild(btnTail); ctrl.appendChild(btnPlay); ctrl.appendChild(btnNext);
+        el.appendChild(ctrl);
+        const menu = document.createElement('div'); menu.className = 'menu';
+        const actions = document.createElement('div'); actions.className = 'actions';
+        const mTail = document.createElement('button'); mTail.innerHTML = '<i class="ri-play-list-2-line"></i> 插入到歌单尾部';
+        const mPlay = document.createElement('button'); mPlay.innerHTML = '<i class="ri-play-fill"></i> 立即播放';
+        const mNext = document.createElement('button'); mNext.innerHTML = '<i class="ri-skip-forward-fill"></i> 下一首播放';
+        mTail.onclick = (e) => { e.stopPropagation(); btnTail.click(); hideFloating(); };
+        mPlay.onclick = (e) => { e.stopPropagation(); btnPlay.click(); hideFloating(); };
+        mNext.onclick = (e) => { e.stopPropagation(); btnNext.click(); hideFloating(); };
+        actions.appendChild(mTail); actions.appendChild(mPlay); actions.appendChild(mNext);
+        menu.appendChild(actions);
+        el.onclick = () => {
+          if (openMenu && openMenu !== menu) openMenu.style.display = 'none';
+          menu.style.display = menu.style.display === 'none' || !menu.style.display ? 'block' : 'none';
+          openMenu = menu.style.display === 'block' ? menu : null;
         };
         r.appendChild(el);
+        r.appendChild(menu);
       }
+    }
+    async function loadPage(append){
+      if (loading) return;
+      loading = true;
+      const r = document.getElementById('result');
+      const btn = document.getElementById('loadmore');
+      const pageInfo = document.getElementById('pageinfo');
+      const dbg = document.getElementById('debugjson');
+      btn.disabled = true;
+      const res = await window.lowbarAPI.pluginCall('radio.music', 'searchKuwo', [currentQuery, currentPage]);
+      const data = res && res.result ? res.result : res;
+      if (!data || data.ok === false) {
+        if (!append) r.textContent = '搜索失败';
+        const txt = (data && data.raw) ? data.raw : JSON.stringify(res || {});
+        dbg.textContent = String(txt || '');
+        dbg.style.display = 'block';
+        loading = false;
+        btn.disabled = false;
+        return;
+      }
+      const items = Array.isArray(data.items) ? data.items : [];
+      hasMore = !!data.hasMore;
+      if (!append) r.innerHTML = '';
+      if (!items.length && !append) { r.textContent = '未找到结果'; }
+      else renderItems(items);
+      if (!items.length) {
+        const txt = (data && data.raw) ? data.raw : JSON.stringify(data || {});
+        dbg.textContent = String(txt || '');
+        dbg.style.display = 'block';
+      } else {
+        dbg.textContent = '';
+        dbg.style.display = 'none';
+      }
+      btn.style.display = hasMore ? 'inline-block' : 'none';
+      pageInfo.textContent = `第 ${currentPage+1} 页`;
+      loading = false;
+      btn.disabled = false;
+    }
+    async function doSearch(){
+      const q = document.getElementById('q').value.trim();
+      const r = document.getElementById('result');
+      r.style.display = 'block';
+      if (!q) { r.innerHTML = '请输入关键词'; return; }
+      currentQuery = q;
+      currentPage = 0;
+      await loadPage(false);
     }
   </script>
 </head>
 <body>
   <div class="wrap">
-    <header>搜索歌曲/电台</header>
+    <header>搜索歌曲</header>
     <div class="content">
-      <input id="q" placeholder="输入歌名/艺术家/电台" />
+      <input id="q" placeholder="输入歌名/艺术家" />
       <button onclick="doSearch()"><i class="ri-search-line"></i> 搜索</button>
     </div>
-    <div id="result" class="result">输入关键词后显示结果（占位）</div>
+    <div class="scroll">
+      <div id="result" class="result">输入关键词后显示结果</div>
+      <div style="padding: 8px 16px; display:flex; align-items:center; gap:12px;">
+        <span id="pageinfo">第 1 页</span>
+        <button id="loadmore" style="display:none;" onclick="(async()=>{ if (!hasMore) return; currentPage += 1; await loadPage(true); })()">加载更多</button>
+      </div>
+      <pre id="debugjson" style="display:none; padding:8px 16px; margin:0; border-top:1px solid #2a2a2a; color:#9ad; white-space:pre-wrap; word-break:break-all; max-height:200px; overflow:auto;"></pre>
+    </div>
   </div>
 </body>
 </html>

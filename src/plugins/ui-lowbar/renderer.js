@@ -186,16 +186,8 @@
       btn.addEventListener('click', () => {
         const payload = { type: (container.id === 'center-items' ? 'click' : 'left.click'), id: it.id, kind: it.type };
         try {
-          if (gEventChannel) {
-            window.lowbarAPI.emitEvent(gEventChannel, payload);
-          } else {
-            window.lowbarAPI.emitEvent('lowbar:click', payload);
-          }
-        } catch {}
-        try {
           if (gCallerPluginId) {
             window.lowbarAPI.pluginCall(gCallerPluginId, 'onLowbarEvent', [payload]);
-          } else {
           }
         } catch {}
       });
@@ -750,18 +742,21 @@
     let dragging = false; let sx=0, sy=0, ox=0, oy=0;
     if (window.PointerEvent) {
       if (bar && bar.style) bar.style.touchAction = 'none';
-      const onDown = (e) => { if (e.pointerType==='mouse' && e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; e.preventDefault(); };
-      const onMove = (e) => { if (!dragging) return; const dx=e.clientX-sx; const dy=e.clientY-sy; fw.style.left=(ox+dx)+'px'; fw.style.top=(oy+dy)+'px'; };
-      const onUp = () => { dragging=false; };
+      let rafScheduled=false; let dxLatest=0; let dyLatest=0;
+      const applyMove = ()=>{ rafScheduled=false; fw.style.left=(ox+dxLatest)+'px'; fw.style.top=(oy+dyLatest)+'px'; };
+      const onDown = (e) => { if (e.pointerType==='mouse' && e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; e.preventDefault(); try{ window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, { once:true }); }catch{} };
+      const onMove = (e) => { if (!dragging) return; dxLatest=e.clientX-sx; dyLatest=e.clientY-sy; if (!rafScheduled) { rafScheduled=true; requestAnimationFrame(applyMove); } };
+      const onUp = () => { dragging=false; rafScheduled=false; try{ window.removeEventListener('pointermove', onMove); }catch{} };
       bar.addEventListener('pointerdown', onDown);
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      fw.addEventListener('pointerdown', (e) => { if (e.pointerType==='mouse' && e.button!==0) return; if (e.target!==fw) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; e.preventDefault(); });
+      fw.addEventListener('pointerdown', (e) => { if (e.pointerType==='mouse' && e.button!==0) return; if (e.target!==fw) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; e.preventDefault(); try{ window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp, { once:true }); }catch{} });
     } else {
-      bar.addEventListener('mousedown', (e) => { if (e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; });
-      window.addEventListener('mousemove', (e) => { if (!dragging) return; const dx=e.clientX-sx; const dy=e.clientY-sy; fw.style.left = (ox+dx)+'px'; fw.style.top=(oy+dy)+'px'; });
-      window.addEventListener('mouseup', () => { dragging=false; });
-      fw.addEventListener('mousedown', (e) => { if (e.button!==0) return; if (e.target !== fw) return; dragging = true; sx = e.clientX; sy = e.clientY; const r = fw.getBoundingClientRect(); ox=r.left; oy=r.top; });
+      let rafScheduled=false; let dxLatest=0; let dyLatest=0;
+      const applyMove = ()=>{ rafScheduled=false; fw.style.left=(ox+dxLatest)+'px'; fw.style.top=(oy+dyLatest)+'px'; };
+      const onDownMouse = (e) => { if (e.button!==0) return; dragging=true; sx=e.clientX; sy=e.clientY; const r=fw.getBoundingClientRect(); ox=r.left; oy=r.top; try{ window.addEventListener('mousemove', onMoveMouse); window.addEventListener('mouseup', onUpMouse, { once:true }); }catch{} };
+      const onMoveMouse = (e) => { if (!dragging) return; dxLatest=e.clientX-sx; dyLatest=e.clientY-sy; if (!rafScheduled) { rafScheduled=true; requestAnimationFrame(applyMove); } };
+      const onUpMouse = () => { dragging=false; rafScheduled=false; try{ window.removeEventListener('mousemove', onMoveMouse); }catch{} };
+      bar.addEventListener('mousedown', onDownMouse);
+      fw.addEventListener('mousedown', (e) => { if (e.button!==0) return; if (e.target !== fw) return; dragging = true; sx = e.clientX; sy = e.clientY; const r = fw.getBoundingClientRect(); ox=r.left; oy=r.top; try{ window.addEventListener('mousemove', onMoveMouse); window.addEventListener('mouseup', onUpMouse, { once:true }); }catch{} });
     }
   })();
 

@@ -8,6 +8,7 @@ const Module = require('module');
 
 let runtimeWin = null;
 let settingsWin = null;
+let audioWin = null;
 let edgeTts = null;
 let pendingQueue = [];
 try {
@@ -134,6 +135,77 @@ function createRuntimeWindow() {
   return runtimeWin;
 }
 
+function ensureAudioWindow() {
+  try {
+    if (!app.isReady()) return null;
+    if (audioWin && !audioWin.isDestroyed()) return audioWin;
+    audioWin = new BrowserWindow({
+      width: 1,
+      height: 1,
+      show: false,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      skipTaskbar: true,
+      focusable: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, autoplayPolicy: 'no-user-gesture-required', backgroundThrottling: false }
+    });
+    try { audioWin.webContents.setAudioMuted(false); } catch {}
+    try { audioWin.loadURL('about:blank'); } catch {}
+    audioWin.on('closed', () => { audioWin = null; });
+    return audioWin;
+  } catch {
+    return null;
+  }
+}
+
+async function playSoundHeadless(which = 'in') {
+  try {
+    if (!app.isReady()) {
+      await new Promise((resolve) => app.once('ready', resolve));
+    }
+    const file = (which === 'out') ? 'out.mp3' : 'in.mp3';
+    const filePath = path.join(__dirname, 'sounds', file);
+    const fileUrl = 'file:///' + filePath.replace(/\\/g, '/');
+    const win = ensureAudioWindow();
+    if (!win || win.isDestroyed()) return false;
+    const html = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0">
+      <audio id="a" src="${fileUrl}" autoplay></audio>
+      <script>try{const a=document.getElementById('a');a.volume=1.0;a.onended=()=>{try{window.close()}catch{}};a.onerror=()=>{try{window.close()}catch{}};}catch{}</script>
+    </body></html>`;
+    try { await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)); } catch {}
+    try {
+      if (volumeLib && typeof volumeLib.setVolume === 'function') {
+        const target = Math.max(0, Math.min(100, Number(store.get('notify','systemSoundVolume') ?? 80)));
+        if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
+          try { previousVolume = await volumeLib.getVolume(); } catch {}
+        }
+        await volumeLib.setVolume(target);
+      }
+    } catch {}
+    let started = false;
+    try {
+      await new Promise((resolve) => {
+        const onStart = () => { started = true; try { win.webContents.removeListener('media-started-playing', onStart); } catch {}; resolve(); };
+        try { win.webContents.once('media-started-playing', onStart); } catch { resolve(); }
+        // 兜底：若事件未触发，短延迟后继续
+        setTimeout(() => resolve(), 300);
+      });
+    } catch {}
+    try {
+      if (previousVolume != null && volumeLib && typeof volumeLib.setVolume === 'function') {
+        await volumeLib.setVolume(Math.max(0, Math.min(100, Number(previousVolume))));
+      }
+    } catch {}
+    previousVolume = null;
+    // 确保自动关闭（页面 onended 已尝试关闭，这里再兜底）
+    try { if (audioWin && !audioWin.isDestroyed()) { setTimeout(() => { try { audioWin.destroy(); } catch {} audioWin = null; }, 500); } } catch {}
+    return started;
+  } catch {
+    return false;
+  }
+}
+
 // 统一的 IPC 注册函数：在初始化或重新启用时调用
 function registerIpcHandlers() {
   try {
@@ -147,7 +219,34 @@ function registerIpcHandlers() {
     try { ipcMain.removeHandler('notify:setVisible'); } catch {}
     ipcMain.handle('notify:setVisible', (_evt, visible) => {
       if (!runtimeWin || runtimeWin.isDestroyed()) return false;
-      try { if (visible) runtimeWin.show(); else runtimeWin.hide(); return true; } catch { return false; }
+      try {
+        if (visible) {
+          try { runtimeWin.setAlwaysOnTop(true, 'screen-saver'); } catch {}
+          try {
+            if (typeof runtimeWin.setVisibleOnAllWorkspaces === 'function') {
+              runtimeWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+            }
+          } catch {}
+          runtimeWin.show();
+        } else {
+          runtimeWin.hide();
+        }
+        return true;
+      } catch { return false; }
+    });
+
+    try { ipcMain.removeHandler('notify:destroyRuntime'); } catch {}
+    ipcMain.handle('notify:destroyRuntime', () => {
+      try {
+        if (runtimeWin && !runtimeWin.isDestroyed()) {
+          try { runtimeWin.webContents?.destroy(); } catch {}
+          try { runtimeWin.destroy(); } catch {}
+          runtimeWin = null;
+        }
+        return true;
+      } catch {
+        return false;
+      }
     });
 
     try { ipcMain.removeHandler('notify:setSystemVolume'); } catch {}
@@ -237,13 +336,12 @@ module.exports = {
   init: (api) => {
     // 插件初始化逻辑
     log('notify:init');
+    try { app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required'); } catch {}
     // 注册 IPC 处理器（避免重复注册：先移除再注册）
     registerIpcHandlers();
-
-    if (app.isReady()) {
-      createRuntimeWindow();
-    } else {
-      app.once('ready', () => { createRuntimeWindow(); registerIpcHandlers(); });
+    // 延迟创建运行窗口：首次通知或显式调用时再创建，空闲不驻留
+    if (!app.isReady()) {
+      app.once('ready', () => { registerIpcHandlers(); });
     }
     
     return Promise.resolve();
@@ -279,10 +377,14 @@ module.exports = {
         return false;
       }
     },
-    enqueue: (payload) => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
+    enqueue: async (payload) => {
       try {
+        if (payload && payload.mode === 'sound' && (!runtimeWin || runtimeWin.isDestroyed())) {
+          const which = (payload.which === 'out' ? 'out' : 'in');
+          return !!(await playSoundHeadless(which));
+        }
+        const win = createRuntimeWindow();
+        if (!win || win.isDestroyed()) return false;
         if (win.webContents.isLoadingMainFrame()) {
           pendingQueue.push(payload);
           log('enqueue:buffer', payload?.mode || 'unknown');
@@ -293,11 +395,37 @@ module.exports = {
         return true;
       } catch { return false; }
     },
-    enqueueBatch: (list) => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
+    enqueueBatch: async (list) => {
       try {
         const payloads = Array.isArray(list) ? list : [list];
+        if ((!runtimeWin || runtimeWin.isDestroyed())) {
+          const rest = [];
+          let okAll = true;
+          for (const p of payloads) {
+            if (p && p.mode === 'sound') {
+              const which = (p.which === 'out' ? 'out' : 'in');
+              const ok = !!(await playSoundHeadless(which));
+              okAll = okAll && ok;
+            } else {
+              rest.push(p);
+            }
+          }
+          if (!rest.length) return okAll;
+          const win2 = createRuntimeWindow();
+          if (!win2 || win2.isDestroyed()) return okAll;
+          try {
+            if (win2.webContents.isLoadingMainFrame()) {
+              pendingQueue.push(...rest);
+              log('enqueueBatch:buffer', rest.length);
+              return true;
+            }
+            win2.webContents.send('notify:enqueue', rest);
+            log('enqueueBatch:send', rest.length);
+            return true;
+          } catch { return okAll; }
+        }
+        const win = createRuntimeWindow();
+        if (!win || win.isDestroyed()) return false;
         if (win.webContents.isLoadingMainFrame()) {
           pendingQueue.push(...payloads);
           log('enqueueBatch:buffer', payloads.length);
@@ -365,16 +493,16 @@ module.exports = {
       } catch { return false; }
     },
     // 兼容自动化事件的细分入口：sound（别名，内部调用 playSound）
-    sound: (which = 'in') => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
+    sound: async (which = 'in') => {
       try {
-        if (win.webContents.isLoadingMainFrame()) {
-          pendingQueue.push(payload);
+        if (!runtimeWin || runtimeWin.isDestroyed()) {
+          return !!(await playSoundHeadless(which === 'out' ? 'out' : 'in'));
+        }
+        if (runtimeWin.webContents.isLoadingMainFrame()) {
+          pendingQueue.push({ mode: 'sound', which: (which === 'out' ? 'out' : 'in') });
           return true;
         }
-        win.webContents.send('notify:enqueue', payload);
+        runtimeWin.webContents.send('notify:enqueue', { mode: 'sound', which: (which === 'out' ? 'out' : 'in') });
         return true;
       } catch { return false; }
     },
@@ -384,16 +512,16 @@ module.exports = {
       return res;
     },
     // 自动化动作/通用：播放内置音效（in 或 out）
-    playSound: (which = 'in') => {
-      const win = createRuntimeWindow();
-      if (!win || win.isDestroyed()) return false;
-      const payload = { mode: 'sound', which: (which === 'out' ? 'out' : 'in') };
+    playSound: async (which = 'in') => {
       try {
-        if (win.webContents.isLoadingMainFrame()) {
-          pendingQueue.push(payload);
+        if (!runtimeWin || runtimeWin.isDestroyed()) {
+          return !!(await playSoundHeadless(which === 'out' ? 'out' : 'in'));
+        }
+        if (runtimeWin.webContents.isLoadingMainFrame()) {
+          pendingQueue.push({ mode: 'sound', which: (which === 'out' ? 'out' : 'in') });
           return true;
         }
-        win.webContents.send('notify:enqueue', payload);
+        runtimeWin.webContents.send('notify:enqueue', { mode: 'sound', which: (which === 'out' ? 'out' : 'in') });
         return true;
       } catch { return false; }
     },

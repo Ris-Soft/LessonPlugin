@@ -10,6 +10,8 @@ async function initGeneralSettings() {
     data: document.getElementById('general-data')
   };
   subItems.forEach((btn) => {
+    if (btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
     btn.addEventListener('click', () => {
       subItems.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
@@ -256,9 +258,9 @@ async function initGeneralSettings() {
         if (body) body.style.background = 'radial-gradient(900px 520px at 50% -200px, #0b2a1d, var(--bg))';
       }
 
-      // 预览语句：根据当前来源设置请求并渲染
+      // 预览语句：根据当前来源设置请求并渲染（非阻塞）
       if (quoteEnabled) {
-        await renderPreviewQuoteFromSource(doc, name);
+        try { renderPreviewQuoteFromSource(doc, name); } catch {}
       }
     } catch (e) {
       // 静默预览错误
@@ -266,7 +268,10 @@ async function initGeneralSettings() {
   }
 
   if (splashPreviewFrame) {
-    splashPreviewFrame.addEventListener('load', () => updateSplashPreview());
+    if (!window.__splashPreviewLoadBound__) {
+      splashPreviewFrame.addEventListener('load', () => updateSplashPreview());
+      window.__splashPreviewLoadBound__ = true;
+    }
     // 如果 iframe 已经加载完成（用户直接进入该子页），也立即应用样式设定
     try {
       const ready = splashPreviewFrame.contentWindow?.document?.readyState;
@@ -579,8 +584,14 @@ async function initGeneralSettings() {
       userDataPathEl.textContent = String(p || '');
     } catch {}
   }
-  // 初始化数据目录大小
-  refreshUserDataSize();
+  // 初始化数据目录大小（延后到空闲阶段，避免点击卡顿）
+  try {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => { try { refreshUserDataSize(); } catch {} }, { timeout: 1000 });
+    } else {
+      setTimeout(() => { try { refreshUserDataSize(); } catch {} }, 0);
+    }
+  } catch { refreshUserDataSize(); }
   if (openUserDataBtn) {
     openUserDataBtn.addEventListener('click', async () => {
       try { await window.settingsAPI?.openUserData?.(); } catch {}

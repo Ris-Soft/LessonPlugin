@@ -759,20 +759,24 @@ async function downloadAndCopyName(url, meta) {
 }
 
 // 控制栏下载按钮
-audioDownloadBtn.onclick = function () {
-  if (!currentAudioUrl || !currentSongMeta) return;
-  downloadAndCopyName(currentAudioUrl, currentSongMeta);
-};
+if (audioDownloadBtn) {
+  audioDownloadBtn.onclick = function () {
+    if (!currentAudioUrl || !currentSongMeta) return;
+    downloadAndCopyName(currentAudioUrl, currentSongMeta);
+  };
+}
 
 // 下载按钮
-audioDownloadBtn.onclick = function () {
-  if (!currentAudioUrl) return;
-  const a = document.createElement("a");
-  a.href = currentAudioUrl;
-  a.download = (currentSongMeta?.title || "music") + ".mp3";
-  a.target = "_blank";
-  a.click();
-};
+if (audioDownloadBtn) {
+  audioDownloadBtn.onclick = function () {
+    if (!currentAudioUrl) return;
+    const a = document.createElement("a");
+    a.href = currentAudioUrl;
+    a.download = (currentSongMeta?.title || "music") + ".mp3";
+    a.target = "_blank";
+    a.click();
+  };
+}
 // 进度条
 function updateProgressBar() {
   if (!audio.duration) return;

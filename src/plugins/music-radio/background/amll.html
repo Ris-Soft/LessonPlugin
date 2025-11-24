@@ -1,105 +1,389 @@
 <!doctype html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>播放页面背景</title>
   <link href="https://assets.3r60.top/icons/bootstrap-icons.css" rel="stylesheet" />
-  <link href="file:///d:/LessonPlugin/example/kmp_zynMw/kmp.css" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
   <style>
-    html, body { height: 100%; margin: 0; background: #000; color: #eee; font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif; }
-    .overlay { position: absolute; left: 0; top: 0; right: 0; height: 48px; display: flex; align-items: center; padding: 0 12px; color: #cfcfcf; font-size: 13px; backdrop-filter: blur(6px); background: rgba(0,0,0,0.25); z-index: 9999; }
-    .overlay a { color: #9cd2ff; text-decoration: none; }
-    .wrap { height: 100%; }
-    .search-bar { display: none; }
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: transparent;
+      color: #eee;
+      font-family: system-ui, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif;
+      overflow: hidden;
+    }
+
+    .wrap {
+      height: 100%;
+      position: relative;
+      z-index: 1;
+    }
+
+    .content-area {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 100px;
+      display: flex;
+      gap: 24px;
+      padding: 24px;
+    }
+
+    .playlist {
+      width: 280px;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      padding-right: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .playlist .item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 0;
+      color: #cfcfcf;
+    }
+
+    .playlist .total {
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      color: #9ad;
+    }
+
+    .now-left {
+      width: 40%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 16px;
+      margin-left: 2vw;
+    }
+    .cover-wrap { width: 100%; display:flex; justify-content:flex-start; }
+    .now-cover {
+      width: clamp(160px, 22vw, 320px);
+      height: clamp(160px, 22vw, 320px);
+      object-fit: cover;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    }
+    .now-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .now-title {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+    }
+
+    .now-artist {
+      font-size: 18px;
+      color: #cfcfcf;
+    }
+
+    .now-right {
+      flex: 1.4;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    #lyrics {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      color: #ddd;
+      font-size: 28px;
+      line-height: 2.0;
+      letter-spacing: 0.1px;
+      padding: 40vh 16px;
+      box-sizing: border-box;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    #lyrics::-webkit-scrollbar { width: 0; height: 0; }
+
+    .audio-bar {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      height: 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      backdrop-filter: blur(10px);
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    .audio-progress-wrap { display:flex; align-items:center; gap:10px; padding: 0 8px; }
+    .audio-progress-time { font-size:12px; color:#cfcfcf; min-width:48px; text-align:center; }
+    .audio-progress-bar {
+      flex:1;
+      height: 4px;
+      margin: 6px 0;
+      background: #222;
+      border-radius: 4px;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .audio-progress {
+      height: 100%;
+      width: 0;
+      background: #6ab4ff;
+      border-radius: 4px;
+    }
+
+    .audio-progress-dot {
+      position: absolute;
+      top: -4px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #6ab4ff;
+      transform: translateX(-50%);
+      left: 0;
+    }
+
+    .audio-bar-inner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 0 16px;
+    }
+
+    .audio-time { display:none; }
+
+    .audio-btn {
+      border: 0;
+      background: transparent;
+      color: #eee;
+      cursor: pointer;
+      font-size: 28px;
+    }
+    .audio-btn:hover { opacity: 0.85; transform: scale(1.06); transition: all .15s ease; }
+
+    .playlist .item {
+      cursor: pointer;
+    }
+
+    .playlist .item.active {
+      color: #6ab4ff;
+    }
+
+    .playlist .item > div:first-child { flex:1; text-align:left; }
+    .playlist .item:hover { background: rgba(255,255,255,0.05); border-radius: 8px; }
+
+    .playlist .item.active::before {
+      background: #6ab4ff;
+    }
   </style>
-  <script src="file:///d:/LessonPlugin/example/kmp_zynMw/config.js"></script>
-  <script src="file:///d:/LessonPlugin/example/kmp_zynMw/kmp.js"></script>
+  <style id="bgRule"></style>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      const statusEl = document.querySelector('.overlay');
+      const statusEl = null;
       const params = new URL(location.href).searchParams;
       const musicUrl = params.get('music') || '';
       const albumUrl = params.get('album') || '';
       const title = params.get('title') || '';
       const artist = params.get('artist') || '';
-      const container = document.querySelector('.container');
       const audioBar = document.getElementById('audioBar');
       const audio = document.getElementById('audio');
       const audioCover = document.getElementById('audioCover');
       const audioTitle = document.getElementById('audioTitle');
       const audioArtist = document.getElementById('audioArtist');
-      const playerModalCover = document.getElementById('playerModalCover');
-      const playerModalTitle = document.getElementById('playerModalTitle');
-      const playerModalArtist = document.getElementById('playerModalArtist');
-      if (container) container.classList.add('centered');
+      const progressBar = document.getElementById('audioProgressBar');
+      const progress = document.getElementById('audioProgress');
+      const progressDot = document.getElementById('audioProgressDot');
+      const audioTime = document.getElementById('audioTime');
+      const bgRule = document.getElementById('bgRule');
+      const musicId = params.get('id') || '';
       if (musicUrl) {
         audio.src = musicUrl;
         audioBar.style.display = 'flex';
         audioCover.src = albumUrl || '';
         audioTitle.textContent = title || '';
         audioArtist.textContent = artist || '';
-        playerModalCover.src = albumUrl || '';
-        playerModalTitle.textContent = title || '';
-        playerModalArtist.textContent = artist || '';
-        try { audio.play(); if (statusEl) statusEl.textContent = '播放页面背景：播放中'; } catch {}
+        try { audio.play(); } catch { }
       } else {
-        if (statusEl) statusEl.textContent = '播放页面背景：未提供音源';
+        // no status overlay
       }
-      if (albumUrl && typeof updateBackground === 'function') {
-        try { updateBackground(albumUrl); } catch {}
+      function applyBlurBackground(urlStr) { if (!bgRule) return; bgRule.textContent = `body::before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${28}px) brightness(${0.6});z-index:-1;}`; const ex = document.getElementById('EX_background_fluentShine'); if (ex) ex.remove(); }
+      function applyFluentShine(urlStr) { if (bgRule) bgRule.textContent = ``; let ex = document.getElementById('EX_background_fluentShine'); if (!ex) { ex = document.createElement('div'); ex.id = 'EX_background_fluentShine'; ex.style.position = 'absolute'; ex.style.inset = '0'; ex.style.zIndex = '-1'; document.body.appendChild(ex); for (let i = 1; i <= 4; i++) { const d = document.createElement('div'); d.className = 'fluentShine'; d.style.position = 'absolute'; d.style.width = '50%'; d.style.height = '50%'; if (i === 1) { d.style.top = '0'; d.style.left = '0'; } else if (i === 2) { d.style.top = '0'; d.style.right = '0'; } else if (i === 3) { d.style.bottom = '0'; d.style.left = '0'; } else { d.style.bottom = '0'; d.style.right = '0'; } ex.appendChild(d); } const style = document.createElement('style'); style.textContent = `#EX_background_fluentShine:before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${70}px) brightness(${0.6});z-index:-1;}@keyframes rotate-clockwise{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes rotate-counterclockwise{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}.fluentShine:nth-child(1){animation:rotate-clockwise 15s linear infinite}.fluentShine:nth-child(2){animation:rotate-counterclockwise 12s linear infinite}.fluentShine:nth-child(3){animation:rotate-clockwise 18s linear infinite}.fluentShine:nth-child(4){animation:rotate-counterclockwise 14s linear infinite}`; document.head.appendChild(style); } }
+      const bgMode = (localStorage.getItem('radio.bgmode') || 'blur');
+      if (albumUrl) { if (bgMode === 'shine') applyFluentShine(albumUrl); else applyBlurBackground(albumUrl); }
+      async function renderLyricsForKuwo(id){
+        try {
+          const r = await window.lowbarAPI.pluginCall('radio.music', 'fetchKuwoLyrics', [id, true]);
+          const data = r && r.result ? r.result : r;
+          if (!data || !data.ok || !data.dataBase64) return;
+          const bin = atob(String(data.dataBase64||''));
+          const arr = new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+          let text = '';
+          try { text = new TextDecoder('gb18030', { fatal:false }).decode(arr); } catch { text = new TextDecoder('utf-8').decode(arr); }
+          const yrc = lrcxToYrcArr(text);
+          mountYrc(yrc);
+        } catch {}
+      }
+      function lrcxToYrcArr(krc){ const lines=String(krc||'').split('\n').filter(l=>l.trim()); const yrc=[]; let w=0; for(const line of lines){ const m=line.match(/^\[(\d+):(\d+)\.(\d+)\](.*)/); if(!m){ const mk=line.match(/^\[kuwo:(\d+)\]/); if(mk){ w=parseInt(mk[1],8)||0; } continue; } const minutes=parseInt(m[1],10), seconds=parseInt(m[2],10), ms=parseInt(String(m[3]).padEnd(3,'0'),10); const ts=minutes*60000+seconds*1000+ms; const content=m[4]; const words=[]; const re=/<(\d+),(-?\d+)>([^<]*)/g; let mm; const k1=Math.floor(w/10), k2=w%10; while((mm=re.exec(content))){ const v1=parseInt(mm[1],10), v2=parseInt(mm[2],10); const start=(v1+v2)/(k1*2); const dur=(v1-v2)/(k2*2); words.push({ t: ts+start, d: dur, tx: mm[3] }); } let ld=0; if (words.length){ const last=words[words.length-1]; ld=last.t+last.d-ts; } yrc.push({ t: ts, d: ld, c: words }); } return yrc; }
+      function mountYrc(yrc){ const el=document.getElementById('lyrics'); if(!el) return; el.innerHTML=''; yrc.forEach((line)=>{ const c=document.createElement('div'); c.className='line'; c.dataset.t=line.t; c.dataset.d=line.d; const row=document.createElement('div'); row.style.whiteSpace='normal'; row.style.opacity='0.9'; line.c.forEach((w,i)=>{ const s=document.createElement('span'); s.textContent=w.tx; s.dataset.t=w.t; s.dataset.d=w.d; s.style.transition=`opacity ${Math.max(0,w.d)}ms ease-out`; s.style.opacity='0.55'; s.style.display='inline'; row.appendChild(s); if(i<line.c.length-1) row.appendChild(document.createTextNode(' ')); }); c.appendChild(row); c.onclick=()=>{ try{ audio.currentTime = (parseInt(c.dataset.t||'0',10))/1000; }catch{} }; el.appendChild(c); }); let userScrollTs=0; let touchStartY=0; el.addEventListener('wheel',()=>{ userScrollTs=Date.now(); }); el.addEventListener('touchstart',(e)=>{ if(e.touches&&e.touches.length===1){ touchStartY=e.touches[0].clientY; } }); el.addEventListener('touchmove',(e)=>{ if(e.touches&&e.touches.length===1){ const dy=Math.abs(e.touches[0].clientY-touchStartY); if(dy>5) userScrollTs=Date.now(); } }); function update(){ const t=audio.currentTime*1000; const lines=Array.from(el.querySelectorAll('.line')); let active=null; for(let i=0;i<lines.length;i++){ const c=lines[i]; const lt=parseInt(c.dataset.t||'0',10); const ld=parseInt(c.dataset.d||'0',10); if(t>=lt && t<lt+ld){ active=c; break; } } lines.forEach((c)=>{ const lt=parseInt(c.dataset.t||'0',10); const ld=parseInt(c.dataset.d||'0',10); const row=c.firstChild; const isActive=(c===active); row.style.opacity=isActive?'1':'0.7'; const spans=row.querySelectorAll('span'); spans.forEach((s)=>{ const st=parseInt(s.dataset.t||'0',10); const sd=parseInt(s.dataset.d||'0',10); const se=st+sd; if(isActive && t>=st && t<se){ s.style.opacity='1'; } else if(isActive && t>=se){ s.style.opacity='1'; } else { s.style.opacity='0.5'; } }); }); if(active && (Date.now()-userScrollTs>2500)){ try{ active.scrollIntoView({ behavior:'smooth', block:'center' }); }catch{} } }
+        audio.addEventListener('timeupdate', update);
+      }
+      if (musicId) renderLyricsForKuwo(musicId);
+      // 进度条显示与控制
+      function formatTime(sec) { if (!sec) return '0:00'; const s = Math.floor(sec); const m = Math.floor(s / 60); const r = s % 60; return `${m}:${String(r).padStart(2, '0')}`; }
+      const progressCurrent = document.getElementById('progressCurrent');
+      const progressDuration = document.getElementById('progressDuration');
+      function updateProgress() { if (!audio || !audio.duration) return; const pct = (audio.currentTime / audio.duration); progress.style.width = `${pct * 100}%`; progressDot.style.left = `${pct * 100}%`; if (progressCurrent) progressCurrent.textContent = formatTime(audio.currentTime); if (progressDuration) progressDuration.textContent = formatTime(audio.duration); }
+      audio.addEventListener('timeupdate', updateProgress);
+      audio.addEventListener('loadedmetadata', updateProgress);
+      if (progressBar) progressBar.addEventListener('click', (e) => { if (!audio.duration) return; const rect = progressBar.getBoundingClientRect(); const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)); audio.currentTime = pct * audio.duration; });
+
+      audio.addEventListener('ended', async () => {
+        try {
+          const res = await window.lowbarAPI.pluginCall('radio.music', 'nextTrack', []);
+          const rr = res && res.result ? res.result : res;
+          // noop
+        } catch { }
+      });
+      async function loadPlaylist() {
+        try {
+          const r = await window.lowbarAPI.pluginCall('radio.music', 'getPlaylist', []);
+          const data = r && r.result ? r.result : r;
+          const listEl = document.getElementById('playlist');
+          const totalEl = document.getElementById('playlistTotal');
+          const empty = document.getElementById('emptyOverlay');
+          if (!data || !listEl || !Array.isArray(data.items)) return;
+          listEl.innerHTML = '';
+          const fmt = (s) => { const n = Math.floor(Number(s) || 0); const m = Math.floor(n / 60); const r = n % 60; return `${m}:${String(r).padStart(2, '0')}`; };
+          data.items.forEach((it, idx) => {
+            const row = document.createElement('div'); row.className = 'item';
+            const name = document.createElement('div'); name.textContent = `${it.title || ''}`;
+            const dur = document.createElement('div'); dur.textContent = fmt(it.duration || 0);
+            row.appendChild(name); row.appendChild(dur);
+            if (idx === data.currentIndex) row.classList.add('active');
+            row.onclick = async () => { try { await window.lowbarAPI.pluginCall('radio.music', 'playIndex', [idx]); } catch { } };
+            let pressTimer = null;
+            row.addEventListener('mousedown', () => { pressTimer = setTimeout(async () => { try { await window.lowbarAPI.pluginCall('radio.music', 'removeIndex', [idx]); } catch {} } , 600); });
+            row.addEventListener('mouseup', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+            row.addEventListener('mouseleave', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+            listEl.appendChild(row);
+          });
+          if (totalEl) totalEl.textContent = `总时长：${fmt(data.totalSecs || 0)}`;
+          if (empty) empty.style.display = (data.items.length === 0 && !musicUrl) ? 'flex' : 'none';
+          if (!musicUrl && data.items.length > 0) {
+            const last = data.items[data.items.length - 1];
+            try {
+              if (last) {
+                document.getElementById('audioCover').src = last.cover || '';
+                document.getElementById('audioTitle').textContent = last.title || '';
+                document.getElementById('audioArtist').textContent = last.artist || '';
+              }
+            } catch {}
+          }
+        } catch { }
+      }
+      loadPlaylist();
+      // subscribe playlist updates
+      try {
+        const ch = new URL(location.href).searchParams.get('channel');
+        if (ch) {
+          window.lowbarAPI.subscribe?.(ch);
+          window.lowbarAPI.onEvent?.((name, payload) => {
+            if (name === ch && payload && payload.type === 'update' && payload.target === 'playlist') {
+              loadPlaylist();
+            }
+          });
+        }
+      } catch { }
+      // 控制按钮
+      const prevBtn = document.getElementById('audioPrevBtn');
+      const nextBtn = document.getElementById('audioNextBtn');
+      const playBtn = document.getElementById('audioPlayBtn');
+      if (prevBtn) prevBtn.onclick = async () => { try { await window.lowbarAPI.pluginCall('radio.music', 'prevTrack', []); } catch { } };
+      if (nextBtn) nextBtn.onclick = async () => { try { await window.lowbarAPI.pluginCall('radio.music', 'nextTrack', []); } catch { } };
+      if (playBtn) {
+        playBtn.onclick = () => { try { if (audio.paused) { audio.play(); playBtn.innerHTML = '<i class="ri-pause-fill"></i>'; } else { audio.pause(); playBtn.innerHTML = '<i class="ri-play-fill"></i>'; } } catch { } };
+        audio.addEventListener('play', () => { playBtn.innerHTML = '<i class="ri-pause-fill"></i>'; });
+        audio.addEventListener('pause', () => { playBtn.innerHTML = '<i class="ri-play-fill"></i>'; });
       }
     });
+    function updateFullscreenStyles() {
+      try {
+        const fs = !!document.fullscreenElement || (window.innerHeight >= (screen.availHeight - 1));
+        const bar = document.getElementById('audioBar');
+        if (bar) bar.style.bottom = fs ? '96px' : '16px';
+      } catch { }
+    }
+    updateFullscreenStyles();
+    window.addEventListener('resize', updateFullscreenStyles);
+    document.addEventListener('fullscreenchange', updateFullscreenStyles);
   </script>
 </head>
+
 <body>
   <div class="wrap">
-    <div class="overlay">播放页面背景：通过 URL 传入 music/album/title/artist。</div>
     <div id="mount" style="position:absolute; inset:0;">
-      <div class="container">
-        <div class="app-title">KMP Music</div>
-        <div class="search-bar">
-          <input id="searchInput" type="text" placeholder="搜索歌曲/歌手/专辑..." autofocus />
-          <button id="searchBtn" title="搜索"><i class="bi bi-search"></i></button>
+      <div class="content-area">
+        <div id="emptyOverlay" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center;">
+          <div style="background:rgba(0,0,0,0.45); padding:24px 28px; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,0.5); color:#e6e6e6;">
+            <div style="font-size:22px; font-weight:700; margin-bottom:8px;">暂无播放内容</div>
+            <div style="font-size:14px; color:#cfcfcf;">在底栏打开“搜索”添加歌曲后开始播放</div>
+          </div>
         </div>
-        <div id="results" class="results" style="display: none"></div>
+        <div class="playlist">
+          <div class="items" id="playlist"></div>
+          <div class="total" id="playlistTotal">总时长：--:--</div>
+        </div>
+        <div class="now-left">
+          <div class="cover-wrap"><img class="now-cover" id="audioCover" src="" alt="cover" /></div>
+          <div class="now-meta">
+            <div class="now-title" id="audioTitle"></div>
+            <div class="now-artist" id="audioArtist"></div>
+          </div>
+        </div>
+        <div class="now-right">
+          <div id="lyrics">暂无歌词</div>
+        </div>
       </div>
       <div class="audio-bar" id="audioBar" style="display: flex">
-        <div class="audio-progress-bar" id="audioProgressBar">
-          <div class="audio-progress" id="audioProgress"></div>
-          <div class="audio-progress-dot" id="audioProgressDot"></div>
+        <div class="audio-progress-wrap">
+          <span class="audio-progress-time" id="progressCurrent">0:00</span>
+          <div class="audio-progress-bar" id="audioProgressBar">
+            <div class="audio-progress" id="audioProgress"></div>
+            <div class="audio-progress-dot" id="audioProgressDot"></div>
+          </div>
+          <span class="audio-progress-time" id="progressDuration">0:00</span>
         </div>
         <div class="audio-bar-inner">
-          <img class="audio-cover" id="audioCover" src="" alt="cover" />
-          <div class="audio-info">
-            <div class="audio-title" id="audioTitle"></div>
-            <div class="audio-artist" id="audioArtist"></div>
-          </div>
           <div class="audio-time" id="audioTime">0:00/0:00</div>
-          <div class="audio-controls">
-            <button class="audio-btn" id="audioPlayBtn" title="播放/暂停"><i class="bi bi-play-fill"></i></button>
-            <button class="audio-btn" id="audioDownloadBtn" title="下载"><i class="bi bi-download"></i></button>
+          <div class="audio-controls" style="margin: 0 auto; display:flex; gap:12px; align-items:center;">
+            <button class="audio-btn" id="audioPrevBtn" title="上一首"><i class="ri-skip-back-fill"></i></button>
+            <button class="audio-btn" id="audioPlayBtn" title="播放/暂停"><i class="ri-play-fill"></i></button>
+            <button class="audio-btn" id="audioNextBtn" title="下一首"><i class="ri-skip-forward-fill"></i></button>
           </div>
         </div>
       </div>
-      <div id="playerModal" style="display: none">
-        <div class="player-modal-mask" id="playerModalMask">
-          <div class="player-modal" id="playerModalPanel">
-            <div class="player-modal-content">
-              <img class="player-modal-cover" id="playerModalCover" src="" alt="cover" />
-              <div class="player-modal-title" id="playerModalTitle"></div>
-              <div class="player-modal-artist" id="playerModalArtist"></div>
-            </div>
-            <div class="player-modal-right">
-              <div class="lyrics-container">
-                <div id="lyrics" class="lyrics"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <audio id="audio" preload="auto" style="display: none" loop></audio>
+      <audio id="audio" preload="auto" style="display: none"></audio>
     </div>
   </div>
 </body>
+
 </html>
