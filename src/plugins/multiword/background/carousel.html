@@ -106,13 +106,10 @@
     const timeLeftEl = document.getElementById('timeLeft');
     const pageInfoEl = document.getElementById('pageInfo');
     let words = []; let pages = []; let pageIdx = 0; let paused = false; let pageRemain = 0; let showCn = (qs.get('showcn') || '1') !== '0';
-    function nonEmptyPages() { try { return (Array.isArray(pages) ? pages.filter(p => Array.isArray(p) && p.length > 0) : []); } catch { return []; } }
     const shufflePreview = (qs.get('shuffle') || '0') === '1';
     function computePageRemain() {
       try {
-        const arr = nonEmptyPages();
-        const cur = Math.max(0, Math.min(arr.length - 1, pageIdx));
-        const len = (arr[cur] || []).length;
+        const len = (pages[pageIdx] || []).length;
         return Math.max(0, len * pageSec);
       } catch { return pageSec; }
     }
@@ -260,8 +257,8 @@
       adjustPageSizeToFit();
       updatePageIndicator();
     }
-    function prevPage() { const arr = nonEmptyPages(); pageIdx = Math.max(0, Math.min(arr.length - 1, pageIdx - 1)); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); triggerWave(); }
-    function nextPage() { const arr = nonEmptyPages(); pageIdx = Math.max(0, Math.min(arr.length - 1, pageIdx + 1)); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); triggerWave(); }
+    function prevPage() { pageIdx = Math.max(0, pageIdx - 1); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); triggerWave(); }
+    function nextPage() { pageIdx = Math.min(pages.length - 1, pageIdx + 1); renderPage(); pageRemain = computePageRemain(); timeLeftEl.textContent = fmt(pageRemain); triggerWave(); }
 
     let tickHandle = null;
     function startLoop() {
@@ -272,8 +269,7 @@
         pageRemain = Math.max(0, pageRemain - 1);
         timeLeftEl.textContent = fmt(pageRemain);
         if (pageRemain <= 0) {
-          const arr = nonEmptyPages();
-          const lastPage = (pageIdx >= arr.length - 1);
+          const lastPage = (pageIdx >= pages.length - 1);
           if (lastPage) {
             if (previewMode) {
               // 预览模式：最后一页结束后停止并播放退场音效
@@ -401,8 +397,7 @@
     } catch { }
     function updatePageIndicator() {
       try {
-        const arr = nonEmptyPages();
-        const total = Math.max(0, arr.length || 0);
+        const total = Math.max(0, pages.length || 0);
         if (!total) { pageInfoEl.textContent = '--/--'; return; }
         const cur = Math.max(1, Math.min(total, (pageIdx || 0) + 1));
         pageInfoEl.textContent = String(cur) + '/' + String(total);
