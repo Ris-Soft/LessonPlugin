@@ -22,6 +22,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const biliToolbar = document.getElementById('biliToolbar');
   const biliCollapseBtn = document.getElementById('biliCollapseBtn');
   const biliExpandBtn = document.getElementById('biliExpandBtn');
+  const bgModePanel = document.getElementById('bgModePanel');
   let biliMode = localStorage.getItem('radio.biliVideo.mode') || 'float';
   function applyBiliMode(){ try {
     if (!biliFloat || !biliToolbar) return;
@@ -74,10 +75,51 @@ window.addEventListener('DOMContentLoaded', () => {
       if (biliToolbar) biliToolbar.style.display = 'none';
     }
   }
-  function applyBlurBackground(urlStr) { if (!bgRule) return; bgRule.textContent = `body::before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${28}px) brightness(${0.6});z-index:-1;}`; const ex = document.getElementById('EX_background_fluentShine'); if (ex) ex.remove(); }
-  function applyFluentShine(urlStr) { if (bgRule) bgRule.textContent = ``; let ex = document.getElementById('EX_background_fluentShine'); if (!ex) { ex = document.createElement('div'); ex.id = 'EX_background_fluentShine'; ex.style.position = 'absolute'; ex.style.inset = '0'; ex.style.zIndex = '-1'; document.body.appendChild(ex); for (let i = 1; i <= 4; i++) { const d = document.createElement('div'); d.className = 'fluentShine'; d.style.position = 'absolute'; d.style.width = '50%'; d.style.height = '50%'; if (i === 1) { d.style.top = '0'; d.style.left = '0'; } else if (i === 2) { d.style.top = '0'; d.style.right = '0'; } else if (i === 3) { d.style.bottom = '0'; d.style.left = '0'; } else { d.style.bottom = '0'; d.style.right = '0'; } ex.appendChild(d); } const style = document.createElement('style'); style.textContent = `#EX_background_fluentShine:before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${70}px) brightness(${0.6});z-index:-1;}@keyframes rotate-clockwise{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes rotate-counterclockwise{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}.fluentShine:nth-child(1){animation:rotate-clockwise 15s linear infinite}.fluentShine:nth-child(2){animation:rotate-counterclockwise 12s linear infinite}.fluentShine:nth-child(3){animation:rotate-clockwise 18s linear infinite}.fluentShine:nth-child(4){animation:rotate-counterclockwise 14s linear infinite}`; document.head.appendChild(style); } }
+  function applyBlurBackground(urlStr) {
+    if (!bgRule) return;
+    bgRule.textContent = `body::before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${28}px) brightness(${0.6});z-index:-1;}`;
+    const ex = document.getElementById('EX_background_fluentShine'); if (ex) ex.remove();
+    const st = document.getElementById('EX_background_fluentShine_style'); if (st) st.remove();
+  }
+  function applyFluentShine(urlStr) {
+    if (bgRule) bgRule.textContent = '';
+    let ex = document.getElementById('EX_background_fluentShine');
+    if (!ex) {
+      ex = document.createElement('div');
+      ex.id = 'EX_background_fluentShine';
+      ex.style.position = 'absolute';
+      ex.style.inset = '0';
+      ex.style.zIndex = '-1';
+      document.body.appendChild(ex);
+      for (let i = 1; i <= 4; i++) {
+        const d = document.createElement('div');
+        d.className = 'fluentShine';
+        d.style.position = 'absolute';
+        d.style.width = '50%';
+        d.style.height = '50%';
+        if (i === 1) { d.style.top = '0'; d.style.left = '0'; }
+        else if (i === 2) { d.style.top = '0'; d.style.right = '0'; }
+        else if (i === 3) { d.style.bottom = '0'; d.style.left = '0'; }
+        else { d.style.bottom = '0'; d.style.right = '0'; }
+        ex.appendChild(d);
+      }
+    }
+    let style = document.getElementById('EX_background_fluentShine_style');
+    if (!style) { style = document.createElement('style'); style.id = 'EX_background_fluentShine_style'; document.head.appendChild(style); }
+    const blurPx = Number(localStorage.getItem('radio.bg.blur') || 70);
+    const dark = Number(localStorage.getItem('radio.bg.dark') || 0.6);
+    style.textContent = `#EX_background_fluentShine:before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${blurPx}px) brightness(${dark});z-index:-1;}
+    .fluentShine:before{content:'';position:absolute;inset:0;background:url(${urlStr}) center/cover;filter:blur(${blurPx}px) brightness(${dark});z-index:-1;}
+    @keyframes rotate-clockwise{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes rotate-counterclockwise{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
+    .fluentShine:nth-child(1){animation:rotate-clockwise 15s linear infinite}
+    .fluentShine:nth-child(2){animation:rotate-counterclockwise 12s linear infinite}
+    .fluentShine:nth-child(3){animation:rotate-clockwise 18s linear infinite}
+    .fluentShine:nth-child(4){animation:rotate-counterclockwise 14s linear infinite}`;
+  }
   const bgMode = (localStorage.getItem('radio.bgmode') || 'blur');
   if (albumUrl) { if (bgMode === 'shine') applyFluentShine(albumUrl); else applyBlurBackground(albumUrl); }
+  function applyBackgroundCurrent(){ try { const src = document.getElementById('audioCover')?.src || albumUrl || ''; if (!src) return; const mode = localStorage.getItem('radio.bgmode') || 'blur'; if (mode === 'shine') applyFluentShine(src); else applyBlurBackground(src); } catch {} }
   async function renderLyricsForKuwo(id) {
     try {
       const le = document.getElementById('lyrics'); if (le) le.textContent = '';
@@ -115,6 +157,7 @@ window.addEventListener('DOMContentLoaded', () => {
   audio.addEventListener('timeupdate', () => { if (biliVideo && musicSource === 'bili') { try { const dt = Math.abs((biliVideo.currentTime||0) - (audio.currentTime||0)); if (dt > 0.5) biliVideo.currentTime = audio.currentTime; } catch { } } });
   if (biliCollapseBtn) biliCollapseBtn.onclick = () => { setBiliMode(biliMode === 'hidden' ? 'float' : 'hidden'); };
   if (biliExpandBtn) biliExpandBtn.onclick = () => { setBiliMode(biliMode === 'expand' ? 'float' : 'expand'); };
+  try { if (bgModePanel) { const items = bgModePanel.querySelectorAll('.bgmode-item'); items.forEach((el) => { el.onclick = () => { try { const m = el.dataset.mode || 'blur'; localStorage.setItem('radio.bgmode', m); bgModePanel.style.display = 'none'; applyBackgroundCurrent(); } catch {} }; }); } } catch {}
   let isDragging = false;
   function seekByClientX(x){ if (!audio.duration) return; const rect = progressBar.getBoundingClientRect(); const pct = Math.max(0, Math.min(1, (x - rect.left) / rect.width)); audio.currentTime = pct * audio.duration; }
   if (progressBar) {
@@ -144,7 +187,7 @@ window.addEventListener('DOMContentLoaded', () => {
   async function updateFinishEstimate() { try { const finEl = document.getElementById('playlistFinish'); if (!finEl) return; if (Date.now() - lastFinishUpdateTs < 3000) return; lastFinishUpdateTs = Date.now(); const r = await window.lowbarAPI.pluginCall('radio.music', 'getPlaylist', []); const data = r && r.result ? r.result : r; if (!data || !Array.isArray(data.items)) return; const startIdx = Math.max(0, data.currentIndex || 0); const remainList = data.items.slice(startIdx); const remainSecs = Math.max(0, remainList.reduce((acc, it) => acc + (Number(it.duration) || 0), 0) - Math.floor(Number(audio.currentTime) || 0)); const dt = new Date(Date.now() + remainSecs * 1000); const hh = String(dt.getHours()).padStart(2, '0'); const mm = String(dt.getMinutes()).padStart(2, '0'); finEl.textContent = `预计播完：${hh}:${mm}`; } catch { } }
   try { audio.addEventListener('timeupdate', updateFinishEstimate); } catch { }
   loadPlaylist();
-  try { const ch = new URL(location.href).searchParams.get('channel'); if (ch) { window.lowbarAPI.subscribe?.(ch); window.lowbarAPI.onEvent?.((name, payload) => { if (name === ch && payload && payload.type === 'update') { if (payload.target === 'playlist') { loadPlaylist(); (async () => { try { const r2 = await window.lowbarAPI.pluginCall('radio.music', 'getPlaylist', []); const d2 = r2 && r2.result ? r2.result : r2; if (d2 && Array.isArray(d2.items) && d2.currentIndex >= 0) { const cur = d2.items[d2.currentIndex]; const le = document.getElementById('lyrics'); if (cur && cur.id && cur.source === 'kuwo') { await renderLyricsForKuwo(cur.id); } else { if (le) le.textContent = ''; } } } catch { } })(); } else if (payload.target === 'songLoading') { try { const x = document.getElementById('songLoading'); if (x) x.style.display = (payload.value === 'show') ? 'flex' : 'none'; } catch { } } } }); } } catch { }
+  try { const ch = new URL(location.href).searchParams.get('channel'); if (ch) { window.lowbarAPI.subscribe?.(ch); window.lowbarAPI.onEvent?.((name, payload) => { if (name === ch && payload && payload.type === 'update') { if (payload.target === 'playlist') { loadPlaylist(); try { applyBackgroundCurrent(); } catch {} (async () => { try { const r2 = await window.lowbarAPI.pluginCall('radio.music', 'getPlaylist', []); const d2 = r2 && r2.result ? r2.result : r2; if (d2 && Array.isArray(d2.items) && d2.currentIndex >= 0) { const cur = d2.items[d2.currentIndex]; const le = document.getElementById('lyrics'); if (cur && cur.id && cur.source === 'kuwo') { await renderLyricsForKuwo(cur.id); } else { if (le) le.textContent = ''; } } } catch { } })(); } else if (payload.target === 'songLoading') { try { const x = document.getElementById('songLoading'); if (x) x.style.display = (payload.value === 'show') ? 'flex' : 'none'; } catch { } } else if (payload.target === 'bgModePanel') { try { if (!bgModePanel) return; const v = String(payload.value||''); if (v === 'toggle') { const cur = bgModePanel.style.display; bgModePanel.style.display = (!cur || cur==='none') ? 'flex' : 'none'; } else if (v === 'show') bgModePanel.style.display = 'flex'; else if (v === 'hide') bgModePanel.style.display = 'none'; } catch {} } } }); } } catch { }
   try { const toggle = document.getElementById('removeAfterPlay'); async function initToggle() { try { const r = await window.lowbarAPI.pluginCall('radio.music', 'getSettings', []); const d = r && r.result ? r.result : r; const cur = !!(d && d.settings && d.settings.removeAfterPlay); if (toggle) toggle.checked = cur; } catch { } } function persistLocal() { try { if (toggle) localStorage.setItem('radio.removeAfterPlay', toggle.checked ? '1' : '0'); } catch { } } if (toggle) { initToggle(); toggle.addEventListener('change', async () => { try { await window.lowbarAPI.pluginCall('radio.music', 'setRemoveAfterPlay', [toggle.checked]); persistLocal(); } catch { } }); } } catch { }
   try { const addBtn = document.getElementById('playlistAddBtn'); if (addBtn) addBtn.onclick = async () => { try { await window.lowbarAPI.pluginCall('radio.music', 'onLowbarEvent', [{ type: 'click', id: 'tab-search' }]); } catch { } }; } catch { }
   const prevBtn = document.getElementById('audioPrevBtn');

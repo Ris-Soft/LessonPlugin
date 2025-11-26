@@ -41,6 +41,7 @@ const functions = {
         centerItems: [
           // { id: 'tab-recommend', text: '推荐', icon: 'ri-thumb-up-line' },
           { id: 'tab-search', text: '搜索', icon: 'ri-search-line' },
+          { id: 'btn-bgmode', text: '背景', icon: 'ri-contrast-drop-2-line' },
           // { id: 'tab-settings', text: '设置', icon: 'ri-settings-3-line' },
           // { id: 'tab-about', text: '关于', icon: 'ri-information-line' }
         ],
@@ -723,6 +724,8 @@ const functions = {
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingBounds', value: { width: 640, height: 400 } });
           pluginApi.emit(state.eventChannel, { type: 'update', target: 'floatingUrl', value: state.pages.about });
           state.currentFloatingUrl = state.pages.about;
+        } else if (payload.id === 'btn-bgmode') {
+          try { pluginApi.emit(state.eventChannel, { type: 'update', target: 'bgModePanel', value: 'toggle' }); } catch {}
         }
       }
       return true;

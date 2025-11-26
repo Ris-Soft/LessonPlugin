@@ -41,7 +41,7 @@ html, body { height: 100%; margin: 0; background: transparent; color: #eee; font
 .now-title, .now-artist { -webkit-user-select: text; -ms-user-select: text; user-select: text; }
 #lyrics::-webkit-scrollbar { width: 0; height: 0; }
 #lyrics .line>div { white-space: normal; word-break: break-word; }
-#lyrics .line { margin: 15px 0; }
+#lyrics .line { margin: 25px 0; }
 #lyrics .row { line-height: 1.4; }
 #lyrics .row.origin { font-size: 1.15em; }
 #lyrics .line.single .row.origin { font-size: 1.25em; }
@@ -73,3 +73,6 @@ html, body { height: 100%; margin: 0; background: transparent; color: #eee; font
 .bili-toolbar.overlay { top:auto; bottom:16px; }
 .bili-toolbar button { border:0; background:transparent; color:#eee; cursor:pointer; font-size:14px; display:flex; align-items:center; gap:6px; padding:4px 8px; }
 .bili-toolbar button:hover { opacity:0.85; }
+.bgmode-panel { position:absolute; right:16px; bottom:96px; background:rgba(0,0,0,0.45); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.12); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.35); padding:8px; display:flex; flex-direction:column; gap:6px; z-index:1000; }
+.bgmode-item { padding:6px 10px; border-radius:8px; cursor:pointer; color:#e6e6e6; }
+.bgmode-item:hover { background:rgba(255,255,255,0.08); }
