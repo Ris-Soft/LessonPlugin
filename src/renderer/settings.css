@@ -1910,6 +1910,6 @@ a.topnav-item { text-decoration: none; }
 .about-logo { width: 36px; height: 36px; }
 .store-tabs .sub-item { background: transparent; border: 1px solid var(--border); color: var(--fg); }
 .store-tabs .sub-item.active { background: transparent; color: var(--accent); border-color: rgba(34, 197, 94, 0.45); }
-.store-tabs .sub-item:hover { background: transparent; border-color: var(--border); }
+.store-tabs .sub-item:hover { background: transparent; }
 .plugin-card { border: 1px solid var(--border); background: var(--panel); border-radius: 10px; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; }
 .plugin-card:hover { border-color: rgba(34, 197, 94, 0.45); background: rgba(34, 197, 94, 0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }

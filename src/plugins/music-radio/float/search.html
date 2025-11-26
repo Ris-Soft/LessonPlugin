@@ -32,12 +32,19 @@
     .menu .actions { display:flex; gap:10px; }
     .menu .actions button { padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid #2a2a2a; background:#262626; color:#e6e6e6; cursor:pointer; }
     .menu .actions i { margin-right:6px; color:#c0c0c0; }
+    .loadingbar { display:none; padding: 8px 16px; color:#9ad; align-items:center; gap:8px; }
+    .loadingbar i { font-size:16px; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; }
+    .tip { padding: 0 16px 4px 16px; color:#9a9a9a; font-size:12px; }
   </style>
   <script>
     let currentPage = 0;
     let currentQuery = '';
+    let currentSource = 'kuwo';
     let hasMore = false;
     let loading = false;
+    let searchSeq = 0;
     let openMenu = null;
     function renderItems(items){
       const r = document.getElementById('result');
@@ -49,26 +56,22 @@
         const a = document.createElement('div'); a.className = 'artist'; a.textContent = (it.artist||'') + (it.album? ' · ' + it.album : '');
         meta.appendChild(t); meta.appendChild(a);
         el.appendChild(img); el.appendChild(meta);
-        const ctrl = document.createElement('div'); ctrl.className = 'controls';
-        const btnTail = document.createElement('button'); btnTail.innerHTML = '<i class="ri-play-list-2-line"></i>';
-        const btnPlay = document.createElement('button'); btnPlay.innerHTML = '<i class="ri-play-fill"></i>';
-        const btnNext = document.createElement('button'); btnNext.innerHTML = '<i class="ri-skip-forward-fill"></i>';
-        function hideFloating(){ try { window.lowbarAPI.emitEvent('radio.music', { type:'update', target:'floatingUrl', value: null }); } catch {} }
-        btnTail.onclick = async (e) => { e.stopPropagation(); await window.lowbarAPI.pluginCall('radio.music', 'enqueueTail', [it]); hideFloating(); };
-        btnPlay.onclick = async (e) => { e.stopPropagation(); const r = await window.lowbarAPI.pluginCall('radio.music', 'playNow', [it]); if (!(r && (r.result ? r.result.ok : r.ok))) alert('播放失败'); hideFloating(); };
-        btnNext.onclick = async (e) => { e.stopPropagation(); await window.lowbarAPI.pluginCall('radio.music', 'enqueueNext', [it]); hideFloating(); };
-        ctrl.appendChild(btnTail); ctrl.appendChild(btnPlay); ctrl.appendChild(btnNext);
-        el.appendChild(ctrl);
         const menu = document.createElement('div'); menu.className = 'menu';
         const actions = document.createElement('div'); actions.className = 'actions';
         const mTail = document.createElement('button'); mTail.innerHTML = '<i class="ri-play-list-2-line"></i> 插入到歌单尾部';
         const mPlay = document.createElement('button'); mPlay.innerHTML = '<i class="ri-play-fill"></i> 立即播放';
         const mNext = document.createElement('button'); mNext.innerHTML = '<i class="ri-skip-forward-fill"></i> 下一首播放';
-        mTail.onclick = (e) => { e.stopPropagation(); btnTail.click(); hideFloating(); };
-        mPlay.onclick = (e) => { e.stopPropagation(); btnPlay.click(); hideFloating(); };
-        mNext.onclick = (e) => { e.stopPropagation(); btnNext.click(); hideFloating(); };
+        function hideFloating(){ try { window.lowbarAPI.emitEvent('radio.music', { type:'update', target:'floatingUrl', value: null }); } catch {} }
+        mTail.onclick = async (e) => { e.stopPropagation(); await window.lowbarAPI.pluginCall('radio.music', 'enqueueTail', [it]); hideFloating(); };
+        mPlay.onclick = async (e) => { e.stopPropagation(); const r = await window.lowbarAPI.pluginCall('radio.music', 'playNow', [it]); if (!(r && (r.result ? r.result.ok : r.ok))) alert('播放失败'); hideFloating(); };
+        mNext.onclick = async (e) => { e.stopPropagation(); await window.lowbarAPI.pluginCall('radio.music', 'enqueueNext', [it]); hideFloating(); };
         actions.appendChild(mTail); actions.appendChild(mPlay); actions.appendChild(mNext);
         menu.appendChild(actions);
+        const ctrl = document.createElement('div'); ctrl.className = 'controls';
+        const btnExpand = document.createElement('button'); btnExpand.innerHTML = '<i class="ri-arrow-down-s-line"></i> 展开';
+        btnExpand.onclick = (e) => { e.stopPropagation(); if (openMenu && openMenu !== menu) openMenu.style.display = 'none'; menu.style.display = (menu.style.display === 'none' || !menu.style.display) ? 'block' : 'none'; openMenu = menu.style.display === 'block' ? menu : null; };
+        ctrl.appendChild(btnExpand);
+        el.appendChild(ctrl);
         el.onclick = () => {
           if (openMenu && openMenu !== menu) openMenu.style.display = 'none';
           menu.style.display = menu.style.display === 'none' || !menu.style.display ? 'block' : 'none';
@@ -85,18 +88,25 @@
       const btn = document.getElementById('loadmore');
       const pageInfo = document.getElementById('pageinfo');
       const dbg = document.getElementById('debugjson');
+      const sbtn = document.getElementById('searchbtn');
+      const lbar = document.getElementById('loadingbar');
       btn.disabled = true;
-      const res = await window.lowbarAPI.pluginCall('radio.music', 'searchKuwo', [currentQuery, currentPage]);
+      if (sbtn) sbtn.disabled = true;
+      if (lbar) { lbar.style.display = 'flex'; }
+      const method = currentSource === 'bili' ? 'searchBili' : 'searchKuwo';
+      const res = await window.lowbarAPI.pluginCall('radio.music', method, [currentQuery, currentPage]);
       const data = res && res.result ? res.result : res;
       if (!data || data.ok === false) {
         if (!append) r.textContent = '搜索失败';
         const txt = (data && data.raw) ? data.raw : JSON.stringify(res || {});
         dbg.textContent = String(txt || '');
         dbg.style.display = 'block';
-        loading = false;
-        btn.disabled = false;
-        return;
-      }
+      loading = false;
+      btn.disabled = false;
+      if (sbtn) sbtn.disabled = false;
+      if (lbar) { lbar.style.display = 'none'; }
+      return;
+    }
       const items = Array.isArray(data.items) ? data.items : [];
       hasMore = !!data.hasMore;
       if (!append) r.innerHTML = '';
@@ -114,16 +124,36 @@
       pageInfo.textContent = `第 ${currentPage+1} 页`;
       loading = false;
       btn.disabled = false;
+      if (sbtn) sbtn.disabled = false;
+      if (lbar) { lbar.style.display = 'none'; }
     }
     async function doSearch(){
       const q = document.getElementById('q').value.trim();
       const r = document.getElementById('result');
       r.style.display = 'block';
       if (!q) { r.innerHTML = '请输入关键词'; return; }
+      searchSeq += 1;
+      const seq = searchSeq;
+      r.innerHTML = '';
+      const dbg = document.getElementById('debugjson');
+      if (dbg) { dbg.textContent = ''; dbg.style.display = 'none'; }
+      const btn = document.getElementById('loadmore');
+      if (btn) { btn.style.display = 'none'; btn.disabled = true; }
       currentQuery = q;
       currentPage = 0;
+      loading = false;
       await loadPage(false);
+      if (seq !== searchSeq) return;
     }
+    function initSourceSwitch(){
+      const sel = document.getElementById('source');
+      if (sel) {
+        sel.value = currentSource;
+        sel.addEventListener('change', () => { currentSource = sel.value || 'kuwo'; });
+      }
+    }
+    window.addEventListener('DOMContentLoaded', initSourceSwitch);
+    window.addEventListener('DOMContentLoaded', () => { const iq = document.getElementById('q'); if (iq) { iq.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); }); try { iq.focus(); } catch {} } });
   </script>
 </head>
 <body>
@@ -131,10 +161,16 @@
     <header>搜索歌曲</header>
     <div class="content">
       <input id="q" placeholder="输入歌名/艺术家" />
-      <button onclick="doSearch()"><i class="ri-search-line"></i> 搜索</button>
+      <select id="source" style="padding:10px 12px;border-radius:6px;border:1px solid #2a2a2a;background:#101010;color:#e6e6e6;">
+        <option value="kuwo">酷我</option>
+        <option value="bili">Bilibili</option>
+      </select>
+      <button id="searchbtn" onclick="doSearch()"><i class="ri-search-line"></i> 搜索</button>
     </div>
+    <div class="tip">请单击目标歌曲以调起播放菜单</div>
     <div class="scroll">
       <div id="result" class="result">输入关键词后显示结果</div>
+      <div id="loadingbar" class="loadingbar"><i class="ri-loader-4-line spin"></i> 正在搜索…</div>
       <div style="padding: 8px 16px; display:flex; align-items:center; gap:12px;">
         <span id="pageinfo">第 1 页</span>
         <button id="loadmore" style="display:none;" onclick="(async()=>{ if (!hasMore) return; currentPage += 1; await loadPage(true); })()">加载更多</button>

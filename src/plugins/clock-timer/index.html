@@ -243,13 +243,37 @@
 
       let isFullscreen = false;
       let prevFullscreen = null;
+      let tz = 'Asia/Shanghai';
+      let baseNowMs = Date.now();
+      let baseJsNow = Date.now();
+      const fmtHMSByTZ = (ms) => {
+        try {
+          const d = new Date(ms);
+          const parts = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(d);
+          const get = (t) => parts.find(p => p.type === t)?.value || '00';
+          return `${get('hour')}:${get('minute')}:${get('second')}`;
+        } catch (_) {
+          const d = new Date(ms);
+          const h = String(d.getHours()).padStart(2, '0');
+          const m = String(d.getMinutes()).padStart(2, '0');
+          const s = String(d.getSeconds()).padStart(2, '0');
+          return `${h}:${m}:${s}`;
+        }
+      };
+      const syncTime = async () => {
+        try {
+          const cfgTz = await window.clockAPI?.configGet('system', 'timeZone');
+          if (typeof cfgTz === 'string' && cfgTz) tz = cfgTz;
+        } catch {}
+        try {
+          const t = await window.clockAPI?.getCurrentTime();
+          if (t && typeof t.nowMs === 'number') { baseNowMs = t.nowMs; baseJsNow = Date.now(); }
+        } catch {}
+      };
       const tick = () => {
-        // clock
-        const now = new Date();
-        el('clock-time').textContent = fmt(now.getHours()*3600*1000 + now.getMinutes()*60*1000 + now.getSeconds()*1000);
-        // stopwatch
+        const nowMs = baseNowMs + (Date.now() - baseJsNow);
+        el('clock-time').textContent = fmtHMSByTZ(nowMs);
         if (swRunning) el('stopwatch-time').textContent = fmt(Date.now() - swStart); else el('stopwatch-time').textContent = fmt(swElapsed);
-        // countdown
         if (cdRunning) {
           const left = Math.max(0, cdTarget - Date.now());
           el('countdown-time').textContent = fmt(left);
@@ -266,6 +290,8 @@
         }
       };
 
+      (async () => { await syncTime(); })();
+      setInterval(() => { syncTime(); }, 5000);
       setInterval(() => {
         tick();
         const idleFor = Date.now() - lastActive;

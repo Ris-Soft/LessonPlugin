@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>播放页面背景</title>
+  <link href="https://assets.3r60.top/icons/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+  <link rel="stylesheet" href="./player.css" />
+  <style id="bgRule"></style>
+  <script defer src="./player.js"></script>
+  </head>
+<body>
+  <div class="wrap">
+    <div id="mount" style="position:absolute; inset:0;">
+      <div class="content-area">
+        <div id="songLoading" class="loading-wrap"><div class="loading-card"><i class="ri-loader-4-line spin"></i> 正在加载歌曲…</div></div>
+        <div id="emptyOverlay" style="position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:#000;">
+          <div style="padding:24px 28px; border-radius:16px; color:#e6e6e6;">
+            <div style="font-size:22px; font-weight:700; margin-bottom:8px;">暂无播放内容</div>
+            <div style="font-size:14px; color:#cfcfcf;">在底栏打开“搜索”添加歌曲后开始播放</div>
+          </div>
+        </div>
+        <div class="playlist">
+          <div class="items" id="playlist"></div>
+          <div style="margin: 8px; display:flex; align-items:center; gap:8px; color:#cfcfcf;">
+            <input id="removeAfterPlay" type="checkbox" style="accent-color:#6ab4ff;" />
+            <label for="removeAfterPlay" style="cursor:pointer;">播完删除</label>
+          </div>
+          <div class="total" id="playlistTotal"><span id="playlistTotalText">总时长：--:--</span> <span id="playlistFinish" style="color:#cfcfcf; font-size:12px;">预计播完：--:--</span></div>
+          <div id="playlistAddBtn" style="margin-top:12px; display:flex; align-items:center; gap:8px; color:#e6e6e6; cursor:pointer; padding:8px; border:1px dashed rgba(255,255,255,0.1); border-radius:8px;">
+            <i class="ri-add-line"></i> 添加音乐
+          </div>
+        </div>
+        <div class="now-left">
+          <div class="cover-wrap"><img class="now-cover" id="audioCover" src="" alt="cover" /></div>
+          <div class="now-meta">
+            <div class="now-title" id="audioTitle"></div>
+            <div class="now-artist" id="audioArtist"></div>
+          </div>
+        </div>
+        <div class="now-right">
+          <div id="lyricsLoading" class="loading-card" style="display:none; position:absolute; right:16px; top:16px;"><i class="ri-loader-4-line spin"></i> 正在加载歌词…</div>
+          <div id="lyrics">暂无歌词</div>
+          <div id="biliVideoFloat" class="bili-video-float" style="display:none;">
+            <video id="biliVideo" playsinline muted></video>
+          </div>
+          <div id="biliToolbar" class="bili-toolbar" style="display:none;">
+            <button id="biliCollapseBtn" title="收起画面"><i class="ri-subtract-line"></i> 收起</button>
+            <button id="biliExpandBtn" title="放大画面"><i class="ri-expand-diagonal-line"></i> 放大</button>
+          </div>
+        </div>
+      </div>
+      <div class="audio-bar" id="audioBar" style="display: flex">
+        <div class="audio-progress-wrap">
+          <span class="audio-progress-time" id="progressCurrent">0:00</span>
+          <div class="audio-progress-bar" id="audioProgressBar">
+            <div class="audio-progress" id="audioProgress"></div>
+            <div class="audio-progress-dot" id="audioProgressDot"></div>
+          </div>
+          <span class="audio-progress-time" id="progressDuration">0:00</span>
+        </div>
+        <div class="audio-bar-inner">
+          <div class="audio-time" id="audioTime">0:00/0:00</div>
+          <div class="audio-controls" style="margin: 0 auto; display:flex; gap:12px; align-items:center;">
+            <button class="audio-btn" id="audioPrevBtn" title="上一首"><i class="ri-skip-back-fill"></i></button>
+            <button class="audio-btn" id="audioPlayBtn" title="播放/暂停"><i class="ri-play-fill"></i></button>
+            <button class="audio-btn" id="audioNextBtn" title="下一首"><i class="ri-skip-forward-fill"></i></button>
+          </div>
+        </div>
+      </div>
+      <audio id="audio" preload="auto" style="display: none"></audio>
+    </div>
+  </div>
+</body>
+</html>

@@ -39,6 +39,7 @@
       .row-header, .col-header { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 6px 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; }
       .row-header.aisle, .col-header.aisle { background: rgba(255,255,255,0.02); border-style: dashed; }
       .row-header.selected, .col-header.selected { outline: 2px solid rgba(255,255,255,0.25); }
+      .cell.drag-hover { outline: 2px solid rgba(80,170,255,0.9); box-shadow: 0 0 0 2px rgba(80,170,255,0.25) inset; }
       .header-actions { display: flex; gap: 6px; }
       .bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 16px; display: flex; justify-content: flex-end; align-items: center; }
       .btn[disabled] { opacity: 0.5; pointer-events: none; }
@@ -98,6 +99,11 @@
       let openCellMenu = null;
       let selectedCellRi = -1;
       let selectedCellCi = -1;
+      let longPressTimer = null;
+      let longPressStart = null;
+      let isManualDragging = false;
+      let manualDrag = null;
+      let hoverCellEl = null;
 
       function seatKey(ri, ci) { const r = config.rows[ri]?.id; const c = config.cols[ci]?.id; return r && c ? `${r}-${c}` : ''; }
       function isAisleRow(i) { return (config.rows[i]?.type || '') === 'aisle'; }
@@ -161,7 +167,7 @@
           d.className = `col-header${col.type==='aisle' ? ' aisle' : ''}`;
           const t = document.createElement('div'); t.textContent = col.type==='aisle' ? '|' : String(colDisplay[ci] || '');
           d.appendChild(t);
-          d.addEventListener('click', (ev) => { selectedColIndex = ci; selectedRowIndex = -1; highlightSelection(); showMarkMenuAtEvent(ev, 'col', ci); });
+          d.addEventListener('click', (ev) => { selectedColIndex = ci; selectedRowIndex = -1; highlightSelection(); showMarkMenuAtEvent(ev, 'col', ci); ev.stopPropagation(); });
           d.draggable = true;
           d.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/col-index', String(ci)); });
           d.addEventListener('dragover', (e) => { e.preventDefault(); });
@@ -184,7 +190,7 @@
           d.className = `row-header${row.type==='aisle' ? ' aisle' : ''}`;
           const t = document.createElement('div'); t.textContent = row.type==='aisle' ? '—' : String(rowDisplay[ri] || '');
           d.appendChild(t);
-          d.addEventListener('click', (ev) => { selectedRowIndex = ri; selectedColIndex = -1; highlightSelection(); showMarkMenuAtEvent(ev, 'row', ri); });
+          d.addEventListener('click', (ev) => { selectedRowIndex = ri; selectedColIndex = -1; highlightSelection(); showMarkMenuAtEvent(ev, 'row', ri); ev.stopPropagation(); });
           d.draggable = true;
           d.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/row-index', String(ri)); });
           d.addEventListener('dragover', (e) => { e.preventDefault(); });
@@ -228,19 +234,24 @@
             menu.appendChild(btnSwap); menu.appendChild(btnRemove);
             cell.appendChild(menu);
             cell.draggable = !!name;
+            cell.addEventListener('pointerdown', (e) => { if (!name || aisle) return; startLongPress(e, { type: 'cell', ri, ci, name }); });
             cell.addEventListener('click', (e) => {
               if (swapFrom) { applySwap(ri, ci); return; }
               if (!aisle && selectedPersonName) { setOccupantAt(ri, ci, selectedPersonName); selectedPersonName=''; selectedPersonEl && (selectedPersonEl.classList.remove('selected'), selectedPersonEl=null); renderGrid(); renderFreeList(); return; }
               selectedRowIndex = -1; selectedColIndex = -1; selectedCellRi = ri; selectedCellCi = ci; highlightSelection();
-              if (name) { if (openCellMenu && openCellMenu !== menu) { openCellMenu.style.display='none'; openCellMenu = null; } showMarkMenuAtEvent(e, 'cell', { ri, ci }); }
+              if (name) { if (openCellMenu && openCellMenu !== menu) { openCellMenu.style.display='none'; openCellMenu = null; } showMarkMenuAtEvent(e, 'cell', { ri, ci }); e.stopPropagation(); }
             });
             cell.addEventListener('dragstart', (e) => { const nm = occupantNameAt(ri, ci); if (nm) { e.dataTransfer.setData('text/student', nm); e.dataTransfer.setData('text/plain', nm); e.dataTransfer.setData('text', nm); e.dataTransfer.setData('Text', nm); e.dataTransfer.setData('text/from', `${ri},${ci}`); e.dataTransfer.effectAllowed = 'copyMove'; } });
             if (!aisle) {
-              cell.addEventListener('dragenter', (e) => { e.preventDefault(); });
+              cell.dataset.dragDepth = '0';
+              cell.addEventListener('dragenter', (e) => { e.preventDefault(); const d = parseInt(cell.dataset.dragDepth||'0'); cell.dataset.dragDepth = String((Number.isFinite(d)?d:0) + 1); cell.classList.add('drag-hover'); });
               cell.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); try { e.dataTransfer.dropEffect = 'copy'; } catch {} });
+              cell.addEventListener('dragleave', (e) => { const d = parseInt(cell.dataset.dragDepth||'0') - 1; const nd = Number.isFinite(d) ? Math.max(0, d) : 0; cell.dataset.dragDepth = String(nd); if (nd <= 0) cell.classList.remove('drag-hover'); });
               cell.addEventListener('drop', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                cell.classList.remove('drag-hover');
+                cell.dataset.dragDepth = '0';
                 let nm = String(e.dataTransfer.getData('text/student')||'');
                 if (!nm) nm = String(e.dataTransfer.getData('text/plain')||'');
                 if (!nm) nm = String(e.dataTransfer.getData('text')||'');
@@ -287,6 +298,7 @@
           const d = document.createElement('div'); d.className = 'item'; d.textContent = s.name || '';
           d.draggable = true;
           d.addEventListener('dragstart', (e) => { const nm = String(s.name||''); e.dataTransfer.setData('text/student', nm); e.dataTransfer.setData('text/plain', nm); e.dataTransfer.setData('text', nm); e.dataTransfer.setData('Text', nm); try { e.dataTransfer.effectAllowed = 'copy'; } catch {} try { e.dataTransfer.setDragImage(d, 10, 10); } catch {} });
+          d.addEventListener('pointerdown', (e) => { const nm = String(s.name||''); startLongPress(e, { type: 'free', name: nm }); });
           d.addEventListener('click', () => {
             if (selectedPersonEl && selectedPersonEl !== d) selectedPersonEl.classList.remove('selected');
             selectedPersonEl = d; selectedPersonName = String(s.name||'');
@@ -445,10 +457,10 @@
             hideMarkMenu();
             selectedRowIndex = -1; selectedColIndex = -1; selectedCellRi = -1; selectedCellCi = -1;
             highlightSelection();
-            document.removeEventListener('mousedown', onDoc);
+            document.removeEventListener('click', onDoc);
           }
         };
-        document.addEventListener('mousedown', onDoc);
+        setTimeout(() => { document.addEventListener('click', onDoc); }, 0);
       }
       function hideMarkMenu() { const menu = document.getElementById('markMenu'); if (menu) menu.style.display = 'none'; }
 
@@ -492,6 +504,94 @@
           const inCellMenu = t && (t.closest && t.closest('.cell .menu'));
           if (!inCellMenu && openCellMenu) { openCellMenu.style.display='none'; openCellMenu = null; }
         });
+      }
+
+      function startLongPress(e, info) {
+        if (isManualDragging) return;
+        const x = e.clientX || 0;
+        const y = e.clientY || 0;
+        longPressStart = { x, y, info };
+        longPressTimer = setTimeout(() => { beginManualDrag(e, info); }, 350);
+        const cancelIfMove = (ev) => {
+          const dx = (ev.clientX||0) - x;
+          const dy = (ev.clientY||0) - y;
+          if (Math.abs(dx) > 6 || Math.abs(dy) > 6) cancelLongPress();
+        };
+        const cancel = () => { cancelLongPress(); document.removeEventListener('pointermove', cancelIfMove); document.removeEventListener('pointerup', cancel); document.removeEventListener('pointercancel', cancel); };
+        document.addEventListener('pointermove', cancelIfMove);
+        document.addEventListener('pointerup', cancel);
+        document.addEventListener('pointercancel', cancel);
+      }
+
+      function cancelLongPress() {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        longPressStart = null;
+      }
+
+      function beginManualDrag(e, info) {
+        isManualDragging = true;
+        manualDrag = { info };
+        const ghost = document.createElement('div');
+        ghost.style.position = 'fixed';
+        ghost.style.left = (e.clientX||0) + 'px';
+        ghost.style.top = (e.clientY||0) + 'px';
+        ghost.style.transform = 'translate(-50%, -50%)';
+        ghost.style.zIndex = '1000';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.background = 'rgba(255,255,255,0.12)';
+        ghost.style.border = '1px solid rgba(255,255,255,0.25)';
+        ghost.style.borderRadius = '6px';
+        ghost.style.padding = '6px 10px';
+        ghost.style.color = '#fff';
+        ghost.textContent = String(info.name||'');
+        document.body.appendChild(ghost);
+        manualDrag.ghost = ghost;
+        const onMove = (ev) => {
+          ghost.style.left = (ev.clientX||0) + 'px';
+          ghost.style.top = (ev.clientY||0) + 'px';
+          const el = document.elementFromPoint(ev.clientX||0, ev.clientY||0);
+          const cell = el && (el.closest && el.closest('.cell'));
+          if (hoverCellEl && hoverCellEl !== cell) hoverCellEl.classList.remove('drag-hover');
+          hoverCellEl = cell || null;
+          if (hoverCellEl) {
+            const toRi = parseInt(hoverCellEl.dataset.ri||'-1');
+            const toCi = parseInt(hoverCellEl.dataset.ci||'-1');
+            const aisle = Number.isFinite(toRi) && Number.isFinite(toCi) ? (isAisleRow(toRi) || isAisleCol(toCi)) : true;
+            if (!aisle) hoverCellEl.classList.add('drag-hover');
+          }
+        };
+        const onUp = (ev) => {
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          document.removeEventListener('pointercancel', onUp);
+          if (hoverCellEl) hoverCellEl.classList.remove('drag-hover');
+          if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+          const cell = hoverCellEl;
+          hoverCellEl = null;
+          isManualDragging = false;
+          manualDrag = null;
+          cancelLongPress();
+          if (cell && cell.dataset) {
+            const toRi = parseInt(cell.dataset.ri);
+            const toCi = parseInt(cell.dataset.ci);
+            const aisle = isAisleRow(toRi) || isAisleCol(toCi);
+            if (!aisle) {
+              if (info.type === 'free') {
+                setOccupantAt(toRi, toCi, String(info.name||''));
+                renderGrid(); renderFreeList();
+              } else if (info.type === 'cell') {
+                const fromName = occupantNameAt(info.ri, info.ci);
+                const toName = occupantNameAt(toRi, toCi);
+                setOccupantAt(info.ri, info.ci, toName);
+                setOccupantAt(toRi, toCi, fromName);
+                renderGrid(); renderFreeList();
+              }
+            }
+          }
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
       }
 
       (async function init() {
