@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>外部词库</title>
     <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
-    <style>
-      body { margin:0; font-family: system-ui, sans-serif; background:#121212; color:#e6e6e6; }
+  <style>
+      html, body { margin:0; padding:0 !important; }
+      body { font-family: system-ui, sans-serif; background:#121212; color:#e6e6e6; }
       .wrap { padding: 16px; }
+      .wrap > .section:first-child { margin-top: 0; }
       input, button { background:#1b1b1b; color:#e6e6e6; border:1px solid #2c2c2c; border-radius:8px; padding:6px 10px; }
       /* 取消输入框选中时的黄色/高亮边线 */
       input:focus, input:focus-visible, textarea:focus, button:focus { outline: none; box-shadow: none; border-color: #2c2c2c; }
@@ -158,9 +160,9 @@
             return base.href;
           };
           const openCarousel = () => {
-            const float = new URL('../../../plugins/multiword/float/externallib-settings.html', window.location.href).href;
-            const href = toUrl(float, { server: String(u||'').trim() });
-            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 820, height: 560 } });
+            const float = new URL('../../../plugins/multiword/float/range-select.html', window.location.href).href;
+            const href = toUrl(float, { server: String(u||'').trim(), next:'carousel' });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 980, height: 680 } });
             window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
           };
           const openAll = () => {
@@ -170,9 +172,9 @@
             window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
           };
           const openCheck = () => {
-            const float = new URL('../../../plugins/multiword/float/check-setup.html', window.location.href).href;
-            const href = toUrl(float, { server: String(u||'').trim() });
-            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 840, height: 580 } });
+            const float = new URL('../../../plugins/multiword/float/range-select.html', window.location.href).href;
+            const href = toUrl(float, { server: String(u||'').trim(), next:'check' });
+            window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 980, height: 680 } });
             window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
           };
           const openDict = () => {

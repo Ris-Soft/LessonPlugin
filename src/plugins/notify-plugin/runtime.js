@@ -1,9 +1,9 @@
 (() => {
   const state = { queue: [], active: false, enabled: true, audio: { info: null, warn: null, error: null }, systemSoundVolume: 80, ttsEnabled: false, ttsVoiceURI: '', ttsPitch: 1, ttsRate: 1, ttsEngine: 'system', ttsEndpoint: '', ttsEdgeVoice: '', ttsVolume: 100 };
   const el = {
-    toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovCountdown: document.getElementById('ovCountdown'),
+    toast: document.getElementById('toast'), overlay: document.getElementById('overlay'), ovTitle: document.getElementById('ovTitle'), ovSub: document.getElementById('ovSub'), ovClose: document.getElementById('ovClose'), ovBarLeft: document.getElementById('ovBarLeft'), ovBarCenter: document.getElementById('ovBarCenter'),
     overlayText: document.getElementById('overlayText'), overlayTextContent: document.getElementById('overlayTextContent'),
-    overlayComponent: document.getElementById('overlayComponent'), ovCompFrame: document.getElementById('ovCompFrame'), ovCompClose: document.getElementById('ovCompClose'), ovCompCountdown: document.getElementById('ovCompCountdown')
+    overlayComponent: document.getElementById('overlayComponent'), ovCompFrame: document.getElementById('ovCompFrame'), ovCompClose: document.getElementById('ovCompClose'), ovCompBarLeft: document.getElementById('ovCompBarLeft'), ovCompBarCenter: document.getElementById('ovCompBarCenter')
   };
 
   // 初始启用穿透（左上角通知与空闲时）
@@ -139,7 +139,8 @@
       return;
     } else if (n.mode === 'overlay') {
       if (sound) playSoundBuiltin(sound, afterSoundSpeak); else afterSoundSpeak();
-      showOverlay({ title, sub, autoClose: !!n.autoClose, duration: n.duration || 3000, showClose: !!n.showClose, closeDelay: n.closeDelay || 0 }, resolve);
+      const source = n.source || n.from || n.caller || n.plugin || '';
+      showOverlay({ title, sub, autoClose: !!n.autoClose, duration: n.duration || 3000, showClose: !!n.showClose, closeDelay: n.closeDelay || 0, source }, resolve);
     } else if (n.mode === 'overlay.text') {
       const text = n.text || speakText;
       const animate = n.animate || 'fade';
@@ -154,7 +155,8 @@
       const duration = n.duration || 3000;
       const showClose = !!n.showClose;
       const closeDelay = n.closeDelay || 0;
-      showOverlayComponent({ group, compId, props, duration, showClose, closeDelay }, resolve);
+      const source = n.source || n.from || n.caller || n.plugin || compId || group || '';
+      showOverlayComponent({ group, compId, props, duration, showClose, closeDelay, source }, resolve);
     } else {
       if (sound) playSoundBuiltin(sound, afterSoundSpeak); else afterSoundSpeak();
       showToast({ title, sub, type, duration: n.duration || 3000 }, resolve);
@@ -204,7 +206,7 @@
     }, step);
   };
 
-  const showOverlay = ({ title, sub, autoClose, duration, showClose, closeDelay }, done) => {
+  const showOverlay = ({ title, sub, autoClose, duration, showClose, closeDelay, source }, done) => {
     // 进入遮罩时关闭穿透
     try { window.notifyAPI?.setClickThrough(false); } catch {}
     el.ovTitle.innerHTML = title;
@@ -215,46 +217,50 @@
     let countdown = closeDelay || 0;
     let timerId = null;
     let autoId = null;
-
-    const updateCountdown = () => {
-      if (countdown > 0) {
-        el.ovCountdown.style.display = 'inline';
-        el.ovCountdown.textContent = `按钮将在 ${Math.ceil(countdown/1000)}s 后可用`;
-      } else {
-        el.ovCountdown.style.display = 'none';
-      }
-    };
+    let autoTimer = null;
+    el.ovBarLeft.textContent = '';
+    el.ovBarCenter.textContent = '';
 
     const enableCloseButton = () => {
-      el.ovClose.disabled = true;
       el.ovClose.style.display = showClose ? 'inline-block' : 'none';
-      updateCountdown();
+      el.ovClose.disabled = countdown > 0;
       if (countdown > 0) {
         timerId = setInterval(() => {
           countdown -= 250;
           if (countdown <= 0) {
             clearInterval(timerId);
             el.ovClose.disabled = false;
-            updateCountdown();
-          } else {
-            updateCountdown();
           }
         }, 250);
-      } else {
-        el.ovClose.disabled = false;
       }
     };
 
     if (showClose) enableCloseButton();
     if (autoClose) {
+      const maxDur = Math.max(800, duration);
+      let remain = maxDur;
+      el.ovBarCenter.textContent = source ? `来自：${source}` : '';
+      const step = 250;
+      autoTimer = setInterval(() => {
+        remain -= step;
+        const s = Math.max(0, Math.ceil(remain / 1000));
+        el.ovBarLeft.textContent = `将在 ${s}s 后自动关闭`;
+        if (remain <= 0) {
+          clearInterval(autoTimer);
+        }
+      }, step);
       autoId = setTimeout(() => {
         close();
-      }, Math.max(800, duration));
+      }, maxDur);
+    } else {
+      el.ovBarLeft.textContent = source ? `来自：${source}` : '';
+      el.ovBarCenter.textContent = '';
     }
 
     const close = () => {
       if (timerId) clearInterval(timerId);
       if (autoId) clearTimeout(autoId);
+      if (autoTimer) clearInterval(autoTimer);
       el.overlay.style.display = 'none';
       el.ovClose.onclick = null;
       // 退出遮罩恢复穿透
@@ -292,7 +298,7 @@
     }, dur);
   };
 
-  const showOverlayComponent = async ({ group, compId, props, duration, showClose, closeDelay }, done) => {
+  const showOverlayComponent = async ({ group, compId, props, duration, showClose, closeDelay, source }, done) => {
     try { window.notifyAPI?.setClickThrough(false); } catch {}
     // 解析组件入口URL：优先指定ID，其次取组内首个
     let entryUrl = null;
@@ -331,41 +337,45 @@
     let countdown = closeDelay || 0;
     let timerId = null;
     let autoId = null;
-
-    const updateCountdown = () => {
-      if (countdown > 0) {
-        el.ovCompCountdown.style.display = 'inline';
-        el.ovCompCountdown.textContent = `按钮将在 ${Math.ceil(countdown/1000)}s 后可用`;
-      } else {
-        el.ovCompCountdown.style.display = 'none';
-      }
-    };
+    let autoTimer = null;
+    el.ovCompBarLeft.textContent = '';
+    el.ovCompBarCenter.textContent = '';
     const enableCloseButton = () => {
-      el.ovCompClose.disabled = true;
       el.ovCompClose.style.display = showClose ? 'inline-block' : 'none';
-      updateCountdown();
+      el.ovCompClose.disabled = countdown > 0;
       if (countdown > 0) {
         timerId = setInterval(() => {
           countdown -= 250;
           if (countdown <= 0) {
             clearInterval(timerId);
             el.ovCompClose.disabled = false;
-            updateCountdown();
-          } else {
-            updateCountdown();
           }
         }, 250);
-      } else {
-        el.ovCompClose.disabled = false;
       }
     };
     if (showClose) enableCloseButton();
     if (duration && duration > 0) {
-      autoId = setTimeout(() => close(), Math.max(800, duration));
+      const maxDur = Math.max(800, duration);
+      let remain = maxDur;
+      el.ovCompBarCenter.textContent = source ? `来自：${source}` : '';
+      const step = 250;
+      autoTimer = setInterval(() => {
+        remain -= step;
+        const s = Math.max(0, Math.ceil(remain / 1000));
+        el.ovCompBarLeft.textContent = `将在 ${s}s 后自动关闭`;
+        if (remain <= 0) {
+          clearInterval(autoTimer);
+        }
+      }, step);
+      autoId = setTimeout(() => close(), maxDur);
+    } else {
+      el.ovCompBarLeft.textContent = source ? `来自：${source}` : '';
+      el.ovCompBarCenter.textContent = '';
     }
     const close = () => {
       if (timerId) clearInterval(timerId);
       if (autoId) clearTimeout(autoId);
+      if (autoTimer) clearInterval(autoTimer);
       el.overlayComponent.style.display = 'none';
       el.ovCompFrame.src = 'about:blank';
       try { window.notifyAPI?.setClickThrough(true); } catch {}

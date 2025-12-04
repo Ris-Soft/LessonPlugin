@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>选择范围</title>
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+  <style>
+    html, body { margin:0; padding:0 !important; }
+    body { font-family: system-ui, Arial, sans-serif; background:#121212; color:#e6e6e6; overflow:hidden; }
+    header { padding:12px 16px; border-bottom:1px solid #2c2c2c; display:flex; align-items:center; gap:10px; background:#171717; }
+    header b { font-size:16px; }
+    main { padding:8px 12px 48px; }
+    fieldset { border:1px solid #2c2c2c; border-radius:10px; padding:12px 14px; background:#1b1b1b; transition: border-color .12s ease, box-shadow .12s ease; }
+    fieldset:hover { border-color:#3a3a3a; box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
+    legend { color:#9ab; }
+    .muted { color:#9aa0a6; }
+    button { padding:6px 10px; border:1px solid #2c2c2c; background:#222; color:#e6e6e6; border-radius:8px; cursor:pointer; }
+    button:hover { background:#2a2a2a; }
+    .monthbar { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+    .monthbar .title { font-weight:600; }
+    .calgrid { display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; }
+    .weekday { text-align:center; font-size:12px; color:#9aa0a6; padding:4px 0; }
+    .day { border:1px solid #2c2c2c; border-radius:10px; background:#181818; min-height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; transition: border-color .12s ease, background .12s ease; }
+    .day .num { font-weight:600; }
+    .day .count { font-size:12px; padding:2px 6px; border-radius:999px; background:#243a4a; border:1px solid #2f4d61; color:#d8ecff; }
+    .day.sel { border-color:#4b6; background:#1a271a; }
+    .day.sel:hover { border-color:#4b6; background:#1a271a; }
+    .day.disabled { opacity:.5; filter:saturate(.6); pointer-events:none; }
+    .day.today { border-color:#3a7afe; }
+    .day:hover { border-color:#3a3a3a; }
+    .quick { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .bottomNav { position:fixed; left:0; right:0; bottom:8px; display:flex; justify-content:center; gap:24px; pointer-events:auto; }
+    .bottomNav button { background:#222; border:1px solid #2c2c2c; border-radius:8px; padding:6px 12px; color:#e6e6e6; }
+    .bottomNav i { font-size:22px; }
+    .calwrap { width:700px; max-width:100%; margin:8px auto 16px; display:flex; flex-direction:column; gap:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <i class="ri-calendar-line"></i>
+    <b>选择范围</b>
+    <span id="serverTip" class="muted"></span>
+  </header>
+  <main>
+    <fieldset>
+      <legend>日期范围</legend>
+      <div class="calwrap">
+        <div class="monthbar">
+          <button id="monthPrev" title="上一月"><i class="ri-arrow-left-s-line"></i></button>
+          <div id="monthTitle" class="title"></div>
+          <button id="monthNext" title="下一月"><i class="ri-arrow-right-s-line"></i></button>
+        </div>
+        <div class="calgrid" id="weekheads"></div>
+        <div class="calgrid" id="calendar"></div>
+        <div class="quick" id="quickSel"></div>
+      </div>
+      <div class="muted">点击具体日期或使用快速选择器</div>
+    </fieldset>
+  </main>
+  <div class="bottomNav">
+    <button id="btnPrev" title="返回"><i class="ri-arrow-left-line"></i></button>
+    <button id="btnNext" title="下一步"><i class="ri-arrow-right-line"></i></button>
+  </div>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const server = qs.get('server')||'';
+    const next = (qs.get('next')||'check').trim();
+    const preset = String(qs.get('daysel')||'').trim();
+    document.getElementById('serverTip').textContent = server ? ('已连接：' + server) : '(未传递服务器参数)';
+    const h = (id) => document.getElementById(id);
+    const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
+    const state = { pool: [], selectedDays: new Set(preset?preset.split(',').map(s=>s.trim()).filter(Boolean):[]), month: null };
+    async function fetchPool(){ try { const u=new URL('/words', String(server||'').trim()); const r=await fetch(u.href); const j=await r.json(); state.pool = Array.isArray(j?.words) ? j.words : []; } catch { state.pool = []; } }
+    function fmtDay(ms){ try{ const tz='Asia/Shanghai'; const d=new Date(ms||Date.now()); const parts=new Intl.DateTimeFormat('zh-CN',{timeZone:tz,hour12:false,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d); const get=(t)=>parts.find(p=>p.type===t)?.value||''; return `${get('year')}-${get('month')}-${get('day')}`; } catch { const d=new Date(ms||Date.now()); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); } }
+    function buildWeekheads(){ const heads=['一','二','三','四','五','六','日']; h('weekheads').innerHTML=heads.map(x=>`<div class="weekday">${x}</div>`).join(''); }
+    function buildCalendar(){ const now=new Date(); const m=state.month||{y:now.getFullYear(), m:now.getMonth()+1}; const first=new Date(m.y,m.m-1,1); const days=new Date(m.y,m.m,0).getDate(); const startIdx=(first.getDay()||7)-1; const counts={}; state.pool.forEach(w=>{ const k=fmtDay(w.createdAt||Date.now()); counts[k]=(counts[k]||0)+1; }); const cells=[]; for(let i=0;i<startIdx;i++) cells.push('<div></div>'); for(let d=1; d<=days; d++){ const k = `${String(m.y)}-${String(m.m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const c = counts[k]||0; const sel = state.selectedDays.has(k) ? ' sel' : ''; const dis = c>0 ? '' : ' disabled'; const isToday = (k===fmtDay(Date.now())) ? ' today' : ''; const countHtml = c>0 ? `<div class="count">${c}</div>` : ''; cells.push(`<div class="day${sel}${dis}${isToday}" data-day="${k}"><div class="num">${d}</div>${countHtml}</div>`); } const totalCells = startIdx + days; const needPad = Math.max(0, 7*6 - totalCells); for (let i=0;i<needPad;i++) cells.push('<div></div>'); h('monthTitle').textContent = `${m.y}年${String(m.m).padStart(2,'0')}月`; h('calendar').innerHTML = cells.join(''); }
+    function bindCalendar(){ h('calendar').addEventListener('click',(ev)=>{ const cell=ev.target.closest('.day'); if(!cell) return; if(cell.classList.contains('disabled')) return; const k=cell.getAttribute('data-day'); if(state.selectedDays.has(k)) state.selectedDays.delete(k); else state.selectedDays.add(k); buildCalendar(); }); h('monthPrev').onclick=()=>{ const cur=state.month||{y:new Date().getFullYear(), m:new Date().getMonth()+1}; const nm={ y:cur.m===1?(cur.y-1):cur.y, m:cur.m===1?12:(cur.m-1)}; state.month=nm; buildCalendar(); }; h('monthNext').onclick=()=>{ const cur=state.month||{y:new Date().getFullYear(), m:new Date().getMonth()+1}; const nm={ y:cur.m===12?(cur.y+1):cur.y, m:cur.m===12?1:(cur.m+1)}; state.month=nm; buildCalendar(); }; }
+    function buildQuickSelectors(){ const q=[{k:'today',t:'今天'},{k:'3',t:'近3天'},{k:'7',t:'近7天'},{k:'30',t:'近30天'},{k:'week',t:'本周'},{k:'month',t:'本月'},{k:'clear',t:'清空选择'}]; h('quickSel').innerHTML = q.map(x=>`<button class="quickbtn" data-k="${x.k}">${x.t}</button>`).join(''); document.querySelectorAll('.quickbtn').forEach(b=>{ b.addEventListener('click',()=>{ const k=String(b.getAttribute('data-k')||''); const now=new Date(); if(k==='clear'){ state.selectedDays.clear(); buildCalendar(); return; } if(k==='today'){ state.selectedDays=new Set([fmtDay(Date.now())]); buildCalendar(); return; } if(['3','7','30'].includes(k)){ const n=parseInt(k,10)||0; const s=new Set(); for(let i=0;i<n;i++){ const d=new Date(now.getFullYear(), now.getMonth(), now.getDate()-i); s.add(fmtDay(d)); } state.selectedDays=s; buildCalendar(); return; } if(k==='week'){ const wd=(now.getDay()||7)-1; const s=new Set(); for(let i=0;i<=wd;i++){ const d=new Date(now.getFullYear(), now.getMonth(), now.getDate()-i); s.add(fmtDay(d)); } state.selectedDays=s; buildCalendar(); return; } if(k==='month'){ const s=new Set(); const y=now.getFullYear(); const m=now.getMonth(); const days=new Date(y,m+1,0).getDate(); for(let d=1; d<=days; d++){ s.add(fmtDay(new Date(y,m,d))); } state.month={y, m:m+1}; state.selectedDays=s; buildCalendar(); return; } }); }); }
+    h('btnPrev').onclick = () => { try { window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: new URL('./externallib.html', window.location.href).href }); } catch {} };
+    h('btnNext').onclick = () => {
+      const target = next==='carousel' ? new URL('./carousel-settings.html', window.location.href).href : new URL('./check-setup.html', window.location.href).href;
+      const sel = Array.from(state.selectedDays||new Set());
+      const href = toUrl(target, { server: String(server||'').trim(), daysel: sel.join(',') });
+      try {
+        const lb = window.lowbarAPI;
+        if (lb) lb.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: next==='carousel' ? { width:740, height:520 } : { width:840, height:580 } });
+        lb.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
+      } catch { location.href = href; }
+    };
+    (async function init(){ await fetchPool(); buildWeekheads(); buildCalendar(); bindCalendar(); buildQuickSelectors(); try { const lb = window.lowbarAPI; lb && lb.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 980, height: 680 } }); } catch {} })();
+  </script>
+</body>
+</html>

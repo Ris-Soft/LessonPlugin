@@ -1287,7 +1287,7 @@ label {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 0 0 8px;
   border-bottom: 1px solid var(--border);
   /* 不显示后方文字，使用不透明背景 */
   z-index: 5;
@@ -1321,12 +1321,13 @@ label {
 
 .win-btn:hover,
 .win-btn:active {
-  background: rgba(34, 197, 94, 0.18);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .win-btn.close:hover,
 .win-btn.close:active {
-  background: rgba(220, 38, 38, 0.25);
+  background: #E81123;
+  color: #fff;
 }
 
 .win-btn {
@@ -1913,3 +1914,25 @@ a.topnav-item { text-decoration: none; }
 .store-tabs .sub-item:hover { background: transparent; }
 .plugin-card { border: 1px solid var(--border); background: var(--panel); border-radius: 10px; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; }
 .plugin-card:hover { border-color: rgba(34, 197, 94, 0.45); background: rgba(34, 197, 94, 0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.entry-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  text-decoration: none;
+  word-break: break-all;
+}
+.entry-link i { color: var(--accent); }
+.entry-link:hover { background: rgba(255, 255, 255, 0.09); }
+
+/* 自绘应用菜单 */
+.app-menu-overlay { position: fixed; inset: 0; z-index: 2000; background: transparent; }
+.app-menu { position: absolute; min-width: 200px; background: #1b1f2a; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); padding: 6px 4px; }
+.app-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--fg); cursor: pointer; border-radius: 6px; }
+.app-menu-item i { font-size: 18px; }
+.app-menu-item:hover { background: rgba(255, 255, 255, 0.06); }
+.app-menu-sep { height: 1px; margin: 4px; background: var(--border); }

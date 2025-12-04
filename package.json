@@ -15,7 +15,6 @@
     "email": "753307914@qq.com"
   },
   "license": "ISC",
- 
   "description": "基于Electron的以JavaScript为核心的插件化大屏课堂辅助工具",
   "build": {
     "asar": false,
@@ -54,6 +53,7 @@
     "edge-tts": "^1.0.1",
     "extract-zip": "^2.0.1",
     "loudness": "^0.4.2",
+    "tar": "^7.5.2",
     "uuid": "^13.0.0"
   }
 }

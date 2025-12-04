@@ -18,6 +18,31 @@
     button { padding:6px 10px; border:1px solid #2c2c2c; background:#222; color:#e6e6e6; border-radius:8px; cursor:pointer; }
     button:hover { background:#2a2a2a; }
     .muted { color:#9aa0a6; }
+    .monthbar { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+    .monthbar .title { font-weight:600; }
+    .calgrid { display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; }
+    .weekday { text-align:center; font-size:12px; color:#9aa0a6; padding:4px 0; }
+    .day { border:1px solid #2c2c2c; border-radius:10px; background:#181818; min-height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; transition: border-color .12s ease, background .12s ease; }
+    .day .num { font-weight:600; }
+    .day .count { font-size:12px; padding:2px 6px; border-radius:999px; background:#243a4a; border:1px solid #2f4d61; color:#d8ecff; }
+    .day.sel { border-color:#4b6; background:#1a271a; }
+    .day.sel:hover { border-color:#4b6; background:#1a271a; }
+    .day.disabled { opacity:.5; filter:saturate(.6); pointer-events:none; }
+    .day.today { border-color:#3a7afe; }
+    .day:hover { border-color:#3a3a3a; }
+    .quick { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .bottomNav { position:fixed; left:0; right:0; bottom:12px; display:flex; justify-content:center; gap:24px; pointer-events:auto; }
+    .bottomNav button { background:#222; border:1px solid #2c2c2c; border-radius:8px; padding:6px 12px; color:#e6e6e6; }
+    .bottomNav i { font-size:22px; }
+    .pickRow { display:flex; align-items:center; justify-content:center; gap:18px; margin:12px 0; }
+    .pickNum { font-size:28px; font-weight:700; padding:6px 12px; border:1px solid #2c2c2c; border-radius:12px; min-width:80px; text-align:center; background:#181818; }
+    #selectedBox { max-height:280px; overflow-y:auto; padding:6px; border:1px solid #2c2c2c; border-radius:10px; background:#181818; }
+    #selectedBox * { scrollbar-width: thin; scrollbar-color: #444 #1a1a1a; }
+    #selectedBox::-webkit-scrollbar { width: 10px; }
+    #selectedBox::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 8px; }
+    #selectedBox::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3b3b3b, #555); border-radius: 8px; border: 1px solid #2c2c2c; }
+    #selectedBox::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #4a4a4a, #666); }
+    .calwrap { width:700px; max-width:100%; margin:0 auto; display:flex; flex-direction:column; gap:8px; }
   </style>
 </head>
 <body>
@@ -27,13 +52,20 @@
     <span id="serverTip" class="muted"></span>
   </header>
   <main>
+    
     <fieldset id="step1">
-      <legend>步骤一：选择范围与数量</legend>
-      <label>最近天数<input type="number" id="days" min="1" value="7" /> <button type="button" class="incdec" data-target="days" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="days" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
-      <label>抽取数量（为空则全部）<input type="number" id="pick" min="1" placeholder="全部" /> <button type="button" class="incdec" data-target="pick" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="pick" data-step="+1" title="增加"><i class="ri-add-line"></i></button> <button type="button" class="incdec" data-target="pick" data-step="-10" title="减少10"><i class="ri-subtract-line"></i>10</button> <button type="button" class="incdec" data-target="pick" data-step="+10" title="增加10"><i class="ri-add-line"></i>10</button></label>
-      <div class="muted">从范围中抽取不重复的单词作为待提问列表</div>
-      <div style="margin-top:8px; display:flex; gap:8px;">
-        <button id="confirm"><i class="ri-checkbox-circle-line"></i> 选词完成，下一步</button>
+      <legend>步骤一：选择数量</legend>
+      <div class="pickRow">
+        <button id="pickMinus10" title="减少10"><i class="ri-subtract-line"></i>10</button>
+        <button id="pickMinus" title="减少"><i class="ri-subtract-line"></i></button>
+        <div id="pickNum" class="pickNum">全部</div>
+        <button id="pickPlus" title="增加"><i class="ri-add-line"></i></button>
+        <button id="pickPlus10" title="增加10"><i class="ri-add-line"></i>10</button>
+      </div>
+      <input type="number" id="pick" min="1" placeholder="全部" style="display:none" />
+      <div class="muted">从已选日期范围中抽取不重复单词作为待提问列表</div>
+      <div style="display:none">
+        <button id="confirm"><i class="ri-checkbox-circle-line"></i></button>
       </div>
     </fieldset>
     <fieldset id="step2" style="display:none">
@@ -42,15 +74,15 @@
       <div id="selectedCount" class="muted" style="margin-top:6px"></div>
       <div style="margin-top:8px; display:flex; gap:8px;">
         <button id="randomAdd"><i class="ri-add-line"></i> 随机添加1个</button>
-        <button id="toPreview"><i class="ri-arrow-right-line"></i> 下一步：设置预览</button>
+        <button id="toPreview" style="display:none"><i class="ri-arrow-right-line"></i></button>
       </div>
     </fieldset>
     <fieldset id="step3" style="display:none">
       <legend>步骤三：预览设置</legend>
-      <label>每词秒数<input type="number" id="wordsec" min="1" value="2" /> <button type="button" class="incdec" data-target="wordsec" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="wordsec" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
-      <label>每译秒数<input type="number" id="cnsec" min="1" value="1" /> <button type="button" class="incdec" data-target="cnsec" data-step="-1" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="cnsec" data-step="+1" title="增加"><i class="ri-add-line"></i></button></label>
-      <label>提问页英文字号<input type="number" id="titlesize" min="24" value="54" /> <button type="button" class="incdec" data-target="titlesize" data-step="-2" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="titlesize" data-step="+2" title="增加"><i class="ri-add-line"></i></button></label>
-      <label>提问页中文字号<input type="number" id="cnsize" min="18" value="30" /> <button type="button" class="incdec" data-target="cnsize" data-step="-2" title="减少"><i class="ri-subtract-line"></i></button> <button type="button" class="incdec" data-target="cnsize" data-step="+2" title="增加"><i class="ri-add-line"></i></button></label>
+      <label>翻页时长（分钟:秒）
+        <input type="number" id="flipmin" min="0" value="6" style="width:80px" /> :
+        <input type="number" id="flipsec" min="0" max="59" value="30" style="width:80px" />
+      </label>
       <label>预览乱序（仅影响轮播顺序）<select id="shuffle"><option value="0">否</option><option value="1">是</option></select></label>
       <label>默认显示中文<select id="showcn"><option value="0">否</option><option value="1">是</option></select></label>
       <div class="muted">单页显示数量将根据可视区域高度自动计算</div>
@@ -59,15 +91,20 @@
       </div>
     </fieldset>
   </main>
+  <div class="bottomNav">
+    <button id="btnPrev" title="上一步"><i class="ri-arrow-left-line"></i></button>
+    <button id="btnNext" title="下一步"><i class="ri-arrow-right-line"></i></button>
+  </div>
   <script>
     const qs = new URLSearchParams(location.search);
     const server = qs.get('server')||'';
     const qsTitleSize = parseInt(String(qs.get('titlesize')||''),10);
     const qsCnSize = parseInt(String(qs.get('cnsize')||''),10);
+    const dayselParam = String(qs.get('daysel')||'').trim();
     document.getElementById('serverTip').textContent = server ? ('已连接：' + server) : '(未传递服务器参数)';
     const h = (id) => document.getElementById(id);
     const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
-    const state = { selected: [], pool: [] };
+    const state = { selected: [], pool: [], selectedDays: new Set(dayselParam?dayselParam.split(',').map(s=>s.trim()).filter(Boolean):[]), month: null };
     async function fetchPool() {
       try {
         const u = new URL('/words', String(server||'').trim());
@@ -75,6 +112,94 @@
         const raw = Array.isArray(j?.words) ? j.words : [];
         state.pool = raw;
       } catch { state.pool = []; }
+    }
+    function fmtDay(ms) {
+      try {
+        const tz = 'Asia/Shanghai';
+        const d = new Date(ms||Date.now());
+        const parts = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, hour12: false, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(d);
+        const get = (t) => parts.find(p=>p.type===t)?.value || '';
+        return `${get('year')}-${get('month')}-${get('day')}`;
+      } catch { const d = new Date(ms||Date.now()); return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-'); }
+    }
+    function buildWeekheads() {
+      const heads = ['一','二','三','四','五','六','日'];
+      h('weekheads').innerHTML = heads.map(x=>`<div class="weekday">${x}</div>`).join('');
+    }
+    function buildCalendar() {
+      const now = new Date();
+      const m = state.month || { y: now.getFullYear(), m: now.getMonth()+1 };
+      const first = new Date(m.y, m.m-1, 1);
+      const days = new Date(m.y, m.m, 0).getDate();
+      const startIdx = (first.getDay()||7) - 1;
+      const counts = {};
+      state.pool.forEach(w => { const k = fmtDay(w.createdAt||Date.now()); counts[k] = (counts[k]||0) + 1; });
+      const cells = [];
+      for (let i=0;i<startIdx;i++) cells.push('<div></div>');
+      for (let d=1; d<=days; d++) {
+        const k = `${String(m.y)}-${String(m.m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const c = counts[k]||0;
+        const sel = state.selectedDays.has(k) ? ' sel' : '';
+        const dis = c>0 ? '' : ' disabled';
+        const isToday = (k === fmtDay(Date.now())) ? ' today' : '';
+        const countHtml = c>0 ? `<div class="count">${c}</div>` : '';
+        cells.push(`<div class="day${sel}${dis}${isToday}" data-day="${k}"><div class="num">${d}</div>${countHtml}</div>`);
+      }
+      const totalCells = startIdx + days;
+      const needPad = Math.max(0, 7*6 - totalCells);
+      for (let i=0;i<needPad;i++) cells.push('<div></div>');
+      h('monthTitle').textContent = `${m.y}年${String(m.m).padStart(2,'0')}月`;
+      h('calendar').innerHTML = cells.join('');
+    }
+    function bindCalendar() {
+      h('calendar').addEventListener('click', (ev) => {
+        const cell = ev.target.closest('.day'); if (!cell) return;
+        if (cell.classList.contains('disabled')) return;
+        const k = cell.getAttribute('data-day');
+        if (state.selectedDays.has(k)) state.selectedDays.delete(k); else state.selectedDays.add(k);
+        buildCalendar();
+      });
+      h('monthPrev').onclick = () => { const cur = state.month || { y: new Date().getFullYear(), m: new Date().getMonth()+1 }; const nm = { y: cur.m===1 ? (cur.y-1) : cur.y, m: cur.m===1 ? 12 : (cur.m-1) }; state.month = nm; buildCalendar(); };
+      h('monthNext').onclick = () => { const cur = state.month || { y: new Date().getFullYear(), m: new Date().getMonth()+1 }; const nm = { y: cur.m===12 ? (cur.y+1) : cur.y, m: cur.m===12 ? 1 : (cur.m+1) }; state.month = nm; buildCalendar(); };
+    }
+    function buildQuickSelectors() {
+      const q = [
+        { k:'today', t:'今天' },
+        { k:'3', t:'近3天' },
+        { k:'7', t:'近7天' },
+        { k:'30', t:'近30天' },
+        { k:'week', t:'本周' },
+        { k:'month', t:'本月' },
+        { k:'clear', t:'清空选择' }
+      ];
+      h('quickSel').innerHTML = q.map(x=>`<button class="quickbtn" data-k="${x.k}">${x.t}</button>`).join('');
+      try { const qr = h('quickRow'); if (qr) qr.innerHTML = q.map(x=>`<button class="quickbtn" data-k="${x.k}">${x.t}</button>`).join(''); } catch {}
+      document.querySelectorAll('.quickbtn').forEach(b=>{
+        b.addEventListener('click', () => {
+          const k = String(b.getAttribute('data-k')||'');
+          const now = new Date();
+          if (k==='clear') { state.selectedDays.clear(); buildCalendar(); return; }
+          if (k==='today') {
+            const d = fmtDay(Date.now());
+            state.selectedDays = new Set([d]); buildCalendar(); return;
+          }
+          if (['3','7','30'].includes(k)) {
+            const n = parseInt(k,10)||0; const s = new Set();
+            for (let i=0;i<n;i++) { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()-i); s.add(fmtDay(d)); }
+            state.selectedDays = s; buildCalendar(); return;
+          }
+          if (k==='week') {
+            const wd = (now.getDay()||7)-1; const s = new Set();
+            for (let i=0;i<=wd;i++) { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()-i); s.add(fmtDay(d)); }
+            state.selectedDays = s; buildCalendar(); return;
+          }
+          if (k==='month') {
+            const s = new Set(); const y = now.getFullYear(); const m = now.getMonth(); const days = new Date(y, m+1, 0).getDate();
+            for (let d=1; d<=days; d++) { s.add(fmtDay(new Date(y, m, d))); }
+            state.month = { y, m: m+1 }; state.selectedDays = s; buildCalendar(); return;
+          }
+        });
+      });
     }
     function renderSelected() {
       const box = h('selectedBox');
@@ -91,20 +216,16 @@
     });
     h('confirm').onclick = async () => {
       await fetchPool();
-      const days = parseInt(h('days').value||'7',10)||7;
       const pick = parseInt(h('pick').value||'0',10)||0;
-      const cutoff = Date.now() - days * 24 * 3600 * 1000;
-      const recent = state.pool.filter(x => (x.createdAt||0) >= cutoff);
-      const uniq = Array.from(new Set(recent.map(x => String(x.word||'').toLowerCase())));
+      let pool = state.pool;
+      if (state.selectedDays && state.selectedDays.size) {
+        pool = pool.filter(x => state.selectedDays.has(fmtDay(x.createdAt||Date.now())));
+      }
+      const uniq = Array.from(new Set(pool.map(x => String(x.word||'').toLowerCase())));
       const out = [];
       const n = pick > 0 ? Math.min(pick, uniq.length) : uniq.length;
-      while (out.length < n && uniq.length) {
-        const idx = Math.floor(Math.random() * uniq.length);
-        out.push(uniq[idx]); uniq.splice(idx,1);
-      }
-      state.selected = out;
-      h('step1').style.display = 'none'; h('step2').style.display = ''; h('step3').style.display = 'none';
-      renderSelected();
+      while (out.length < n && uniq.length) { const idx = Math.floor(Math.random() * uniq.length); out.push(uniq[idx]); uniq.splice(idx,1); }
+      state.selected = out; renderSelected();
     };
     h('randomAdd').onclick = async () => {
       if (!state.pool.length) await fetchPool();
@@ -115,16 +236,12 @@
       state.selected.push(remaining[idx]);
       renderSelected();
     };
-    h('toPreview').onclick = () => {
-      h('step1').style.display = 'none'; h('step2').style.display = 'none'; h('step3').style.display = '';
-    };
+    h('toPreview').onclick = () => { h('step1').style.display = 'none'; h('step2').style.display = 'none'; h('step3').style.display = ''; };
     h('preview').onclick = () => {
       const params = {
-        wordsec: parseInt(h('wordsec').value||'2',10)||2,
-        cnsec: parseInt(h('cnsec').value||'1',10)||1,
+        pagesec: Math.max(1,(parseInt(h('flipmin').value||'6',10)||0)*60 + (parseInt(h('flipsec').value||'30',10)||0)),
         showcn: String(h('showcn').value||'0'),
         shuffle: String(h('shuffle').value||'0'),
-        preview: '1',
         server: String(server||'').trim(),
         wordsize: 34,
         cnsize: 24,
@@ -147,6 +264,37 @@
       if (Number.isFinite(qsTitleSize) && qsTitleSize>0) h('titlesize').value = String(qsTitleSize);
       if (Number.isFinite(qsCnSize) && qsCnSize>0) h('cnsize').value = String(qsCnSize);
     } catch {}
+    let stepIdx = 1;
+    function showStep(i) {
+      stepIdx = Math.max(1, Math.min(3, i));
+      h('step1').style.display = stepIdx===1 ? '' : 'none';
+      h('step2').style.display = stepIdx===2 ? '' : 'none';
+      h('step3').style.display = stepIdx===3 ? '' : 'none';
+      try {
+        const lb = window.lowbarAPI;
+        if (lb) lb.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 840, height: 580 } });
+      } catch {}
+    }
+    h('btnPrev').onclick = () => {
+      try {
+        const float = new URL('./range-select.html', window.location.href).href;
+        const href = toUrl(float, { server: String(server||'').trim(), next: 'check', daysel: Array.from(state.selectedDays||new Set()).join(',') });
+        window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 980, height: 680 } });
+        window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href });
+      } catch {}
+    };
+    h('btnNext').onclick = async () => {
+      if (stepIdx===1) { await h('confirm').onclick(); showStep(2); return; }
+      if (stepIdx===2) { showStep(3); return; }
+      if (stepIdx===3) { h('preview').click(); return; }
+    };
+    (async () => { await fetchPool(); showStep(1); })();
+    function syncPickNum(){ try { const val = parseInt(String(h('pick').value||''),10); h('pickNum').textContent = Number.isFinite(val) && val>0 ? String(val) : '全部'; } catch {} }
+    h('pickMinus').onclick = () => { try { const cur = parseInt(String(h('pick').value||''),10); const base = Number.isFinite(cur)?cur:0; const next = Math.max(0, base - 1); h('pick').value = next ? String(next) : ''; syncPickNum(); } catch {} };
+    h('pickMinus10').onclick = () => { try { const cur = parseInt(String(h('pick').value||''),10); const base = Number.isFinite(cur)?cur:0; const next = Math.max(0, base - 10); h('pick').value = next ? String(next) : ''; syncPickNum(); } catch {} };
+    h('pickPlus').onclick = () => { try { const cur = parseInt(String(h('pick').value||''),10); const base = Number.isFinite(cur)?cur:0; const next = Math.max(1, base + 1); h('pick').value = String(next); syncPickNum(); } catch {} };
+    h('pickPlus10').onclick = () => { try { const cur = parseInt(String(h('pick').value||''),10); const base = Number.isFinite(cur)?cur:0; const next = Math.max(1, base + 10); h('pick').value = String(next); syncPickNum(); } catch {} };
+    syncPickNum();
   </script>
   <script>
     try {

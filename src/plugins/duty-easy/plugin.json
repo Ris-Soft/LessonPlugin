@@ -6,7 +6,8 @@
   "icon": "ri-calendar-check-line",
   "description": "使用底栏模板的值日安排与分工管理",
   "actions": [
-    { "id": "openDuty", "icon": "ri-calendar-check-line", "text": "轻松值日", "target": "openDuty" }
+    { "id": "openDuty", "icon": "ri-calendar-check-line", "text": "轻松值日", "target": "openDuty" },
+    { "id": "showDutyOverlay", "icon": "ri-notification-2-line", "text": "值日遮罩提醒", "target": "showDutyOverlay" }
   ],
   "variables": ["timeISO","pluginName"]
 }

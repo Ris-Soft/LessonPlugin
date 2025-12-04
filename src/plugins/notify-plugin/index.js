@@ -164,7 +164,8 @@ async function playSoundHeadless(which = 'in') {
     if (!app.isReady()) {
       await new Promise((resolve) => app.once('ready', resolve));
     }
-    const file = (which === 'out') ? 'out.mp3' : 'in.mp3';
+    const map = { in: 'in.mp3', out: 'out.mp3', message: 'message.mp3', alarm: 'alarm.mp3' };
+    const file = map[which] || map.in;
     const filePath = path.join(__dirname, 'sounds', file);
     const fileUrl = 'file:///' + filePath.replace(/\\/g, '/');
     const win = ensureAudioWindow();

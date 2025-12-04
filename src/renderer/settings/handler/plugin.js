@@ -370,6 +370,7 @@ function renderPlugin(item) {
         // 启用前检查 dependencies 是否满足（支持 name@version 范式）
         const list = await fetchPlugins();
         const depends = Array.isArray(item.dependencies) ? item.dependencies : (Array.isArray(item.pluginDepends) ? item.pluginDepends : []);
+        const norm = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
         const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
         const satisfies = (ver, range) => {
@@ -390,7 +391,8 @@ function renderPlugin(item) {
         const problems = [];
         for (const d of depends) {
           const [depName, depRange] = String(d).split('@');
-          const target = list.find(pp => (pp.id === depName) || (pp.name === depName));
+          const depKey = norm(depName);
+          const target = list.find(pp => norm(pp.id || pp.name) === depKey);
           if (!target || !target.enabled) { problems.push(`${depName}（未安装或未启用）`); continue; }
           if (!satisfies(target.version, depRange)) { problems.push(`${depName}（版本不满足，已装${target.version || '未知'}）`); }
         }

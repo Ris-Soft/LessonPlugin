@@ -1,6 +1,43 @@
 const path = require('path');
 const url = require('url');
 const { BrowserWindow, app, screen } = require('electron');
+
+let __dragTracker = { timer: null };
+function startDragTracking() {
+  try {
+    stopDragTracking();
+    __dragTracker.timer = setInterval(() => {
+      try {
+        const pt = screen.getCursorScreenPoint ? screen.getCursorScreenPoint() : { x: 0, y: 0 };
+        const nx = Math.floor(pt.x - state.dragOffsetX);
+        const ny = Math.floor(pt.y - state.dragOffsetY);
+        functions.moveTo(nx, ny);
+      } catch {}
+    }, 16);
+  } catch {}
+}
+function stopDragTracking() {
+  try { if (__dragTracker.timer) clearInterval(__dragTracker.timer); __dragTracker.timer = null; } catch {}
+}
+function lockWindowSize(w, h) {
+  try {
+    if (!compassWin || compassWin.isDestroyed()) return;
+    const W = Math.max(1, Math.floor(Number(w || 0)));
+    const H = Math.max(1, Math.floor(Number(h || 0)));
+    try { compassWin.setResizable(false); } catch {}
+    try { compassWin.setMinimumSize(W, H); } catch {}
+    try { compassWin.setMaximumSize(W, H); } catch {}
+    try { compassWin.setContentSize(W, H); } catch {}
+  } catch {}
+}
+function unlockWindowSize() {
+  try {
+    if (!compassWin || compassWin.isDestroyed()) return;
+    try { compassWin.setResizable(true); } catch {}
+    try { compassWin.setMinimumSize(1, 1); } catch {}
+    try { compassWin.setMaximumSize(9999, 9999); } catch {}
+  } catch {}
+}
 const { spawn } = require('child_process');
 
 let pluginApi = null;
@@ -8,7 +45,17 @@ let compassWin = null;
 
 const state = {
   eventChannel: 'screen.compass',
-  dragging: false
+  dragging: false,
+  draggingDisplayId: null,
+  dragOffsetX: 0,
+  dragOffsetY: 0,
+  dragStartWinX: 0,
+  dragStartWinY: 0,
+  dragInputType: 'mouse',
+  lockWidth: 0,
+  lockHeight: 0,
+  sizing: false,
+  mode: 'collapsed'
 };
 
 function createCompassWindow() {
@@ -24,6 +71,7 @@ function createCompassWindow() {
       y: b.y + b.height - h - mb,
       width: w,
       height: h,
+      useContentSize: true,
       frame: false,
       transparent: true,
       backgroundColor: '#00000000',
@@ -45,6 +93,10 @@ function createCompassWindow() {
       }
     });
     compassWin.loadFile(path.join(__dirname, 'float', 'compass.html'));
+    try { compassWin.on('will-resize', (e) => { try { e.preventDefault(); } catch {} }); } catch {}
+    try { const bInit = compassWin.getBounds(); lockWindowSize(bInit.width, bInit.height); } catch {}
+    try { const b0 = compassWin.getBounds(); state.lockWidth = b0.width; state.lockHeight = b0.height; } catch {}
+    try { compassWin.on('resize', () => { try { const b = compassWin.getBounds(); if (state.lockWidth && state.lockHeight && (b.width !== state.lockWidth || b.height !== state.lockHeight)) { compassWin.setBounds({ x: b.x, y: b.y, width: state.lockWidth, height: state.lockHeight }); } } catch {} }); } catch {}
     try { compassWin.setAlwaysOnTop(true); } catch {}
     try { compassWin.setAlwaysOnTop(true, 'screen-saver'); } catch {}
     try { if (isLinux) compassWin.setAlwaysOnTop(true, 'pop-up-menu'); } catch {}
@@ -68,7 +120,7 @@ function createCompassWindow() {
         if (x !== wb.x || y !== wb.y) compassWin.setPosition(x, y);
       } catch {}
     };
-    const scheduleSnap = () => { try { if (state.dragging) return; if (snapTimer) clearTimeout(snapTimer); snapTimer = setTimeout(snap, 120); } catch {} };
+    const scheduleSnap = () => { try { if (state.dragging) return; if (state.sizing) return; if (snapTimer) clearTimeout(snapTimer); snapTimer = setTimeout(snap, 120); } catch {} };
     try { compassWin.on('move', scheduleSnap); } catch {}
     try { compassWin.on('moved', scheduleSnap); } catch {}
     return compassWin;
@@ -241,45 +293,125 @@ const functions = {
       return [];
     } catch (e) { return []; }
   },
-  setExpandedWindow: (on) => {
+  setExpandedWindow: (on, wOpt, hOpt) => {
     try {
       if (!compassWin || compassWin.isDestroyed()) return false;
-      const d = screen.getPrimaryDisplay();
-      const sb = d.bounds;
       const wb = compassWin.getBounds();
       const cx = wb.x + Math.floor(wb.width / 2);
       const cy = wb.y + Math.floor(wb.height / 2);
+      const display = screen.getDisplayNearestPoint ? screen.getDisplayNearestPoint({ x: cx, y: cy }) : screen.getPrimaryDisplay();
+      const sb = display.bounds;
       const expanded = !!on;
-      const size = expanded ? { width: 240, height: 240 } : { width: 60, height: 60 };
+      const dw = Number(wOpt); const dh = Number(hOpt);
+      const size = expanded
+        ? { width: (Number.isFinite(dw) && dw > 0 ? dw : 240), height: (Number.isFinite(dh) && dh > 0 ? dh : 240) }
+        : { width: (Number.isFinite(dw) && dw > 0 ? dw : 60), height: (Number.isFinite(dh) && dh > 0 ? dh : 60) };
+      state.mode = expanded ? 'expanded' : 'collapsed';
+      state.sizing = true;
       let nx = cx - Math.floor(size.width / 2);
       let ny = cy - Math.floor(size.height / 2);
       if (nx < sb.x) nx = sb.x;
       if (ny < sb.y) ny = sb.y;
       if (nx + size.width > sb.x + sb.width) nx = sb.x + sb.width - size.width;
       if (ny + size.height > sb.y + sb.height) ny = sb.y + sb.height - size.height;
-      compassWin.setBounds({ x: nx, y: ny, width: size.width, height: size.height });
+      try { unlockWindowSize(); } catch {}
+      try { compassWin.setContentSize(size.width, size.height); } catch {}
+      try { compassWin.setBounds({ x: nx, y: ny, width: size.width, height: size.height }); } catch {}
+      try { lockWindowSize(size.width, size.height); } catch {}
+      try { state.lockWidth = size.width; state.lockHeight = size.height; } catch {}
+      try { setTimeout(() => { state.sizing = false; }, 60); } catch {}
       return true;
     } catch { return false; }
   },
-  setDragging: (flag) => { try { state.dragging = !!flag; return true; } catch { return false; } },
+  setDragging: (flag, offsetX, offsetY, inputType) => {
+    try {
+      state.dragging = !!flag;
+      if (state.dragging) {
+        if (compassWin && !compassWin.isDestroyed()) {
+          const wb = compassWin.getBounds();
+          try { lockWindowSize(wb.width, wb.height); } catch {}
+          try { state.lockWidth = wb.width; state.lockHeight = wb.height; } catch {}
+          state.dragStartWinX = wb.x;
+          state.dragStartWinY = wb.y;
+          const cx = wb.x + Math.floor(wb.width / 2);
+          const cy = wb.y + Math.floor(wb.height / 2);
+          const display = screen.getDisplayNearestPoint ? screen.getDisplayNearestPoint({ x: cx, y: cy }) : screen.getPrimaryDisplay();
+          state.draggingDisplayId = display && typeof display.id === 'number' ? display.id : null;
+          try {
+            const pt = screen.getCursorScreenPoint ? screen.getCursorScreenPoint() : { x: 0, y: 0 };
+            const useX = (typeof offsetX === 'number') ? offsetX : Math.max(0, pt.x - wb.x);
+            const useY = (typeof offsetY === 'number') ? offsetY : Math.max(0, pt.y - wb.y);
+            state.dragOffsetX = useX;
+            state.dragOffsetY = useY;
+          } catch { state.dragOffsetX = 0; state.dragOffsetY = 0; }
+          state.dragInputType = (String(inputType||'').toLowerCase()==='touch') ? 'touch' : 'mouse';
+          if (state.dragInputType === 'mouse') {
+            try { startDragTracking(); } catch {}
+          } else {
+            try { stopDragTracking(); } catch {}
+          }
+        } else {
+          state.draggingDisplayId = null;
+        }
+      } else {
+        state.draggingDisplayId = null;
+        state.dragInputType = 'mouse';
+        try { stopDragTracking(); } catch {}
+        try { const b = compassWin && !compassWin.isDestroyed() ? compassWin.getBounds() : null; if (b) { lockWindowSize(b.width, b.height); state.lockWidth = b.width; state.lockHeight = b.height; } } catch {}
+      }
+      return true;
+    } catch { return false; }
+  },
+  touchDragMove: (dx, dy) => {
+    try {
+      if (!compassWin || compassWin.isDestroyed()) return false;
+      if (!state.dragging || state.dragInputType !== 'touch') return false;
+      const nx = Math.floor(state.dragStartWinX + Number(dx||0));
+      const ny = Math.floor(state.dragStartWinY + Number(dy||0));
+      return functions.moveTo(nx, ny);
+    } catch { return false; }
+  },
   getBounds: () => { try { if (!compassWin || compassWin.isDestroyed()) return null; return compassWin.getBounds(); } catch { return null; } },
   moveTo: (x, y) => {
     try {
       if (!compassWin || compassWin.isDestroyed()) return false;
-      const d = screen.getPrimaryDisplay();
-      const sb = d.bounds; const wb = compassWin.getBounds();
-      const nx = Math.max(sb.x, Math.min(x, sb.x + sb.width - wb.width));
-      const ny = Math.max(sb.y, Math.min(y, sb.y + sb.height - wb.height));
-      compassWin.setPosition(Math.floor(nx), Math.floor(ny));
+      const wb = compassWin.getBounds();
+      let sb = null;
+      if (state.dragging && state.draggingDisplayId != null) {
+        const displays = screen.getAllDisplays ? screen.getAllDisplays() : [screen.getPrimaryDisplay()];
+        const d = (displays || []).find(v => v && v.id === state.draggingDisplayId);
+        sb = (d && d.bounds) ? d.bounds : null;
+      }
+      if (!sb) {
+        const cx = Math.floor(x + wb.width / 2);
+        const cy = Math.floor(y + wb.height / 2);
+        const display = screen.getDisplayNearestPoint ? screen.getDisplayNearestPoint({ x: cx, y: cy }) : screen.getPrimaryDisplay();
+        sb = display.bounds;
+      }
+      const nx = Math.max(sb.x, Math.min(x, sb.x + sb.width - (state.lockWidth || wb.width)));
+      const ny = Math.max(sb.y, Math.min(y, sb.y + sb.height - (state.lockHeight || wb.height)));
+      const W = state.lockWidth || wb.width;
+      const H = state.lockHeight || wb.height;
+      compassWin.setBounds({ x: Math.floor(nx), y: Math.floor(ny), width: W, height: H });
       return true;
     } catch { return false; }
   },
   snap: () => {
     try {
       if (!compassWin || compassWin.isDestroyed()) return false;
-      const d = screen.getPrimaryDisplay();
       const wb = compassWin.getBounds();
-      const b = d.bounds;
+      let b = null;
+      if (state.dragging && state.draggingDisplayId != null) {
+        const displays = screen.getAllDisplays ? screen.getAllDisplays() : [screen.getPrimaryDisplay()];
+        const d = (displays || []).find(v => v && v.id === state.draggingDisplayId);
+        b = (d && d.bounds) ? d.bounds : null;
+      }
+      if (!b) {
+        const cx = wb.x + Math.floor(wb.width / 2);
+        const cy = wb.y + Math.floor(wb.height / 2);
+        const display = screen.getDisplayNearestPoint ? screen.getDisplayNearestPoint({ x: cx, y: cy }) : screen.getPrimaryDisplay();
+        b = display.bounds;
+      }
       const th = 24;
       let x = wb.x, y = wb.y;
       if (Math.abs(wb.x - b.x) <= th) x = b.x;

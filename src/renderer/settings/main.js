@@ -1,4 +1,6 @@
 async function main() {
+  if (window.__settingsMainRan) return;
+  window.__settingsMainRan = true;
   // 获取开发环境标记
   let isDev = true;
   try {
@@ -40,7 +42,7 @@ async function main() {
         pages[key].hidden = key !== page;
       }
       if (page === 'npm') {
-        renderInstalled();
+        window.renderInstalled?.();
       } else if (page === 'general') {
         initGeneralSettings();
       } else if (page === 'automation') {
@@ -60,130 +62,7 @@ async function main() {
           } catch {}
         })();
       } else if (page === 'components') {
-        (async () => {
-          try {
-            const container = document.getElementById('components-list');
-            container.innerHTML = '';
-            const res = await window.settingsAPI?.componentsList?.('');
-            const list = (res?.ok && Array.isArray(res.components)) ? res.components : [];
-            list.forEach((c) => {
-              const el = document.createElement('div');
-              el.className = 'plugin-card';
-              el.innerHTML = `
-                <div class="card-header">
-                  <i class="ri-layout-3-line"></i>
-                  <div>
-                    <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
-                    <div class="card-desc">入口：${c.entry || 'index.html'}</div>
-                  </div>
-                  <div class="inline" style="display:flex;gap:8px;align-items:center;">
-                    <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
-                    <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
-                  </div>
-                </div>
-              `;
-              const btn = el.querySelector('.preview-btn');
-              btn.addEventListener('click', async () => {
-                try {
-                  const url = c.url || (await window.settingsAPI?.componentEntryUrl?.(c.id));
-                  if (!url) { await showAlert('未找到组件入口'); return; }
-                  const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-                  const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
-                  const title = document.createElement('div'); title.className = 'modal-title';
-                  title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${c.name || c.id}</span>`;
-                  const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
-                  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
-                  title.appendChild(closeBtn);
-                  try { title.style.justifyContent = 'space-between'; } catch {}
-                  const body = document.createElement('div'); body.className = 'modal-body';
-                  const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
-                  body.appendChild(frame);
-                  box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
-                } catch {}
-              });
-              const uninstallBtn = el.querySelector('.uninstall-btn');
-              uninstallBtn?.addEventListener('click', async () => {
-                const ok = await showConfirm(`卸载组件：${c.name || c.id}？`);
-                if (!ok) return;
-                const out = await window.settingsAPI?.uninstallPlugin?.(c.id);
-                if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
-                showToast(`已卸载组件：${c.name || c.id}`, { type: 'success', duration: 2000 });
-                try {
-                  const res2 = await window.settingsAPI?.componentsList?.('');
-                  const list2 = (res2?.ok && Array.isArray(res2.components)) ? res2.components : [];
-                  container.innerHTML = '';
-                  list2.forEach((cc) => {
-                    const card = document.createElement('div');
-                    card.className = 'plugin-card';
-                    card.innerHTML = `
-                      <div class="card-header">
-                        <i class="ri-layout-3-line"></i>
-                        <div>
-                          <div class="card-title">${cc.name || cc.id} <span class="pill small">${cc.group || '未分组'}</span></div>
-                          <div class="card-desc">入口：${cc.entry || 'index.html'}</div>
-                        </div>
-                        <div class="inline" style="display:flex;gap:8px;align-items:center;">
-                          <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
-                          <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
-                        </div>
-                      </div>
-                    `;
-                    const preview = card.querySelector('.preview-btn');
-                    preview.addEventListener('click', async () => {
-                      try {
-                        const url = cc.url || (await window.settingsAPI?.componentEntryUrl?.(cc.id));
-                        if (!url) { await showAlert('未找到组件入口'); return; }
-                        const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-                        const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
-                        const title = document.createElement('div'); title.className = 'modal-title';
-                        title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${cc.name || cc.id}</span>`;
-                        const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
-                        closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
-                        title.appendChild(closeBtn);
-                        try { title.style.justifyContent = 'space-between'; } catch {}
-                        const body = document.createElement('div'); body.className = 'modal-body';
-                        const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
-                        body.appendChild(frame);
-                        box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
-                      } catch {}
-                    });
-                    const rm = card.querySelector('.uninstall-btn');
-                    rm.addEventListener('click', async () => {
-                      const ok2 = await showConfirm(`卸载组件：${cc.name || cc.id}？`);
-                      if (!ok2) return;
-                      const out2 = await window.settingsAPI?.uninstallPlugin?.(cc.id);
-                      if (!out2?.ok) { await showAlert(`卸载失败：${out2?.error || '未知错误'}`); return; }
-                      showToast(`已卸载组件：${cc.name || cc.id}`, { type: 'success', duration: 2000 });
-                      const res3 = await window.settingsAPI?.componentsList?.('');
-                      const list3 = (res3?.ok && Array.isArray(res3.components)) ? res3.components : [];
-                      container.innerHTML = '';
-                      list3.forEach((ccc) => {
-                        const card2 = document.createElement('div');
-                        card2.className = 'plugin-card';
-                        card2.innerHTML = `
-                          <div class="card-header">
-                            <i class="ri-layout-3-line"></i>
-                            <div>
-                              <div class="card-title">${ccc.name || ccc.id} <span class="pill small">${ccc.group || '未分组'}</span></div>
-                              <div class="card-desc">入口：${ccc.entry || 'index.html'}</div>
-                            </div>
-                            <div class="inline" style="display:flex;gap:8px;align-items:center;">
-                              <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
-                              <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
-                            </div>
-                          </div>
-                        `;
-                        container.appendChild(card2);
-                      });
-                    });
-                    container.appendChild(card);
-                  });
-                } catch {}
-              });
-              container.appendChild(el);
-            });
-          } catch {}
-        })();
+        try { window.initComponentsPage?.(); } catch {}
       } else if (page === 'about') {
         initAboutPage();
       }
@@ -201,7 +80,7 @@ async function main() {
         pages[key].hidden = key !== page;
       }
       if (page === 'npm') {
-      renderInstalled();
+      window.renderInstalled?.();
     } else if (page === 'general') {
       initGeneralSettings();
     } else if (page === 'automation') {
@@ -221,130 +100,7 @@ async function main() {
         } catch {}
       })();
     } else if (page === 'components') {
-      (async () => {
-        try {
-          const container = document.getElementById('components-list');
-          container.innerHTML = '';
-          const res = await window.settingsAPI?.componentsList?.('');
-          const list = (res?.ok && Array.isArray(res.components)) ? res.components : [];
-          list.forEach((c) => {
-            const el = document.createElement('div');
-            el.className = 'plugin-card';
-            el.innerHTML = `
-              <div class="card-header">
-                <i class="ri-layout-3-line"></i>
-                <div>
-                  <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
-                  <div class="card-desc">入口：${c.entry || 'index.html'}</div>
-                </div>
-                <div class="inline" style="display:flex;gap:8px;align-items:center;">
-                  <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
-                  <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
-                </div>
-              </div>
-            `;
-            const btn = el.querySelector('.preview-btn');
-            btn.addEventListener('click', async () => {
-              try {
-                const url = c.url || (await window.settingsAPI?.componentEntryUrl?.(c.id));
-                if (!url) { await showAlert('未找到组件入口'); return; }
-                const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-                const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
-                const title = document.createElement('div'); title.className = 'modal-title';
-                title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${c.name || c.id}</span>`;
-                const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
-                closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
-                title.appendChild(closeBtn);
-                try { title.style.justifyContent = 'space-between'; } catch {}
-                const body = document.createElement('div'); body.className = 'modal-body';
-                const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
-                body.appendChild(frame);
-                box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
-              } catch {}
-            });
-            const uninstallBtn = el.querySelector('.uninstall-btn');
-            uninstallBtn?.addEventListener('click', async () => {
-              const ok = await showConfirm(`卸载组件：${c.name || c.id}？`);
-              if (!ok) return;
-              const out = await window.settingsAPI?.uninstallPlugin?.(c.id);
-              if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
-              showToast(`已卸载组件：${c.name || c.id}`, { type: 'success', duration: 2000 });
-              try {
-                const res2 = await window.settingsAPI?.componentsList?.('');
-                const list2 = (res2?.ok && Array.isArray(res2.components)) ? res2.components : [];
-                container.innerHTML = '';
-                list2.forEach((cc) => {
-                  const card = document.createElement('div');
-                  card.className = 'plugin-card';
-                  card.innerHTML = `
-                    <div class="card-header">
-                      <i class="ri-layout-3-line"></i>
-                      <div>
-                        <div class="card-title">${cc.name || cc.id} <span class="pill small">${cc.group || '未分组'}</span></div>
-                        <div class="card-desc">入口：${cc.entry || 'index.html'}</div>
-                      </div>
-                      <div class="inline" style="display:flex;gap:8px;align-items:center;">
-                        <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
-                        <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
-                      </div>
-                    </div>
-                  `;
-                  const preview = card.querySelector('.preview-btn');
-                  preview.addEventListener('click', async () => {
-                    try {
-                      const url = cc.url || (await window.settingsAPI?.componentEntryUrl?.(cc.id));
-                      if (!url) { await showAlert('未找到组件入口'); return; }
-                      const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-                      const box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '860px';
-                      const title = document.createElement('div'); title.className = 'modal-title';
-                      title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${cc.name || cc.id}</span>`;
-                      const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
-                      closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
-                      title.appendChild(closeBtn);
-                      try { title.style.justifyContent = 'space-between'; } catch {}
-                      const body = document.createElement('div'); body.className = 'modal-body';
-                      const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
-                      body.appendChild(frame);
-                      box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
-                    } catch {}
-                  });
-                  const rm = card.querySelector('.uninstall-btn');
-                  rm.addEventListener('click', async () => {
-                    const ok2 = await showConfirm(`卸载组件：${cc.name || cc.id}？`);
-                    if (!ok2) return;
-                    const out2 = await window.settingsAPI?.uninstallPlugin?.(cc.id);
-                    if (!out2?.ok) { await showAlert(`卸载失败：${out2?.error || '未知错误'}`); return; }
-                    showToast(`已卸载组件：${cc.name || cc.id}`, { type: 'success', duration: 2000 });
-                    const res3 = await window.settingsAPI?.componentsList?.('');
-                    const list3 = (res3?.ok && Array.isArray(res3.components)) ? res3.components : [];
-                    container.innerHTML = '';
-                    list3.forEach((ccc) => {
-                      const card2 = document.createElement('div');
-                      card2.className = 'plugin-card';
-                      card2.innerHTML = `
-                        <div class="card-header">
-                          <i class="ri-layout-3-line"></i>
-                          <div>
-                            <div class="card-title">${ccc.name || ccc.id} <span class="pill small">${ccc.group || '未分组'}</span></div>
-                            <div class="card-desc">入口：${ccc.entry || 'index.html'}</div>
-                          </div>
-                          <div class="inline" style="display:flex;gap:8px;align-items:center;">
-                            <button class="btn secondary preview-btn"><i class="ri-eye-line"></i> 预览</button>
-                            <button class="btn danger uninstall-btn"><i class="ri-delete-bin-line"></i> 卸载</button>
-                          </div>
-                        </div>
-                      `;
-                      container.appendChild(card2);
-                    });
-                  });
-                  container.appendChild(card);
-                });
-              } catch {}
-            });
-            container.appendChild(el);
-          });
-        } catch {}
-      })();
+      try { window.initComponentsPage?.(); } catch {}
     } else if (page === 'about') {
       initAboutPage();
     }
@@ -427,9 +183,10 @@ async function main() {
               }
             } catch {}
           };
-          try { window.settingsAPI?.onProgress?.(handler); } catch {}
+          let unsubscribe = null;
+          try { unsubscribe = window.settingsAPI?.onProgress?.(handler); } catch {}
           const ensure = await window.settingsAPI?.pluginEnsureDeps?.(p.id || p.name);
-          try { window.settingsAPI?.offProgress?.(handler); } catch {}
+          try { unsubscribe && unsubscribe(); } catch {}
           try { progressModal?.close?.(); } catch {}
           if (ensure?.ok) {
             await showToast(`已安装 ${p.name} 依赖`);
@@ -447,9 +204,24 @@ async function main() {
   document.querySelectorAll('.win-btn').forEach((b) => {
     b.addEventListener('click', () => {
       const act = b.dataset.act;
-      window.settingsAPI?.windowControl(act);
+      if (act === 'menu') {
+        try {
+          const r = b.getBoundingClientRect();
+          window.showAppMenu({ x: r.right - 180, y: r.bottom + 6 });
+        } catch {}
+      } else {
+        window.settingsAPI?.windowControl(act);
+      }
     });
   });
+
+  try {
+    const titlebar = document.querySelector('.titlebar');
+    titlebar?.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      window.showAppMenu({ x: e.clientX, y: e.clientY });
+    });
+  } catch {}
 
   // NPM 管理逻辑（仅展示已安装列表）
   const installedEl = document.getElementById('npm-installed');
@@ -579,10 +351,10 @@ async function main() {
               }
             } catch {}
           };
-          window.settingsAPI?.onProgress?.(handler);
+          const unsubscribe = window.settingsAPI?.onProgress?.(handler);
           const dl = await window.settingsAPI?.npmDownload?.(name, v);
           // 解绑进度并关闭模态框
-          try { window.settingsAPI?.offProgress?.(handler); } catch {}
+          try { unsubscribe && unsubscribe(); } catch {}
           try { progressModal?.close?.(); } catch {}
           if (!dl?.ok) {
             await showAlert(`下载失败：${dl?.error || '未知错误'}`);

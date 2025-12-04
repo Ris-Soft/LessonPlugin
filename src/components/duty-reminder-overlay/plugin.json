@@ -1,0 +1,9 @@
+{
+  "id": "component.duty.reminder",
+  "name": "值日生提醒遮罩",
+  "version": "1.0.0",
+  "type": "component",
+  "group": "notify.overlay",
+  "entry": "index.html",
+  "icon": "ri-notification-2-line"
+}

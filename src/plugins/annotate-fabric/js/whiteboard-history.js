@@ -1,4 +1,4 @@
-export function createHistory(canvas, state, undoBtn, redoBtn, setMode, fitFn, board) {
+export function createHistory(canvas, state, undoBtn, redoBtn, setMode, fitFn, board, updateEraseCursorVis) {
   function getCurrentHistory() {
     if (!state.pageHistories[state.pageIndex]) state.pageHistories[state.pageIndex] = [];
     if (typeof state.pageHistoryIndex[state.pageIndex] !== 'number') state.pageHistoryIndex[state.pageIndex] = -1;
@@ -56,7 +56,25 @@ export function createHistory(canvas, state, undoBtn, redoBtn, setMode, fitFn, b
       canvas.loadFromJSON(dataForCanvas, () => {
         try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch {}
         try { setMode(state.mode); } catch {}
-        try { if (state.mode === 'erase') { canvas.isDrawingMode = true; canvas.selection = false; canvas.skipTargetFind = true; } } catch {}
+        try {
+          if (state.mode === 'erase') {
+            if (typeof fabric !== 'undefined' && fabric.EraserBrush) {
+              if (!(canvas.freeDrawingBrush instanceof fabric.EraserBrush)) {
+                const eb = new fabric.EraserBrush(canvas);
+                eb.width = Number(state.eraseSize) || 80;
+                eb.strokeLineCap = 'round';
+                eb.strokeLineJoin = 'round';
+                eb.inverted = false;
+                eb.shadow = null;
+                canvas.freeDrawingBrush = eb;
+              }
+            }
+            canvas.isDrawingMode = true;
+            canvas.selection = false;
+            canvas.skipTargetFind = true;
+            try { if (typeof updateEraseCursorVis === 'function') updateEraseCursorVis(); } catch {}
+          }
+        } catch {}
         try {
           const defaultBg = state.bgColor || canvas.backgroundColor || '#121212';
           const toBg = (parsed && parsed.backgroundColor) ? parsed.backgroundColor : defaultBg;

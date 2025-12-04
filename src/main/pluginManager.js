@@ -3,6 +3,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const extract = require('extract-zip');
 const { v4: uuidv4 } = require('uuid');
+const zlib = require('zlib');
 const Module = require('module');
 const { app, webContents } = require('electron');
 const https = require('https');
@@ -26,6 +27,70 @@ let progressReporter = null; // 供插件在初始化期间更新启动页文本
 // 引入自动化管理器引用，供插件入口 API 使用
 let automationManagerRef = null;
 try { tar = require('tar'); } catch {}
+
+function ensureTar() {
+  if (!tar) {
+    try { tar = require('tar'); } catch {}
+  }
+  return !!tar;
+}
+
+function extractWithSystemTar(file, cwd) {
+  return new Promise((resolve, reject) => {
+    try {
+      const args = process.platform === 'win32'
+        ? ['-x', '-f', file, '-C', cwd]
+        : ['-x', '-z', '-f', file, '-C', cwd];
+      const proc = spawn('tar', args, { stdio: 'ignore' });
+      proc.on('error', (e) => reject(e));
+      proc.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`tar_exit_${code}`));
+      });
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+function extractTgzPureJS(file, cwd) {
+  return new Promise((resolve, reject) => {
+    try {
+      const gz = fs.readFileSync(file);
+      const tarBuf = zlib.gunzipSync(gz);
+      let i = 0;
+      const isEmptyHeader = (buf) => {
+        for (let j = 0; j < 512; j++) { if (buf[j] !== 0) return false; }
+        return true;
+      };
+      while (i + 512 <= tarBuf.length) {
+        const header = tarBuf.slice(i, i + 512);
+        if (isEmptyHeader(header)) break;
+        const name = header.toString('utf8', 0, 100).replace(/\0.*$/, '');
+        const sizeStr = header.toString('utf8', 124, 136).replace(/\0.*$/, '').trim();
+        const typeflag = header[156];
+        const size = parseInt(sizeStr, 8) || 0;
+        i += 512;
+        const data = tarBuf.slice(i, i + size);
+        i += size;
+        const pad = (512 - (size % 512)) % 512;
+        i += pad;
+        const safe = String(name || '').replace(/\\/g, '/');
+        const outPath = path.join(cwd, safe);
+        if (!outPath.startsWith(path.resolve(cwd))) continue;
+        if (typeflag === 53) {
+          try { fs.mkdirSync(outPath, { recursive: true }); } catch {}
+        } else {
+          try { fs.mkdirSync(path.dirname(outPath), { recursive: true }); } catch {}
+          fs.writeFileSync(outPath, data);
+        }
+      }
+      resolve();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
 
 function readJsonSafe(jsonPath, fallback) {
   try {
@@ -549,6 +614,7 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
     if (!config.npmSelection) config.npmSelection = {};
     const selMap = (config.npmSelection[p.id] || config.npmSelection[p.name] || {});
     const logs = [];
+    let hadError = false;
     logs.push(`[deps] 开始处理插件依赖：${p.name}（${deps.length} 项）`);
     console.log('deps:ensure', p.name, deps);
     for (const d of deps) {
@@ -578,10 +644,12 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
             logs.push(`[deps] 下载 ${name}@${pick} 完成`);
           } else {
             logs.push(`[deps] 下载 ${name}@${pick} 失败：${dl.error}`);
+            hadError = true;
             continue;
           }
         } else {
           logs.push(`[deps] 未能确定 ${name} 可用版本`);
+          hadError = true;
           continue;
         }
       }
@@ -590,6 +658,7 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
       if (!link.ok) {
         logs.push(`[deps] 链接 ${name}@${version} 到插件失败：${link.error}`);
         try { console.error('deps:link:failed', name, version, link.error); } catch {}
+        hadError = true;
       } else {
         const method = link.method === 'copy' ? '复制' : '链接';
         logs.push(`[deps] 已${method} ${name}@${version} 到插件`);
@@ -597,7 +666,7 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
         try { if (progressReporter) progressReporter({ stage: 'npm', message: `已${method} ${name}@${version}` }); } catch {}
       }
     }
-    return { ok: true, logs };
+    return { ok: !hadError, logs };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
@@ -852,11 +921,24 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
   const tmpTgz = path.join(tmpDir, `${segs[segs.length - 1]}-${version}.tgz`);
   try { fs.writeFileSync(tmpTgz, tgz.buffer); } catch (e) { return { ok: false, error: e?.message || '写入临时文件失败' }; }
-  if (!tar) return { ok: false, error: '缺少 tar 依赖，无法解压' };
-  try {
-    await tar.x({ file: tmpTgz, cwd: tmpDir });
-  } catch (e) {
-    return { ok: false, error: e?.message || '解压失败' };
+  {
+    let extractedOk = false;
+    let extractErr = null;
+    if (ensureTar()) {
+      try { await tar.x({ file: tmpTgz, cwd: tmpDir }); extractedOk = true; }
+      catch (e) { extractErr = e; }
+    }
+    if (!extractedOk) {
+      try { await extractWithSystemTar(tmpTgz, tmpDir); extractedOk = true; }
+      catch (e) { extractErr = e; }
+    }
+    if (!extractedOk) {
+      try { await extractTgzPureJS(tmpTgz, tmpDir); extractedOk = true; }
+      catch (e) { extractErr = e; }
+    }
+    if (!extractedOk) {
+      return { ok: false, error: `解压失败：${extractErr?.message || 'tar不可用'}` };
+    }
   }
   const extracted = path.join(tmpDir, 'package');
   if (!fs.existsSync(extracted)) return { ok: false, error: '解压内容缺失' };
@@ -1728,7 +1810,10 @@ module.exports.listComponents = function listComponents(group) {
     const items = (manifest.plugins || []).filter((p) => String(p.type || '').toLowerCase() === 'component');
     const baseDir = path.dirname(manifestPath);
     const out = [];
-    const seen = new Set();
+    const seenCanon = new Set();
+    const seenUrl = new Set();
+    const seenDisplay = new Set();
+    const seenId = new Set();
     for (const p of items) {
       if (group && String(p.group || '').trim() && String(p.group).trim() !== String(group).trim()) continue;
       const entryRel = p.entry || 'index.html';
@@ -1741,11 +1826,19 @@ module.exports.listComponents = function listComponents(group) {
           url = u;
         }
       } catch {}
-      const key = String(p.id || p.name || '').trim();
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        out.push({ id: p.id, name: p.name, group: p.group || null, entry: entryRel, url });
-      }
+      const canon = canonicalizePluginId(p.id || p.name || '');
+      const urlKey = String(url || '').trim();
+      const displayKey = `${String(p.name || '').trim().toLowerCase()}|${String(p.group || '').trim().toLowerCase()}`;
+      const idKey = String(p.id || '').trim().toLowerCase();
+      if (idKey && seenId.has(idKey)) continue;
+      if (canon && seenCanon.has(canon)) continue;
+      if (urlKey && seenUrl.has(urlKey)) continue;
+      if (displayKey && seenDisplay.has(displayKey)) continue;
+      if (idKey) seenId.add(idKey);
+      if (canon) seenCanon.add(canon);
+      if (urlKey) seenUrl.add(urlKey);
+      if (displayKey) seenDisplay.add(displayKey);
+      out.push({ id: p.id, name: p.name, group: p.group || null, entry: entryRel, url });
     }
     return { ok: true, components: out };
   } catch (e) { return { ok: false, error: e?.message || String(e) }; }

@@ -38,6 +38,7 @@ function ensureDefaults() {
     },
     singleRoles: ['清洁', '黑板', '值日生'],
     singleRoleLists: {},
+    singleRoleConditions: {},
     lastStartupDate: ''
   };
   try { store.ensureDefaults('duty.easy', defaults); } catch {}
@@ -82,6 +83,8 @@ function predict(nextDays) {
   const rule = cfg.rule || {};
   const baseDate = new Date(todayISO());
   const out = [];
+  function weekNumberISO(dateStr){ const d=new Date(dateStr); const dd=new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day=(dd.getUTCDay()+6)%7; dd.setUTCDate(dd.getUTCDate()-day+3); const firstThursday=new Date(Date.UTC(dd.getUTCFullYear(),0,4)); const diff=dd-firstThursday; return 1+Math.round(diff/604800000); }
+  function matchCond(dateStr, cond){ if(!cond||typeof cond!=='object') return true; const wk=weekNumberISO(dateStr); const isOdd=(wk%2)===1; if(cond.mode==='odd' && !isOdd) return false; if(cond.mode==='even' && isOdd) return false; const d=new Date(dateStr).getDay(); const d17=d===0?7:d; const arr=Array.isArray(cond.weekdays)?cond.weekdays:[]; if(arr.length){ return arr.includes(d17); } return true; }
   for (let i = 0; i < nextDays; i++) {
     const d = new Date(baseDate.getTime() + i * 24 * 60 * 60 * 1000);
     const yyyy = d.getFullYear();
@@ -101,11 +104,14 @@ function predict(nextDays) {
     rolesAll.forEach((r) => { groupMembers[r] = Array.isArray(group.roles?.[r]) ? group.roles[r] : []; });
     const lists = typeof cfg.singleRoleLists === 'object' && cfg.singleRoleLists ? cfg.singleRoleLists : {};
     const indices = typeof rule.singleRoleIndices === 'object' && rule.singleRoleIndices ? rule.singleRoleIndices : {};
+    const conds = typeof cfg.singleRoleConditions === 'object' && cfg.singleRoleConditions ? cfg.singleRoleConditions : {};
     const singleMembers = {};
     singleRoles.forEach((r) => {
       const arr = Array.isArray(lists[r]) ? lists[r] : [];
       const base = Number.isFinite(indices[r]) ? indices[r] : 0;
-      const pick = arr.length ? arr[(base + i) % arr.length] : undefined;
+      const cond = conds[r] || null;
+      const canShow = matchCond(dateISO, cond);
+      const pick = arr.length && canShow ? arr[(base + i) % arr.length] : undefined;
       singleMembers[r] = pick ? [pick] : [];
     });
     out.push({ dateISO, groupIndex: gi, groupName: group.name || '', rolesGroup: rolesAll, groupMembers, rolesSingle: singleRoles, singleMembers });
@@ -139,6 +145,28 @@ const functions = {
       ]
     };
     await pluginApi.call('ui.lowbar', 'openTemplate', [params]);
+    return true;
+  },
+  showDutyOverlay: async () => {
+    ensureDefaults();
+    const list = predict(1);
+    const today = Array.isArray(list) && list.length ? list[0] : null;
+    if (!today) return false;
+    const members = [];
+    const rs = Array.isArray(today.rolesSingle) ? today.rolesSingle : [];
+    const membersSingle = [];
+    rs.forEach((r) => {
+      const arr = Array.isArray(today.singleMembers && today.singleMembers[r]) ? today.singleMembers[r] : [];
+      if (arr.length) { membersSingle.push({ role: r, names: arr }); members.push({ role: r, names: arr }); }
+    });
+    const rg = Array.isArray(today.rolesGroup) ? today.rolesGroup : [];
+    const membersGroup = [];
+    rg.forEach((r) => {
+      const arr = Array.isArray(today.groupMembers && today.groupMembers[r]) ? today.groupMembers[r] : [];
+      if (arr.length) { membersGroup.push({ role: r, names: arr }); members.push({ role: r, names: arr }); }
+    });
+    const props = { title: '今日值日生提醒', date: today.dateISO, group: today.groupName, members: JSON.stringify(members), columns: JSON.stringify(rg), membersGroup: JSON.stringify(membersGroup), membersSingle: JSON.stringify(membersSingle) };
+    await pluginApi.call('notify.plugin', 'overlayComponent', ['notify.overlay', 'component.duty.reminder', props, 60000, true, 3000]);
     return true;
   },
   onLowbarEvent: async (payload = {}) => {
@@ -181,6 +209,7 @@ const functions = {
       if (payload.rule && typeof payload.rule === 'object') store.set('duty.easy', 'rule', payload.rule);
       if (payload.singleRoleLists && typeof payload.singleRoleLists === 'object') store.set('duty.easy', 'singleRoleLists', payload.singleRoleLists);
       if (Array.isArray(payload.singleRoles)) store.set('duty.easy', 'singleRoles', payload.singleRoles);
+      if (payload.singleRoleConditions && typeof payload.singleRoleConditions === 'object') store.set('duty.easy', 'singleRoleConditions', payload.singleRoleConditions);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },

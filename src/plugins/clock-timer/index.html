@@ -281,7 +281,7 @@
             cdRunning = false;
             try {
               const times = 3; const interval = 2000;
-              for (let i = 0; i < times; i++) { setTimeout(() => { try { window.clockAPI?.pluginCall('notify.plugin','sound',['out']); } catch {} }, i * interval); }
+              for (let i = 0; i < times; i++) { setTimeout(() => { try { window.clockAPI?.pluginCall('notify.plugin','sound',['alarm']); } catch {} }, i * interval); }
             } catch {}
             cdEditorVisible = true;
             el('cd-editor').classList.remove('hidden');

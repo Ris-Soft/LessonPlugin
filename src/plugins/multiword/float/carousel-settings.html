@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>轮播设置</title>
+  <link rel="stylesheet" href="../../../renderer/remixicon-local.css" />
+  <link rel="stylesheet" href="../../../renderer/settings.css" />
+  <style>
+    html, body { margin:0; padding:0 !important; }
+    body { font-family: system-ui, Arial, sans-serif; background:#121212; color:#e6e6e6; }
+    header { padding:12px 16px; border-bottom:1px solid #2c2c2c; display:flex; align-items:center; gap:10px; background:#171717; }
+    header { margin:0 !important; }
+    header b { font-size:16px; }
+    main { padding:12px 16px 54px; }
+    fieldset { border:1px solid #2c2c2c; border-radius:10px; padding:10px 12px; background:#1b1b1b; }
+    legend { color:#9ab; }
+    label { display:block; margin:6px 0; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .ops { display:flex; gap:8px; margin-top:10px; }
+    button { padding:6px 10px; border:1px solid #2c2c2c; background:#222; color:#e6e6e6; border-radius:8px; cursor:pointer; }
+    button:hover { background:#2a2a2a; }
+    .muted { color:#9aa0a6; }
+    input[type="text"], input[type="number"], select, textarea { background:#1f1f1f; color:#e6e6e6; border:1px solid #2a2a2a; border-radius:8px; padding:6px 10px; outline:none; }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus { border-color:#3a7afe; box-shadow:0 0 0 3px rgba(58,122,254,0.15); }
+    .row label { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+    .row label input[type="number"] { width:100px; }
+    .bottomNav { position:fixed; left:0; right:0; bottom:8px; display:flex; justify-content:center; gap:24px; pointer-events:auto; }
+    .bottomNav button { background:#222; border:1px solid #2c2c2c; border-radius:8px; padding:6px 12px; color:#e6e6e6; }
+    .bottomNav i { font-size:22px; }
+  </style>
+</head>
+<body>
+  <header>
+    <i class="ri-slideshow-line"></i>
+    <b>轮播设置</b>
+    <span id="serverTip" class="muted"></span>
+  </header>
+  <main>
+    <fieldset id="step1">
+      <legend>轮播参数</legend>
+      <div class="row">
+        <label>翻页时长（分钟:秒） <input type="number" id="flipmin" min="0" value="6" /> : <input type="number" id="flipsec" min="0" max="59" value="30" /> </label>
+        <label>默认显示中文<select id="showcn"><option value="1">是</option><option value="0">否</option></select></label>
+      </div>
+      <div class="muted">单页显示数量将根据可视区域高度自动计算</div>
+      <div class="ops">
+        <button id="startCarousel"><i class="ri-play-circle-line"></i> 开始轮播</button>
+        <button id="backHome"><i class="ri-arrow-go-back-line"></i> 返回首页</button>
+      </div>
+    </fieldset>
+  </main>
+  <div class="bottomNav">
+    <button id="btnPrev" title="返回"><i class="ri-arrow-left-line"></i></button>
+    <button id="btnNext" title="开始"><i class="ri-arrow-right-line"></i></button>
+  </div>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const server = qs.get('server')||'';
+    document.getElementById('serverTip').textContent = server ? ('已连接：' + server) : '(未传递服务器参数)';
+    const h = (id) => document.getElementById(id);
+    const toUrl = (page, params={}) => { const base = new URL(page, window.location.href); Object.entries(params).forEach(([k,v]) => base.searchParams.set(k, String(v))); return base.href; };
+    const dayselParam = String(qs.get('daysel')||'').trim();
+    const state = { pool: [], selectedDays: new Set(dayselParam?dayselParam.split(',').map(s=>s.trim()).filter(Boolean):[]), month: null };
+    async function fetchPool(){
+      try{ const u=new URL('/words', String(server||'').trim()); const r=await fetch(u.href); const j=await r.json(); state.pool = Array.isArray(j?.words) ? j.words : []; }catch{ state.pool = []; }
+    }
+    function fmtDay(ms){ try{ const tz='Asia/Shanghai'; const d=new Date(ms||Date.now()); const parts=new Intl.DateTimeFormat('zh-CN',{timeZone:tz,hour12:false,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d); const get=(t)=>parts.find(p=>p.type===t)?.value||''; return `${get('year')}-${get('month')}-${get('day')}`; } catch { const d=new Date(ms||Date.now()); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); } }
+    function buildWeekheads(){ const heads=['一','二','三','四','五','六','日']; h('weekheads').innerHTML=heads.map(x=>`<div class="weekday">${x}</div>`).join(''); }
+    function buildCalendar(){
+      const now=new Date(); const m=state.month||{y:now.getFullYear(), m:now.getMonth()+1};
+      const first=new Date(m.y,m.m-1,1); const days=new Date(m.y,m.m,0).getDate(); const startIdx=(first.getDay()||7)-1;
+      const counts={}; state.pool.forEach(w=>{ const k=fmtDay(w.createdAt||Date.now()); counts[k]=(counts[k]||0)+1; });
+      const cells=[]; for(let i=0;i<startIdx;i++) cells.push('<div></div>');
+      for(let d=1; d<=days; d++){
+        const k = `${String(m.y)}-${String(m.m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const c = counts[k]||0; const sel = state.selectedDays.has(k) ? ' sel' : ''; const dis = c>0 ? '' : ' disabled'; const isToday = (k===fmtDay(Date.now())) ? ' today' : ''; const countHtml = c>0 ? `<div class="count">${c}</div>` : '';
+        cells.push(`<div class="day${sel}${dis}${isToday}" data-day="${k}"><div class="num">${d}</div>${countHtml}</div>`);
+      }
+      const totalCells = startIdx + days; const needPad = Math.max(0, 7*6 - totalCells); for (let i=0;i<needPad;i++) cells.push('<div></div>');
+      h('monthTitle').textContent = `${m.y}年${String(m.m).padStart(2,'0')}月`;
+      h('calendar').innerHTML = cells.join('');
+    }
+    function bindCalendar(){
+      h('calendar').addEventListener('click',(ev)=>{ const cell=ev.target.closest('.day'); if(!cell) return; if(cell.classList.contains('disabled')) return; const k=cell.getAttribute('data-day'); if(state.selectedDays.has(k)) state.selectedDays.delete(k); else state.selectedDays.add(k); buildCalendar(); });
+      h('monthPrev').onclick=()=>{ const cur=state.month||{y:new Date().getFullYear(), m:new Date().getMonth()+1}; const nm={ y:cur.m===1?(cur.y-1):cur.y, m:cur.m===1?12:(cur.m-1)}; state.month=nm; buildCalendar(); };
+      h('monthNext').onclick=()=>{ const cur=state.month||{y:new Date().getFullYear(), m:new Date().getMonth()+1}; const nm={ y:cur.m===12?(cur.y+1):cur.y, m:cur.m===12?1:(cur.m+1)}; state.month=nm; buildCalendar(); };
+    }
+    function buildQuickSelectors(){
+      const q=[{k:'today',t:'今天'},{k:'3',t:'近3天'},{k:'7',t:'近7天'},{k:'30',t:'近30天'},{k:'week',t:'本周'},{k:'month',t:'本月'},{k:'clear',t:'清空选择'}];
+      h('quickSel').innerHTML = q.map(x=>`<button class="quickbtn" data-k="${x.k}">${x.t}</button>`).join('');
+      document.querySelectorAll('.quickbtn').forEach(b=>{ b.addEventListener('click',()=>{ const k=String(b.getAttribute('data-k')||''); const now=new Date(); if(k==='clear'){ state.selectedDays.clear(); buildCalendar(); return; } if(k==='today'){ state.selectedDays=new Set([fmtDay(Date.now())]); buildCalendar(); return; } if(['3','7','30'].includes(k)){ const n=parseInt(k,10)||0; const s=new Set(); for(let i=0;i<n;i++){ const d=new Date(now.getFullYear(), now.getMonth(), now.getDate()-i); s.add(fmtDay(d)); } state.selectedDays=s; buildCalendar(); return; } if(k==='week'){ const wd=(now.getDay()||7)-1; const s=new Set(); for(let i=0;i<=wd;i++){ const d=new Date(now.getFullYear(), now.getMonth(), now.getDate()-i); s.add(fmtDay(d)); } state.selectedDays=s; buildCalendar(); return; } if(k==='month'){ const s=new Set(); const y=now.getFullYear(); const m=now.getMonth(); const days=new Date(y,m+1,0).getDate(); for(let d=1; d<=days; d++){ s.add(fmtDay(new Date(y,m,d))); } state.month={y, m:m+1}; state.selectedDays=s; buildCalendar(); return; } }); });
+    }
+    h('startCarousel').onclick = async () => {
+      const params = {
+        pagesec: Math.max(1,(parseInt(h('flipmin').value||'6',10)||0)*60 + (parseInt(h('flipsec').value||'30',10)||0)),
+        showcn: String(h('showcn').value||'1'),
+        server: String(server||'').trim()
+      };
+      try { const selDays = Array.from(state.selectedDays||new Set()); if (selDays.length) { if (!state.pool.length) { try { await fetchPool(); } catch {} } const list = state.pool.filter(x => selDays.includes(fmtDay(x.createdAt||Date.now()))); const uniq = Array.from(new Set(list.map(x => String(x.word||'').toLowerCase()))); params.selected = uniq.join(','); } else { params.days = 7; } } catch { params.days = 7; }
+      const bg = new URL('../../../plugins/multiword/background/carousel.html', window.location.href).href;
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'backgroundUrl', value: toUrl(bg, params) });
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'centerItems', value: [
+        { id:'carousel-prev', text:'上一页', icon:'ri-skip-back-line' },
+        { id:'carousel-pause', text:'暂停', icon:'ri-pause-circle-line' },
+        { id:'carousel-next', text:'下一页', icon:'ri-skip-forward-line' },
+        { id:'carousel-toggle-cn', text:'中文开关', icon:'ri-translate' },
+        { id:'open-carousel-settings', text:'轮播设置', icon:'ri-settings-3-line' },
+        { id:'carousel-stop', text:'结束轮播', icon:'ri-stop-circle-line' }
+      ] });
+      window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: null });
+    };
+    h('backHome').onclick = () => { const home = new URL('./externallib.html', window.location.href).href; window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: home }); };
+    h('btnPrev').onclick = () => { try { const float = new URL('./range-select.html', window.location.href).href; const href = toUrl(float, { server: String(server||'').trim(), next:'carousel', daysel: Array.from(state.selectedDays||new Set()).join(',') }); window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingBounds', value: { width: 980, height: 680 } }); window.lowbarAPI.emitEvent('multiword.lowbar', { type:'update', target:'floatingUrl', value: href }); } catch {} };
+    h('btnNext').onclick = () => { h('startCarousel').click(); };
+    (async function init(){ await fetchPool(); })();
+  </script>
+</body>
+</html>

@@ -90,7 +90,9 @@ const functions = {
           const basePool = pool.length ? pool : unique;
           const steps = basePool.length ? Math.min(5, basePool.length) : 0;
           for (let i = 0; i < steps; i++) { const j = Math.floor(Math.random() * basePool.length); seq.push(basePool[j] || finalName || ''); }
-          try { pluginApi.emit(state.eventChannel, { type: 'animate.pick', names: seq, final: finalName, stepMs: 40 }); } catch {}
+          let seat = null;
+          try { seat = await functions._getSeatingContext(finalName); } catch { seat = null; }
+          try { pluginApi.emit(state.eventChannel, { type: 'animate.pick', names: seq, final: finalName, stepMs: 40, seat }); } catch {}
         }
       } else if (payload.type === 'left.click') {
         if (payload.id === 'openSettings') {
@@ -117,6 +119,38 @@ const functions = {
       return true;
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
+  _getSeatingContext: async (finalName) => {
+    try {
+      let res = await pluginApi.call('profiles.seating', 'getConfig');
+      res = res?.result || res;
+      const cfg = res?.config || {};
+      const rows = Array.isArray(cfg.rows) ? cfg.rows : [];
+      const cols = Array.isArray(cfg.cols) ? cfg.cols : [];
+      const seats = (cfg && typeof cfg.seats === 'object') ? cfg.seats : {};
+      const name = String(finalName || '').trim();
+      if (!name) return { found: false };
+      let foundKey = '';
+      for (const k of Object.keys(seats || {})) { const v = seats[k]; if (v && String(v.name||'').trim() === name) { foundKey = k; break; } }
+      if (!foundKey) return { found: false };
+      const parts = foundKey.split('-');
+      if (parts.length !== 2) return { found: false };
+      const rowId = parts[0]; const colId = parts[1];
+      const ri = rows.findIndex(r => String(r?.id||'') === rowId);
+      const ci = cols.findIndex(c => String(c?.id||'') === colId);
+      if (ri < 0 || ci < 0) return { found: false };
+      const isAisleRow = (i) => (rows[i]?.type || 'row') === 'aisle';
+      const isAisleCol = (i) => (cols[i]?.type || 'col') === 'aisle';
+      const seatKey = (rIdx, cIdx) => { const r = rows[rIdx]?.id; const c = cols[cIdx]?.id; return (r && c) ? `${r}-${c}` : ''; };
+      const occupantAt = (rIdx, cIdx) => { const key = seatKey(rIdx, cIdx); const o = key ? seats[key] : null; return o && typeof o === 'object' ? String(o.name || '') : ''; };
+      let rowNumber = 0; for (let i = 0; i <= ri; i++) { if (!isAisleRow(i)) rowNumber++; }
+      let colNumber = 0; for (let j = 0; j <= ci; j++) { if (!isAisleCol(j)) colNumber++; }
+      const collectLeft = () => { const arr = []; let c = ci - 1; while (c >= 0 && arr.length < 2) { if (!isAisleCol(c)) { const nm = occupantAt(ri, c); if (nm) arr.push(nm); } c--; } return arr; };
+      const collectRight = () => { const arr = []; let c = ci + 1; while (c < cols.length && arr.length < 2) { if (!isAisleCol(c)) { const nm = occupantAt(ri, c); if (nm) arr.push(nm); } c++; } return arr; };
+      const collectFront = () => { const arr = []; let r = ri - 1; while (r >= 0 && arr.length < 2) { if (!isAisleRow(r)) { const nm = occupantAt(r, ci); if (nm) arr.push(nm); } r--; } return arr; };
+      const collectBack = () => { const arr = []; let r = ri + 1; while (r < rows.length && arr.length < 2) { if (!isAisleRow(r)) { const nm = occupantAt(r, ci); if (nm) arr.push(nm); } r++; } return arr; };
+      return { found: true, pos: { row: rowNumber, col: colNumber }, neighbors: { left: collectLeft(), right: collectRight(), front: collectFront(), back: collectBack() } };
+    } catch { return { found: false }; }
+  }
   
 };
 

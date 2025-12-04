@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const __progressListeners = new Map();
+
 contextBridge.exposeInMainWorld('settingsAPI', {
   getPlugins: () => ipcRenderer.invoke('plugin:list'),
   togglePlugin: (name, enabled) => ipcRenderer.invoke('plugin:toggle', name, enabled),
@@ -17,6 +19,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   // 新增：在线获取插件 README（优先 npm registry）
   getPluginReadmeOnline: (name) => ipcRenderer.invoke('plugin:readmeOnline', name),
   windowControl: (action) => ipcRenderer.invoke('window:control', action),
+  showAppMenu: (coords) => ipcRenderer.invoke('settings:showMenu', coords),
   npmGetVersions: (name) => ipcRenderer.invoke('npm:versions', name),
   npmDownload: (name, version) => ipcRenderer.invoke('npm:download', name, version),
   npmSwitch: (pluginName, name, version) => ipcRenderer.invoke('npm:switch', pluginName, name, version)
@@ -60,11 +63,28 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   },
   // 进度事件订阅（主进程通过 'plugin-progress' 推送）
   onProgress: (handler) => {
-    try { ipcRenderer.on('plugin-progress', (_e, payload) => handler && handler(payload)); } catch {}
+    try {
+      const listener = (_e, payload) => handler && handler(payload);
+      __progressListeners.set(handler, listener);
+      ipcRenderer.on('plugin-progress', listener);
+      return () => {
+        const l = __progressListeners.get(handler);
+        if (l) {
+          ipcRenderer.removeListener('plugin-progress', l);
+          __progressListeners.delete(handler);
+        }
+      };
+    } catch {}
   },
   // 取消进度事件订阅（用于安装完成后解绑）
   offProgress: (handler) => {
-    try { ipcRenderer.removeListener('plugin-progress', handler); } catch {}
+    try {
+      const listener = __progressListeners.get(handler);
+      if (listener) {
+        ipcRenderer.removeListener('plugin-progress', listener);
+        __progressListeners.delete(handler);
+      }
+    } catch {}
   },
   // 打开插件信息模态框事件订阅
   onOpenPluginInfo: (handler) => {
@@ -75,6 +95,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   },
   onMarketInstall: (handler) => {
     ipcRenderer.on('settings:marketInstall', (_e, payload) => handler && handler(payload));
+  },
+  onOpenIconAdder: (handler) => {
+    ipcRenderer.on('settings:openIconAdder', (_e) => handler && handler());
   },
   // 自动化执行确认覆盖层通信
   onAutomationConfirmInit: (handler) => {
@@ -102,14 +125,20 @@ contextBridge.exposeInMainWorld('settingsAPI', {
     const dir = await ipcRenderer.invoke('icons:dir');
     return require('electron').shell.openPath(dir);
   },
+  openInstallDir: async () => ipcRenderer.invoke('system:openInstallDir'),
+  quitApp: async () => ipcRenderer.invoke('system:quit'),
+  uninstallAllPlugins: async () => ipcRenderer.invoke('plugin:uninstallAll'),
   // 查询依赖反向引用（依赖此插件的插件与自动化）
   pluginDependents: (idOrName) => ipcRenderer.invoke('plugin:dependents', idOrName)
   ,
   // 后端日志（调试）：获取最近记录与订阅实时日志
   backendLogsGet: () => ipcRenderer.invoke('debug:logs:get'),
   onBackendLog: (handler) => {
-    ipcRenderer.on('backend:log', (_e, line) => handler && handler(line));
-    // 主动声明订阅以便主进程推送
+    const listener = (_e, line) => handler && handler(line);
+    ipcRenderer.on('backend:log', listener);
     try { ipcRenderer.send('debug:logs:subscribe'); } catch {}
+    return () => {
+      ipcRenderer.removeListener('backend:log', listener);
+    };
   }
 });

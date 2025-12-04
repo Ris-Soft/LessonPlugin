@@ -26,7 +26,8 @@
       .seg { display:flex; gap:6px; }
       .seg .btn { height:30px; padding:0 12px; }
       .seg .btn.active { border-color: rgba(64,128,255,0.42); background: rgba(64,128,255,0.22); }
-      .preview { margin-top:12px; border:1px solid rgba(255,255,255,0.2); border-radius:10px; background: rgba(16,24,36,0.4); width: 240px; height: 240px; display:flex; align-items:center; justify-content:center; position: relative; overflow:hidden; }
+      .pane-row { display:flex; gap:12px; align-items:flex-start; margin-top:12px; }
+      .preview { border:1px solid rgba(255,255,255,0.2); border-radius:10px; background: rgba(16,24,36,0.4); width: 240px; height: 240px; display:flex; align-items:center; justify-content:center; position: relative; overflow:hidden; }
       .preview .root { width:100%; height:100%; position:relative; display:flex; align-items:center; justify-content:center; }
       .preview .circle-bg { position:absolute; inset:0; border-radius:50%; background: rgba(20,28,40,0.28); border: 1px solid rgba(255,255,255,0.18); }
       .preview .ring { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
@@ -46,7 +47,11 @@
       .preview.sector .item { background: transparent; border: none; }
       .preview.classic .item.active .dot { border-color: rgba(64,128,255,0.42); box-shadow: 0 0 0 2px rgba(64,128,255,0.22) inset; }
       .editor { border:1px solid rgba(255,255,255,0.2); border-radius:10px; background: rgba(16,24,36,0.35); padding:10px; display:flex; flex-direction:column; gap:8px; margin-top: 12px; }
+      #appearanceEditor { margin-top: 0; width: 320px; flex: 0 0 320px; position: sticky; top: 12px; }
       .editor .row { margin: 0; }
+      #appearanceEditor .row label { flex: 0 0 120px; }
+      #appearanceEditor .row input { flex: 1 1 auto; min-width: 0; }
+      #appearanceEditor .row .btn { flex: 0 0 auto; min-width: 120px; height: 30px; padding: 0 12px; white-space: nowrap; }
     </style>
   </head>
   <body>
@@ -59,12 +64,33 @@
           <button class="btn" id="themeSectorBtn"><span>扇形</span></button>
         </div>
       </div>
-      <div class="preview" id="preview">
-        <div class="root" id="pvRoot">
-          <div class="circle-bg" id="pvCircle"></div>
-          <div class="sectors" id="pvSectors"></div>
-          <div class="ring" id="pvRing"></div>
-          <div class="center-btn" id="pvCenter"><i class="ri-compass-3-line"></i></div>
+      <div class="pane-row" id="pvRow">
+        <div class="preview" id="preview">
+          <div class="root" id="pvRoot">
+            <div class="circle-bg" id="pvCircle"></div>
+            <div class="sectors" id="pvSectors"></div>
+            <div class="ring" id="pvRing"></div>
+            <div class="center-btn" id="pvCenter"><i class="ri-compass-3-line"></i></div>
+          </div>
+        </div>
+        <div class="editor" id="appearanceEditor">
+          <div class="row">
+            <label style="min-width:120px;color:#e6f0ff;">收起窗口尺寸</label>
+            <input id="sizeCollapsedInput" type="number" min="40" max="240" step="1" placeholder="60" />
+          </div>
+          <div class="row">
+            <label style="min-width:120px;color:#e6f0ff;">展开窗口尺寸</label>
+            <input id="sizeExpandedInput" type="number" min="120" max="480" step="1" placeholder="240" />
+          </div>
+          <div class="row">
+            <label style="min-width:120px;color:#e6f0ff;">中心按钮大小</label>
+            <input id="centerSizeInput" type="number" min="32" max="160" step="1" placeholder="50" />
+          </div>
+          <div class="row">
+            <label style="min-width:120px;color:#e6f0ff;">罗盘图标</label>
+            <input id="centerIconInput" placeholder="ri-compass-3-line" />
+            <button class="btn" id="pickCenterIcon"><i class="ri-pantone-line"></i><span>选择图标</span></button>
+          </div>
         </div>
       </div>
       <div id="list"></div>
@@ -96,6 +122,16 @@
           items = Array.isArray(list) ? list : [];
           items.forEach(it => { if (it && typeof it==='object') { if (it.actionType==='program') it.actionType='openApp'; if (it.actionType==='command') it.actionType='cmd'; } });
         } catch { items = []; }
+        try { const v = await window.lowbarAPI.configGet(scope, 'sizeCollapsed'); window.__sizeCollapsed = Number((v && v.result) ? v.result : v) || 60; } catch { window.__sizeCollapsed = 60; }
+        try { const v = await window.lowbarAPI.configGet(scope, 'sizeExpanded'); window.__sizeExpanded = Number((v && v.result) ? v.result : v) || 240; } catch { window.__sizeExpanded = 240; }
+        try { const v = await window.lowbarAPI.configGet(scope, 'centerSize'); window.__centerSize = Number((v && v.result) ? v.result : v) || 50; } catch { window.__centerSize = 50; }
+        try { const v = await window.lowbarAPI.configGet(scope, 'centerIcon'); window.__centerIcon = String((v && v.result) ? v.result : v || 'ri-compass-3-line'); } catch { window.__centerIcon = 'ri-compass-3-line'; }
+        try {
+          window.__centerSize = Math.max(32, Math.min(160, Number(window.__centerSize || 50)));
+          window.__sizeCollapsed = Math.max(40, Math.min(240, Number(window.__sizeCollapsed || (window.__centerSize + 10))));
+          window.__centerSize = Math.max(32, Math.min(160, Number(window.__sizeCollapsed - 10)));
+          window.__sizeCollapsed = Math.max(40, Math.min(240, Number(window.__centerSize + 10)));
+        } catch {}
       }
       function render(){
         const root = document.getElementById('list');
@@ -132,7 +168,20 @@
       } catch {} }
       document.getElementById('themeClassicBtn').onclick = () => { theme = 'classic'; updateThemeSeg(); placePreview(); };
       document.getElementById('themeSectorBtn').onclick = () => { theme = 'sector'; updateThemeSeg(); placePreview(); };
-      document.getElementById('save').onclick = async () => { try { await window.lowbarAPI.configSet(scope, 'theme', theme); await window.lowbarAPI.configSet(scope, 'buttons', items); await window.lowbarAPI.emitEvent(scope, { type: 'buttons.update', buttons: items, theme }); } catch {} };
+      document.getElementById('save').onclick = async () => {
+        try {
+          await window.lowbarAPI.configSet(scope, 'theme', theme);
+          await window.lowbarAPI.configSet(scope, 'buttons', items);
+          await window.lowbarAPI.configSet(scope, 'sizeCollapsed', Math.max(40, Math.min(240, Number(document.getElementById('sizeCollapsedInput').value || window.__sizeCollapsed || 60))));
+          await window.lowbarAPI.configSet(scope, 'sizeExpanded', Math.max(120, Math.min(480, Number(document.getElementById('sizeExpandedInput').value || window.__sizeExpanded || 240))));
+          const centerSaved = Math.max(32, Math.min(160, Number(document.getElementById('centerSizeInput').value || window.__centerSize || 50)));
+          window.__centerSize = centerSaved;
+          window.__sizeCollapsed = Math.max(40, Math.min(240, centerSaved + 10));
+          await window.lowbarAPI.configSet(scope, 'centerSize', window.__centerSize);
+          await window.lowbarAPI.configSet(scope, 'centerIcon', String(document.getElementById('centerIconInput').value || window.__centerIcon || 'ri-compass-3-line'));
+          await window.lowbarAPI.emitEvent(scope, { type: 'buttons.update', buttons: items, theme, sizeCollapsed: window.__sizeCollapsed, sizeExpanded: window.__sizeExpanded, centerSize: window.__centerSize, centerIcon: window.__centerIcon });
+        } catch {}
+      };
       function placePreview(){
         try { const rootEl = document.getElementById('pvRoot'); const ring = document.getElementById('pvRing'); ring.innerHTML=''; const sectors = document.getElementById('pvSectors'); sectors.innerHTML=''; } catch {}
         const rootEl = document.getElementById('pvRoot'); const ring = document.getElementById('pvRing'); const sectors = document.getElementById('pvSectors');
@@ -201,6 +250,13 @@
           ring.appendChild(div);
         }
         const center = document.getElementById('pvCenter');
+        try {
+          center.style.width = (window.__centerSize || 50) + 'px';
+          center.style.height = (window.__centerSize || 50) + 'px';
+          const icon = center.querySelector('i');
+          icon.className = String(window.__centerIcon || 'ri-compass-3-line');
+          icon.style.fontSize = Math.round((window.__centerSize || 50) * 0.44) + 'px';
+        } catch {}
         try { center.onclick = () => {}; } catch {}
       }
       function renderActionFields(it, box){
@@ -311,6 +367,27 @@
       (async function init(){
         await ensureDefaults();
         await load();
+        try {
+          const sc = document.getElementById('sizeCollapsedInput'); sc.value = String(window.__sizeCollapsed || 60);
+          const se = document.getElementById('sizeExpandedInput'); se.value = String(window.__sizeExpanded || 240);
+          const cs = document.getElementById('centerSizeInput'); cs.value = String(window.__centerSize || 50);
+          const ci = document.getElementById('centerIconInput'); ci.value = String(window.__centerIcon || 'ri-compass-3-line');
+          document.getElementById('pickCenterIcon').onclick = () => openIconPicker(ci);
+          sc.onchange = () => {
+            window.__sizeCollapsed = Math.max(40, Math.min(240, Number(sc.value)||60));
+            window.__centerSize = Math.max(32, Math.min(160, window.__sizeCollapsed - 10));
+            cs.value = String(window.__centerSize);
+            placePreview();
+          };
+          se.onchange = () => { window.__sizeExpanded = Math.max(120, Math.min(480, Number(se.value)||240)); placePreview(); };
+          cs.onchange = () => {
+            window.__centerSize = Math.max(32, Math.min(160, Number(cs.value)||50));
+            window.__sizeCollapsed = Math.max(40, Math.min(240, window.__centerSize + 10));
+            sc.value = String(window.__sizeCollapsed);
+            placePreview();
+          };
+          ci.onchange = () => { window.__centerIcon = String(ci.value || 'ri-compass-3-line'); placePreview(); };
+        } catch {}
         try {
           let list = [];
           try {

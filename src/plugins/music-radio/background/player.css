@@ -5,7 +5,7 @@ html, body { height: 100%; margin: 0; background: transparent; color: #eee; font
   user-select: none;
 }
 .wrap { height: 100%; position: relative; z-index: 1; }
-.content-area { position: absolute; left: 0; right: 0; top: 0; bottom: 100px; display: flex; gap: 24px; padding: 24px; }
+.content-area { position: absolute; left: 0; right: 0; top: 0; bottom: 100px; display: flex; gap: 32px; padding: 24px; }
 .playlist { width: 280px; border-right: 1px solid rgba(255, 255, 255, 0.08); padding-right: 16px; display: flex; flex-direction: column; justify-content: flex-end; }
 .playlist .item { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; color: #cfcfcf; }
 .playlist .total { margin-top: auto; padding-top: 8px; border-top: 1px dashed rgba(255, 255, 255, 0.1); color: #9ad; display: flex; justify-content: space-between; align-items: center; }
@@ -41,11 +41,11 @@ html, body { height: 100%; margin: 0; background: transparent; color: #eee; font
 .now-title, .now-artist { -webkit-user-select: text; -ms-user-select: text; user-select: text; }
 #lyrics::-webkit-scrollbar { width: 0; height: 0; }
 #lyrics .line>div { white-space: normal; word-break: break-word; }
-#lyrics .line { margin: 25px 0; }
+#lyrics .line { margin: 32px 0; }
 #lyrics .row { line-height: 1.4; }
-#lyrics .row.origin { font-size: 1.15em; }
-#lyrics .line.single .row.origin { font-size: 1.25em; }
-#lyrics .row.trans { opacity: 0.8; font-size: 0.9em; color: #cfcfcf; margin-top: 2px; }
+#lyrics .row.origin { font-size: 1.22em; }
+#lyrics .line.single .row.origin { font-size: 1.32em; }
+#lyrics .row.trans { opacity: 0.8; font-size: 0.92em; color: #cfcfcf; margin-top: 6px; }
 .audio-bar { position: absolute; left: 16px; right: 16px; bottom: 16px; height: 64px; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; backdrop-filter: blur(10px); background: rgba(0,0,0,0.35); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
 .audio-progress-wrap { display:flex; align-items:center; gap:10px; padding: 0 8px; }
 .audio-progress-time { font-size:12px; color:#cfcfcf; min-width:48px; text-align:center; }

@@ -762,6 +762,23 @@ ipcMain.handle('plugin:readmeOnline', async (_e, key) => {
     try { return pluginManager.getPluginReadme(key); } catch { return null; }
   } catch { return null; }
 });
+ipcMain.handle('plugin:uninstallAll', async () => {
+  try {
+    const list = await pluginManager.getPlugins();
+    const items = Array.isArray(list) ? list : [];
+    const removed = [];
+    for (const p of items) {
+      const key = p.id || p.name;
+      try {
+        await pluginManager.uninstall(key);
+        removed.push(key);
+      } catch {}
+    }
+    return { ok: true, removed };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
 
 // 窗口控制（用于自定义标题栏按钮）
 ipcMain.handle('window:control', async (event, action) => {
@@ -794,6 +811,22 @@ ipcMain.handle('window:control', async (event, action) => {
     default:
       break;
   }
+  return { ok: true };
+});
+
+ipcMain.handle('settings:showMenu', async (event, coords) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+  const menu = Menu.buildFromTemplate([
+    { label: '为项目加入图标', click: () => { try { win?.webContents?.send('settings:openIconAdder'); } catch {} } },
+    { label: '刷新设置页', click: () => { try { win?.webContents?.reload(); } catch {} } },
+    { type: 'separator' },
+    { label: '快速重启程序', click: () => { try { store.set('system', 'openSettingsOnBootOnce', true); } catch {} app.relaunch(); app.exit(0); } },
+    { label: '打开数据目录', click: async () => { try { const root = path.join(app.getPath('userData'), 'LessonPlugin'); try { fs.mkdirSync(root, { recursive: true }); } catch {} await require('electron').shell.openPath(root); } catch {} } },
+    { label: '打开安装目录', click: async () => { try { const dir = path.dirname(process.execPath); await require('electron').shell.openPath(dir); } catch {} } },
+    { type: 'separator' },
+    { label: '退出程序', click: () => app.quit() }
+  ]);
+  try { menu.popup({ window: win }); } catch {}
   return { ok: true };
 });
 
@@ -1030,6 +1063,9 @@ ipcMain.handle('system:changeUserData', async () => {
     const sel = await require('electron').dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
     if (sel.canceled || !sel.filePaths || !sel.filePaths[0]) return { ok: false, error: '未选择目录' };
     const targetBase = sel.filePaths[0];
+    if (path.resolve(targetBase) === path.resolve(app.getPath('userData'))) {
+      return { ok: false, error: '选择的目录与当前目录相同' };
+    }
     const currentBase = app.getPath('userData');
     const currentRoot = path.join(currentBase, 'LessonPlugin');
     const nextRoot = path.join(targetBase, 'LessonPlugin');
@@ -1052,7 +1088,17 @@ ipcMain.handle('system:changeUserData', async () => {
     copyDir(currentRoot, nextRoot);
     const programDir = path.dirname(process.execPath);
     const markerPath = path.join(programDir, 'user-data.json');
-    try { fs.writeFileSync(markerPath, JSON.stringify({ overrideDir: targetBase }, null, 2), 'utf-8'); } catch {}
+    let writeOk = false;
+    try { fs.writeFileSync(markerPath, JSON.stringify({ overrideDir: targetBase }, null, 2), 'utf-8'); writeOk = true; } catch {}
+    let verifyOk = false;
+    try {
+      const text = fs.readFileSync(markerPath, 'utf-8');
+      const cfg = JSON.parse(text);
+      verifyOk = String(cfg?.overrideDir || '') === targetBase;
+    } catch {}
+    if (!writeOk || !verifyOk) {
+      return { ok: false, error: '无法写入应用目录标记文件，请检查权限后重试' };
+    }
     return { ok: true, nextPath: targetBase };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1290,6 +1336,18 @@ ipcMain.handle('system:restart', async () => {
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
+});
+ipcMain.handle('system:openInstallDir', async () => {
+  try {
+    const dir = path.dirname(process.execPath);
+    const res = await require('electron').shell.openPath(dir);
+    return { ok: !res, error: res || null };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('system:quit', async () => {
+  try { app.quit(); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
 });
 // 调试日志：最近记录查询与订阅实时流
 ipcMain.handle('debug:logs:get', async () => {

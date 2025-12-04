@@ -642,7 +642,10 @@ class AutomationManager {
     };
     for (const act of actions) {
       try {
-        // console.log(act);
+        const manual = String(ctx?.reason || '') === 'manual_test';
+        if ((act && (act.type === 'pluginEvent' || act.type === 'pluginAction')) && !manual) {
+          continue;
+        }
         if (act.type === 'pluginEvent') {
           const params = Array.isArray(act.params) ? await Promise.all(act.params.map((x) => expandValue(x))) : [];
           await this.pluginManager.callFunction(act.pluginId, act.event, params);

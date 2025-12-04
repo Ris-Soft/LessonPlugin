@@ -47,7 +47,10 @@ function initAboutPage() {
   if (openDataBtn) {
     if (window.settingsAPI?.openUserData) {
       openDataBtn.hidden = false;
-      openDataBtn.addEventListener('click', () => window.settingsAPI.openUserData());
+      if (openDataBtn.dataset.bound !== '1') {
+        openDataBtn.dataset.bound = '1';
+        openDataBtn.addEventListener('click', () => window.settingsAPI.openUserData());
+      }
     } else {
       openDataBtn.hidden = true;
     }

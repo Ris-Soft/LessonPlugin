@@ -49,6 +49,10 @@
       let theme = 'classic';
       let activeIndex = -1;
       let toggleLock = false;
+      let sizeCollapsed = 60;
+      let sizeExpanded = 240;
+      let centerSize = 50;
+      let centerIcon = 'ri-compass-3-line';
 
       async function ensureDefaults() {
         const defaults = {
@@ -57,6 +61,7 @@
           ]
         };
         try { await window.compassAPI.configEnsureDefaults(scope, defaults); } catch {}
+        try { await window.compassAPI.configEnsureDefaults(scope, { sizeCollapsed: 60, sizeExpanded: 240, centerSize: 50, centerIcon: 'ri-compass-3-line' }); } catch {}
       }
 
       async function loadItems() {
@@ -66,6 +71,16 @@
           items = Array.isArray(list) ? list : [];
         } catch { items = []; }
         try { const t = await window.compassAPI.configGet(scope, 'theme'); const v = (t && t.result) ? t.result : t; theme = (v === 'sector') ? 'sector' : 'classic'; } catch { theme = 'classic'; }
+        try { const v = await window.compassAPI.configGet(scope, 'sizeCollapsed'); sizeCollapsed = Number((v && v.result) ? v.result : v) || 60; } catch { sizeCollapsed = 60; }
+        try { const v = await window.compassAPI.configGet(scope, 'sizeExpanded'); sizeExpanded = Number((v && v.result) ? v.result : v) || 240; } catch { sizeExpanded = 240; }
+        try { const v = await window.compassAPI.configGet(scope, 'centerSize'); centerSize = Number((v && v.result) ? v.result : v) || 50; } catch { centerSize = 50; }
+        try { const v = await window.compassAPI.configGet(scope, 'centerIcon'); centerIcon = String((v && v.result) ? v.result : v || 'ri-compass-3-line'); } catch { centerIcon = 'ri-compass-3-line'; }
+        try {
+          centerSize = Math.max(32, Math.min(160, Number(centerSize || 50)));
+          sizeCollapsed = Math.max(40, Math.min(240, Number(sizeCollapsed || (centerSize + 10))));
+          centerSize = Math.max(32, Math.min(160, Number(sizeCollapsed - 10)));
+          sizeCollapsed = Math.max(40, Math.min(240, Number(centerSize + 10)));
+        } catch {}
       }
 
       function placeItems() {
@@ -175,33 +190,35 @@
       let inactivityTimer = null;
       function resetInactivityTimer(){ try { if (inactivityTimer) clearTimeout(inactivityTimer); inactivityTimer = setTimeout(() => { if (expanded) setExpanded(false); }, 30000); } catch {} }
 
-      let dragging = false; let startScreenX = 0; let startScreenY = 0; let lastScreenX = 0; let lastScreenY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false; let rafScheduled = false; let nextX = 0; let nextY = 0; let boundsReady = false;
+      let dragging = false; let startScreenX = 0; let startScreenY = 0; let lastScreenX = 0; let lastScreenY = 0; let lastClientX = 0; let lastClientY = 0; let startWinX = 0; let startWinY = 0; let moved = false; let justDragged = false; let rafScheduled = false; let nextX = 0; let nextY = 0; let downClientX = 0; let downClientY = 0; let boundsReady = false;
       function onPointerDown(e){
-        dragging = true; moved = false; boundsReady = false; startScreenX = e.screenX; startScreenY = e.screenY; lastScreenX = startScreenX; lastScreenY = startScreenY;
-        try { window.compassAPI.pluginCall('screen.compass','setDragging',[true]); } catch {}
+        dragging = true; moved = false; boundsReady = false; startScreenX = e.screenX; startScreenY = e.screenY; lastScreenX = startScreenX; lastScreenY = startScreenY; downClientX = e.clientX; downClientY = e.clientY; lastClientX = downClientX; lastClientY = downClientY;
+        const inputType = String(e.pointerType||'').toLowerCase();
+        try { e.preventDefault(); } catch {}
         try { center.setPointerCapture(e.pointerId); } catch {}
         window.compassAPI.getBounds().then((raw)=>{
           const b = (raw && raw.result) ? raw.result : raw;
           startWinX = (b && typeof b.x==='number')? b.x:0; startWinY = (b && typeof b.y==='number')? b.y:0; boundsReady = true;
-          const dx0 = lastScreenX - startScreenX; const dy0 = lastScreenY - startScreenY;
-          nextX = startWinX + dx0; nextY = startWinY + dy0;
-          if (!rafScheduled) { rafScheduled = true; requestAnimationFrame(()=>{ rafScheduled=false; window.compassAPI.moveTo(nextX, nextY); }); }
+          const offsetX = Math.max(0, (typeof e.screenX === 'number' ? e.screenX : 0) - startWinX);
+          const offsetY = Math.max(0, (typeof e.screenY === 'number' ? e.screenY : 0) - startWinY);
+          try { window.compassAPI.pluginCall('screen.compass','setDragging',[true, offsetX, offsetY, inputType]); } catch {}
         });
       }
       function onPointerMove(e){
         if (!dragging) return;
         try {
           const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-          if (evs && evs.length) { const le = evs[evs.length-1]; lastScreenX = le.screenX; lastScreenY = le.screenY; }
-          else { lastScreenX = e.screenX; lastScreenY = e.screenY; }
-        } catch { lastScreenX = e.screenX; lastScreenY = e.screenY; }
+          if (evs && evs.length) { const le = evs[evs.length-1]; lastClientX = le.clientX; lastClientY = le.clientY; lastScreenX = le.screenX; lastScreenY = le.screenY; }
+          else { lastClientX = e.clientX; lastClientY = e.clientY; lastScreenX = e.screenX; lastScreenY = e.screenY; }
+        } catch { lastClientX = e.clientX; lastClientY = e.clientY; lastScreenX = e.screenX; lastScreenY = e.screenY; }
         if (!boundsReady) { return; }
-        const dx = lastScreenX - startScreenX, dy = lastScreenY - startScreenY;
+        const dx = lastClientX - downClientX, dy = lastClientY - downClientY;
         if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
-        nextX = startWinX + dx; nextY = startWinY + dy;
-        if (!rafScheduled) {
-          rafScheduled = true;
-          requestAnimationFrame(() => { rafScheduled = false; window.compassAPI.moveTo(nextX, nextY); });
+        try { e.preventDefault(); } catch {}
+        if (dragging && boundsReady && String(e.pointerType||'').toLowerCase()==='touch') {
+          const dx = lastClientX - downClientX;
+          const dy = lastClientY - downClientY;
+          try { window.compassAPI.pluginCall('screen.compass','touchDragMove',[dx, dy]); } catch {}
         }
       }
       function onPointerUp(e){ try { center.releasePointerCapture(e.pointerId); } catch {} dragging=false; boundsReady=false; rafScheduled=false; if (moved) { justDragged = true; setTimeout(()=>{ justDragged=false; }, 200); } window.compassAPI.snap(); try { window.compassAPI.pluginCall('screen.compass','setDragging',[false]); } catch {} }
@@ -212,11 +229,11 @@
       center.addEventListener('pointercancel', onPointerCancel);
 
       const iconEl = center.querySelector('i');
-      function updateCenterIcon(){ try { iconEl.className = expanded ? 'ri-close-line' : 'ri-compass-3-line'; } catch {} }
+      function updateCenterIcon(){ try { iconEl.className = expanded ? 'ri-close-line' : centerIcon; iconEl.style.fontSize = Math.round(centerSize * 0.44) + 'px'; center.style.width = centerSize + 'px'; center.style.height = centerSize + 'px'; } catch {} }
       const __origSetExpanded = setExpanded;
       setExpanded = (on) => {
         if (window.__compassToggleTs && Date.now() - window.__compassToggleTs < 140) return; window.__compassToggleTs = Date.now();
-        try { window.compassAPI.pluginCall('screen.compass','setExpandedWindow',[!!on]); } catch {}
+        try { const w = on ? sizeExpanded : sizeCollapsed; window.compassAPI.pluginCall('screen.compass','setExpandedWindow',[!!on, w, w]); } catch {}
         let done = false;
         const run = () => { if (done) return; done = true; try { placeItems(); __origSetExpanded(on); updateCenterIcon(); if (expanded) resetInactivityTimer(); else { try { if (inactivityTimer) clearTimeout(inactivityTimer); } catch {} } } catch {} };
         const onResize = () => { try { window.removeEventListener('resize', onResize); } catch {} run(); };
@@ -237,6 +254,15 @@
               if (Array.isArray(payload.buttons)) { items = payload.buttons; }
               else { await loadItems(); }
               if (payload.theme) { theme = (payload.theme === 'sector') ? 'sector' : 'classic'; }
+              if (payload.centerSize) {
+                centerSize = Math.max(32, Math.min(160, Number(payload.centerSize) || centerSize));
+                sizeCollapsed = Math.max(40, Math.min(240, centerSize + 10));
+              } else if (payload.sizeCollapsed) {
+                sizeCollapsed = Math.max(40, Math.min(240, Number(payload.sizeCollapsed) || sizeCollapsed));
+                centerSize = Math.max(32, Math.min(160, sizeCollapsed - 10));
+              }
+              if (payload.sizeExpanded) sizeExpanded = Number(payload.sizeExpanded) || sizeExpanded;
+              if (payload.centerIcon) centerIcon = String(payload.centerIcon) || centerIcon;
             } catch {}
             placeItems(); setExpanded(expanded);
           }

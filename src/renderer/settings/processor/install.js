@@ -555,7 +555,8 @@
           hasError = true;
           try {
             const msg = String(e?.message || '');
-            if (!tarGuideShown && /(缺少\s*tar|tar\s*依赖|tar.*无法解压)/i.test(msg)) {
+            const isWindows = /Windows/i.test(navigator.userAgent || '') || /Win/i.test(navigator.platform || '');
+            if (!isWindows && !tarGuideShown && /(缺少\s*tar|tar\s*依赖|tar.*无法解压)/i.test(msg)) {
               tarGuideShown = true;
               await showLinuxTarGuide(msg);
             }

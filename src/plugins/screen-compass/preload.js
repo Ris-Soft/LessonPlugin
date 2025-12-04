@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-try { ipcRenderer.send('plugin:register', 'screen.compass', ['performAction','getBounds','moveTo','snap']); } catch {}
+try { ipcRenderer.send('plugin:register', 'screen.compass', ['performAction','getBounds','moveTo','snap','setDragging','setExpandedWindow']); } catch {}
 
 contextBridge.exposeInMainWorld('compassAPI', {
   pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),

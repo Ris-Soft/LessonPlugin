@@ -34,6 +34,14 @@ async function showPluginAboutModal(pluginItem) {
   metaGrid.style.gap = '10px';
   metaGrid.innerHTML = `
     <div>
+      <div class="muted">插件名称</div>
+      <div>${pluginItem.name || '未知'}</div>
+    </div>
+    <div>
+      <div class="muted">插件ID</div>
+      <div style="word-break: break-all; overflow-wrap: anywhere;">${pluginItem.id || '未知'}</div>
+    </div>
+    <div>
       <div class="muted">版本</div>
       <div><span class="pill small">${versionText}</span></div>
     </div>
@@ -59,6 +67,7 @@ async function showPluginAboutModal(pluginItem) {
   // 计算依赖满足状态（插件依赖为数组，NPM 依赖为对象）
   let installedList = [];
   try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch {}
+  const norm = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
   const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
   const satisfies = (ver, range) => {
@@ -75,7 +84,8 @@ async function showPluginAboutModal(pluginItem) {
   if (pluginDeps.length) {
     pluginDeps.forEach((d) => {
       const [depName, depRange] = String(d).split('@');
-      const target = installedList.find(pp => (pp.id === depName) || (pp.name === depName));
+      const depKey = norm(depName);
+      const target = installedList.find(pp => norm(pp.id || pp.name) === depKey);
       const ok = !!target && satisfies(target?.version, depRange);
       const icon = ok ? 'ri-check-line' : 'ri-close-line';
       const cls = ok ? 'pill small ok' : 'pill small danger';

@@ -101,20 +101,20 @@ import { createHistory } from './whiteboard-history.js';
     document.getElementById('modeSelect').classList.toggle('active', m==='select');
     document.getElementById('modePan').classList.toggle('active', m==='pan');
     document.getElementById('modeErase').classList.toggle('active', m==='erase');
-    if (m === 'draw') {
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      canvas.getObjects().forEach(o => o.selectable = false);
-      if (!(currentBrush instanceof fabric.PencilBrush)) {
-        try { currentBrush = new fabric.PencilBrush(canvas); } catch { try { currentBrush = new fabric.PencilBrush({ canvas }); } catch {} }
-        if (!currentBrush) currentBrush = new fabric.PencilBrush(canvas);
-        currentBrush.color = penColor.value;
-        currentBrush.width = currentPenWidth;
-        currentBrush.decimate = 2;
-      }
-      canvas.freeDrawingBrush = currentBrush;
-      hidePopup();
-    } else if (m === 'select') {
+  if (m === 'draw') {
+    canvas.isDrawingMode = true;
+    canvas.selection = false;
+    canvas.getObjects().forEach(o => o.selectable = false);
+    if (!(currentBrush instanceof fabric.PencilBrush)) {
+      try { currentBrush = new fabric.PencilBrush(canvas); } catch { try { currentBrush = new fabric.PencilBrush({ canvas }); } catch {} }
+      if (!currentBrush) currentBrush = new fabric.PencilBrush(canvas);
+      currentBrush.decimate = 2;
+    }
+    currentBrush.color = penColor.value;
+    currentBrush.width = currentPenWidth;
+    canvas.freeDrawingBrush = currentBrush;
+    hidePopup();
+  } else if (m === 'select') {
       canvas.isDrawingMode = false;
       canvas.selection = true;
       canvas.skipTargetFind = false;
@@ -174,6 +174,15 @@ import { createHistory } from './whiteboard-history.js';
   }
   penColor.addEventListener('input', () => { canvas.freeDrawingBrush.color = penColor.value; });
   penColor.addEventListener('input', () => { updatePenPaletteSelection(); });
+  paletteBtns.forEach((b) => {
+    b.addEventListener('click', () => {
+      const c = b.getAttribute('data-color');
+      if (!c) return;
+      penColor.value = c;
+      try { if (canvas.freeDrawingBrush) canvas.freeDrawingBrush.color = c; } catch {}
+      updatePenPaletteSelection();
+    });
+  });
 
   let currentPenWidth = 6;
   const penWidthButtons = penWidths ? penWidths.querySelectorAll('button[data-penw]') : [];
@@ -257,6 +266,7 @@ import { createHistory } from './whiteboard-history.js';
       if (!p) return;
       if (state.mode === 'draw') { p.erasable = true; }
       else if (state.mode === 'erase' && fabric && fabric.EraserBrush) { p.selectable = false; p.evented = false; p.isEraser = true; }
+      try { if (state.mode === 'erase' && !history.restoring) history.recordHistory(); } catch {}
     } catch {}
   });
 
@@ -292,12 +302,14 @@ import { createHistory } from './whiteboard-history.js';
   function loadPageSnapshot(i) {
     const data = state.pages[i];
     canvas.clear();
-    if (data) {
-      canvas.loadFromJSON(data, () => {
-        canvas.renderAll();
-        setMode(state.mode);
-        try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch {}
-        if (state.mode === 'erase') {
+  if (data) {
+    canvas.loadFromJSON(data, () => {
+      try { setBackgroundColor(state.bgColor, true); } catch {}
+      canvas.renderAll();
+      setMode(state.mode);
+      updateEraseCursorVis();
+      try { canvas.getObjects().forEach(o => { if (o && o.isEraser === true) { o.globalCompositeOperation = 'destination-out'; o.selectable = false; o.evented = false; } }); } catch {}
+      if (state.mode === 'erase') {
           try {
             canvas.getObjects().forEach(o => { o.erasable = true; o.selectable = false; });
             let eBrush = null;
@@ -360,7 +372,7 @@ import { createHistory } from './whiteboard-history.js';
   document.getElementById('importJSON').addEventListener('click', () => { document.getElementById('importFile').value = ''; document.getElementById('importFile').click(); });
   document.getElementById('importFile').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const reader = new FileReader(); reader.onload = () => { try { const data = JSON.parse(String(reader.result || '{}')); canvas.clear(); canvas.loadFromJSON(data, () => { canvas.renderAll(); setMode(state.mode); }); } catch {} }; reader.readAsText(f); });
 
-  const history = createHistory(canvas, state, undoBtn, redoBtn, setMode, fit, board);
+  const history = createHistory(canvas, state, undoBtn, redoBtn, setMode, fit, board, updateEraseCursorVis);
   undoBtn.addEventListener('click', () => { history.undo(); });
   redoBtn.addEventListener('click', () => { history.redo(); });
   try {
@@ -406,7 +418,8 @@ import { createHistory } from './whiteboard-history.js';
   canvas.on('mouse:up', () => { if ((state.mode === 'erase' || state.mode === 'draw' || draggingPan) && !history.restoring) { try { history.recordHistory(); } catch {} } draggingErase = false; draggingPan = false; history.updateUndoRedoUI(); });
   canvas.on('mouse:wheel', (opt) => { const e = opt.e; let delta = e.deltaY; let zoom = canvas.getZoom(); zoom *= 0.999 ** delta; zoom = Math.max(0.2, Math.min(3, zoom)); const p = typeof canvas.getPointer === 'function' ? canvas.getPointer(e) : { x: e.offsetX, y: e.offsetY }; canvas.zoomToPoint(new fabric.Point(p.x, p.y), zoom); resizeEraseCursor(state.eraseSize); try { if (!history.restoring) history.recordHistory(); } catch {} history.updateUndoRedoUI(); opt.e.preventDefault(); opt.e.stopPropagation(); });
   canvas.upperCanvasEl.addEventListener('touchstart', (e) => { if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.twoFingerPan && e.touches.length >= 2) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
-  canvas.upperCanvasEl.addEventListener('touchmove', (e) => { if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) { const sp = getPointerScreen(canvas, { e }); const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y; if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); } else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); } e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { if (state.twoFingerPan && e.touches.length >= 2) { e.preventDefault(); } else if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
+  canvas.upperCanvasEl.addEventListener('touchstart', (e) => { if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.twoFingerPan && e.touches.length >= 2) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { const sp = getPointerScreen(canvas, { e }); resizeEraseCursor(state.eraseSize); const half = (Number(state.eraseSize) || 80) / 2; eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`; if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
+  canvas.upperCanvasEl.addEventListener('touchmove', (e) => { if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) { const sp = getPointerScreen(canvas, { e }); const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y; if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); } else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); } e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { const sp = getPointerScreen(canvas, { e }); resizeEraseCursor(state.eraseSize); const half = (Number(state.eraseSize) || 80) / 2; eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`; if (state.twoFingerPan && e.touches.length >= 2) { e.preventDefault(); } else if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
   canvas.upperCanvasEl.addEventListener('touchend', (e) => { draggingPan = false; if ((state.mode === 'draw' || state.mode === 'erase') && !history.restoring) { try { history.recordHistory(); } catch {} } history.updateUndoRedoUI(); }, { passive: false });
 
   const bgWhite = document.getElementById('bgWhite');

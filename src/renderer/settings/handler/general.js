@@ -512,12 +512,14 @@ async function initGeneralSettings() {
 
   // 清理用户数据：提示确认后调用主进程删除用户数据目录
   const cleanupBtn = document.getElementById('cleanup-user-data');
-  if (cleanupBtn) {
+  if (cleanupBtn && cleanupBtn.dataset.bound !== '1') {
+    cleanupBtn.dataset.bound = '1';
     cleanupBtn.addEventListener('click', async () => {
       const confirmed = window.confirm('确认删除所有插件与配置等用户数据？此操作不可恢复。');
       if (!confirmed) return;
       const res = await window.settingsAPI?.cleanupUserData?.();
       if (res?.ok) {
+        try { await refreshUserDataSize(); } catch {}
         alert('已清理用户数据。您现在可以从系统中卸载应用。');
       } else {
         alert('清理失败：' + (res?.error || '未知错误'));
@@ -592,12 +594,14 @@ async function initGeneralSettings() {
       setTimeout(() => { try { refreshUserDataSize(); } catch {} }, 0);
     }
   } catch { refreshUserDataSize(); }
-  if (openUserDataBtn) {
+  if (openUserDataBtn && openUserDataBtn.dataset.bound !== '1') {
+    openUserDataBtn.dataset.bound = '1';
     openUserDataBtn.addEventListener('click', async () => {
       try { await window.settingsAPI?.openUserData?.(); } catch {}
     });
   }
-  if (changeUserDataBtn) {
+  if (changeUserDataBtn && changeUserDataBtn.dataset.bound !== '1') {
+    changeUserDataBtn.dataset.bound = '1';
     changeUserDataBtn.addEventListener('click', async () => {
       const res = await window.settingsAPI?.changeUserData?.();
       if (res?.ok) {
@@ -610,11 +614,5 @@ async function initGeneralSettings() {
       }
     });
   }
-  // 清理后刷新占用大小
-  if (cleanupBtn) {
-    cleanupBtn.addEventListener('click', async () => {
-      // 原逻辑在上方，此处仅在成功后追加刷新
-      try { await refreshUserDataSize(); } catch {}
-    });
-  }
+  // 清理后刷新占用大小由上方绑定统一处理，避免重复绑定
 }

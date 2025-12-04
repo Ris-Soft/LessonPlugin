@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>值日生提醒遮罩</title>
+    <link rel="stylesheet" href="../../renderer/remixicon-local.css" />
+    <style>
+      :root{--bg:#121212;--fg:#e6e6e6;--muted:#b0b0b0;--border:rgba(255,255,255,0.12);--accent:#8ab4f8}
+      html,body{height:100%}
+      body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+      .wrap{padding:16px}
+      .header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+      .header i{font-size:24px;color:var(--accent)}
+      .title{font-size:28px;font-weight:800;color:var(--fg)}
+      .sub{font-size:18px;color:var(--muted)}
+      .grid{margin-top:12px;overflow-x:auto}
+      table{width:100%;border-collapse:separate;border-spacing:0;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+      thead th{font-weight:700;color:var(--muted);text-align:center;padding:12px;border-bottom:1px solid var(--border);font-size:18px}
+      tbody td{color:var(--fg);padding:14px 12px;text-align:center;border-top:1px solid var(--border);font-size:20px}
+      tbody tr:first-child td{border-top:none}
+      .label-lg{font-size:28px;font-weight:900;white-space:nowrap}
+      .cell-lg{font-size:22px}
+      .rot{margin-top:12px}
+      .rot table{width:100%;border-collapse:separate;border-spacing:0;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+      .rot tbody td{border-top:1px solid var(--border)}
+      .rot tbody tr:first-child td{border-top:none}
+      .rot-name{width:160px;text-align:left;font-size:20px;font-weight:800;color:var(--fg);padding-left:12px}
+      .rot-names{text-align:left;font-size:20px;color:var(--fg)}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <i class="ri-notification-2-line"></i>
+        <div class="title" id="title"></div>
+      </div>
+      <div class="sub" id="sub"></div>
+      <div class="grid"><table id="table"></table></div>
+      <div class="rot"><table id="rot"></table></div>
+    </div>
+    <script>
+      const p=new URLSearchParams(location.search)
+      const title=p.get('title')||'今日值日生提醒'
+      const date=p.get('date')||new Date().toISOString().slice(0,10)
+      const group=p.get('group')||''
+      let members=[]
+      try{const raw=p.get('members');if(raw)members=JSON.parse(raw)}catch{}
+      document.getElementById('title').textContent=title
+      document.getElementById('sub').textContent=`${date}${group?`｜${group}`:''}`
+      const table=document.getElementById('table')
+      let colsFromParam=[]
+      try{const rawCols=p.get('columns');if(rawCols)colsFromParam=JSON.parse(rawCols)}catch{}
+      let membersGroup=[]
+      let membersSingle=[]
+      try{const mg=p.get('membersGroup');if(mg)membersGroup=JSON.parse(mg)}catch{}
+      try{const ms=p.get('membersSingle');if(ms)membersSingle=JSON.parse(ms)}catch{}
+      const groupItems=membersGroup.length?membersGroup:members.filter(m=>Array.isArray(m?.names)&&m.names.length>1)
+      const singleItems=membersSingle.length?membersSingle:members.filter(m=>Array.isArray(m?.names)&&m.names.length===1)
+      const cols=[]
+      const base=colsFromParam.length?colsFromParam:(groupItems.length?groupItems:members)
+      base.forEach(m=>{const r=typeof m==='string'?m:String(m?.role||'').trim();if(r&&!cols.includes(r))cols.push(r)})
+      const gMap={}
+      groupItems.forEach(m=>{gMap[String(m.role)]=Array.isArray(m.names)?m.names:[]})
+      const thead=document.createElement('thead')
+      const hr=document.createElement('tr')
+      const firstTh=document.createElement('th')
+      firstTh.textContent=''
+      hr.appendChild(firstTh)
+      cols.forEach(c=>{const th=document.createElement('th');th.textContent=String(c);hr.appendChild(th)})
+      thead.appendChild(hr)
+      const tbody=document.createElement('tbody')
+      const r1=document.createElement('tr')
+      const r1Label=document.createElement('td')
+      r1Label.className='label-lg'
+      r1Label.textContent=group||''
+      r1.appendChild(r1Label)
+      cols.forEach(c=>{const td=document.createElement('td');td.className='cell-lg';td.textContent=Array.isArray(gMap[c])?gMap[c].join('、'):'';r1.appendChild(td)})
+      tbody.appendChild(r1)
+      table.appendChild(thead)
+      table.appendChild(tbody)
+      const rot=document.getElementById('rot')
+      const rotBody=document.createElement('tbody')
+      singleItems.forEach(it=>{const tr=document.createElement('tr');const lc=document.createElement('td');lc.className='rot-name';lc.textContent=String(it?.role||'');const rc=document.createElement('td');rc.className='rot-names';rc.textContent=Array.isArray(it?.names)?it.names.join('、'):'';tr.appendChild(lc);tr.appendChild(rc);rotBody.appendChild(tr)})
+      rot.appendChild(rotBody)
+    </script>
+  </body>
+</html>

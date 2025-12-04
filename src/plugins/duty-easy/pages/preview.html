@@ -16,12 +16,18 @@
       @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
       .card { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 14px; background: linear-gradient(180deg, rgba(40,80,120,0.25), rgba(20,30,50,0.25)); box-shadow: 0 6px 18px rgba(0,0,0,0.25); transform: translateY(0); transition: transform .2s ease, box-shadow .2s ease; }
       .card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.35); }
-      .card h4 { margin: 0 0 8px 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+      .card h4 { margin: 0 0 8px 0; font-size: 18px; display: flex; align-items: center; gap: 8px; }
       .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-size: 12px; }
-      .role { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-      .role .name { font-weight: 600; width: 88px; flex: 0 0 88px; color: var(--muted); }
-      .role .list { display: flex; flex-wrap: wrap; gap: 6px; }
-      .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+      .table { margin-top: 8px; overflow-x: auto; }
+      .table table { width: 100%; border-collapse: separate; border-spacing: 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow: hidden; }
+      .table thead th { font-weight: 700; color: var(--muted); text-align: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 14px; }
+      .table tbody td { color: var(--fg); padding: 10px 8px; text-align: center; border-top: 1px solid rgba(255,255,255,0.12); font-size: 16px; }
+      .table tbody tr:first-child td { border-top: none; }
+      .label-lg { font-weight: 800; white-space: nowrap; }
+      .rot { margin-top: 6px; }
+      .rot table { width:100%; border-collapse: separate; border-spacing:0; background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow:hidden }
+      .rot-name { width: 120px; text-align: left; font-weight: 700; color: var(--fg); padding-left: 8px; }
+      .rot-names { text-align: left; }
       .muted { color: var(--muted); }
       .today { outline: 2px solid rgba(72,207,173,0.5); }
       .header { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -47,12 +53,13 @@
           const gBadge=el('span','badge'); gBadge.innerHTML=`<i class=\"ri-group-line\"></i> ${item.groupName||'未设置组'}`;
           head.appendChild(t); head.appendChild(b); head.appendChild(gBadge);
           h.appendChild(head); card.appendChild(h);
-          (item.rolesGroup||[]).forEach(r=>{ const row=el('div','role'); const name=el('div','name'); name.textContent=r; const lst=el('div','list');
-            const arr=Array.isArray(item.groupMembers?.[r])?item.groupMembers[r]:[]; if(arr.length===0){const t=el('span','muted'); t.textContent='未设置'; lst.appendChild(t)}
-            arr.forEach(n=>{ const t=el('span','tag'); t.innerHTML=`<i class=\"ri-user-line\"></i> ${n||''}`; lst.appendChild(t)});
-            const soloArr=Array.isArray(item.singleMembers?.[r])?item.singleMembers[r]:[]; if(soloArr.length){ const solo=el('span','badge'); solo.innerHTML=`<i class=\"ri-user-star-line\"></i> 单人 ${soloArr[0]}`; lst.appendChild(solo) }
-            row.appendChild(name); row.appendChild(lst); card.appendChild(row);
-          }); wrap.appendChild(card);
+          const tableWrap=el('div','table'); const table=document.createElement('table'); const thead=document.createElement('thead'); const trh=document.createElement('tr'); const th0=document.createElement('th'); th0.textContent=''; trh.appendChild(th0);
+          (item.rolesGroup||[]).forEach(r=>{ const th=document.createElement('th'); th.textContent=r; trh.appendChild(th) }); thead.appendChild(trh); table.appendChild(thead);
+          const tbody=document.createElement('tbody'); const r1=document.createElement('tr'); const tdLabel=document.createElement('td'); tdLabel.className='label-lg'; tdLabel.textContent=item.groupName||''; r1.appendChild(tdLabel);
+          (item.rolesGroup||[]).forEach(r=>{ const td=document.createElement('td'); const arr=Array.isArray(item.groupMembers?.[r])?item.groupMembers[r]:[]; td.textContent=arr.length?arr.join('、'):'未设置'; r1.appendChild(td) }); tbody.appendChild(r1); table.appendChild(tbody); tableWrap.appendChild(table); card.appendChild(tableWrap);
+          const rotWrap=el('div','rot'); const rot=document.createElement('table'); const rotBody=document.createElement('tbody');
+          (item.rolesGroup||[]).forEach(r=>{ const soloArr=Array.isArray(item.singleMembers?.[r])?item.singleMembers[r]:[]; if(!soloArr.length) return; const tr=document.createElement('tr'); const lc=document.createElement('td'); lc.className='rot-name'; lc.textContent=r; const rc=document.createElement('td'); rc.className='rot-names'; rc.textContent=soloArr.join('、'); tr.appendChild(lc); tr.appendChild(rc); rotBody.appendChild(tr) }); rot.appendChild(rotBody); rotWrap.appendChild(rot); card.appendChild(rotWrap);
+          wrap.appendChild(card);
         });
       }
       (function(){ try{const u=new URL(window.location.href); channel=String(u.searchParams.get('channel')||''); caller=String(u.searchParams.get('caller')||'');}catch{}
