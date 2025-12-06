@@ -119,8 +119,8 @@
           res = res?.result || res;
           list = Array.isArray(res?.students) ? res.students : [];
         } else if (window.pluginAPI?.configGet) {
-          await window.pluginAPI?.configEnsureDefaults('profiles', { students: [] });
-          const arr = await window.pluginAPI?.configGet('profiles', 'students');
+          await window.pluginAPI?.configEnsureDefaults('profiles-students', { students: [] });
+          const arr = await window.pluginAPI?.configGet('profiles-students', 'students');
           list = Array.isArray(arr) ? arr : [];
         }
         students = list.map(s => ({ ...s, name: String(s?.name || '') }));
@@ -137,8 +137,8 @@
           config.seats = typeof cfg.seats === 'object' && cfg.seats ? cfg.seats : {};
           
         } else {
-          await window.pluginAPI?.configEnsureDefaults('profiles.seating', { rows: [], cols: [], seats: {}, backgroundStatus: '默认' });
-          const all = await window.pluginAPI?.configGetAll?.('profiles.seating');
+          await window.pluginAPI?.configEnsureDefaults('profiles-seating', { rows: [], cols: [], seats: {}, backgroundStatus: '默认' });
+          const all = await window.pluginAPI?.configGetAll?.('profiles-seating');
           config.rows = Array.isArray(all?.rows) ? all.rows : [];
           config.cols = Array.isArray(all?.cols) ? all.cols : [];
           config.seats = typeof all?.seats === 'object' && all.seats ? all.seats : {};
@@ -467,15 +467,15 @@
 
       async function saveAll() {
         if (window.lowbarAPI?.pluginCall) {
-          try { if (window.lowbarAPI?.configSet) { await window.lowbarAPI.configSet('profiles.seating', 'rows', config.rows); await window.lowbarAPI.configSet('profiles.seating', 'cols', config.cols); await window.lowbarAPI.configSet('profiles.seating', 'seats', config.seats); } } catch {}
+          try { if (window.lowbarAPI?.configSet) { await window.lowbarAPI.configSet('profiles-seating', 'rows', config.rows); await window.lowbarAPI.configSet('profiles-seating', 'cols', config.cols); await window.lowbarAPI.configSet('profiles-seating', 'seats', config.seats); } } catch {}
           await window.lowbarAPI.pluginCall?.(caller, 'saveConfig', { rows: config.rows, cols: config.cols, seats: config.seats });
           skipNextRefresh = true;
           await loadConfig();
           return;
         } else if (window.pluginAPI?.configSet) {
-          await window.pluginAPI?.configSet('profiles.seating', 'rows', config.rows);
-          await window.pluginAPI?.configSet('profiles.seating', 'cols', config.cols);
-          await window.pluginAPI?.configSet('profiles.seating', 'seats', config.seats);
+          await window.pluginAPI?.configSet('profiles-seating', 'rows', config.rows);
+          await window.pluginAPI?.configSet('profiles-seating', 'cols', config.cols);
+          await window.pluginAPI?.configSet('profiles-seating', 'seats', config.seats);
           await loadConfig();
         }
       }

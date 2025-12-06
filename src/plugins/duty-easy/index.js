@@ -41,12 +41,12 @@ function ensureDefaults() {
     singleRoleConditions: {},
     lastStartupDate: ''
   };
-  try { store.ensureDefaults('duty.easy', defaults); } catch {}
+  try { store.ensureDefaults('duty-easy', defaults); } catch {}
 }
 
 function advanceOnStartup() {
   ensureDefaults();
-  const cfg = store.getAll('duty.easy');
+  const cfg = store.getAll('duty-easy');
   const today = todayISO();
   const last = cfg.lastStartupDate || '';
   if (last !== today) {
@@ -76,7 +76,7 @@ function advanceOnStartup() {
 
 function predict(nextDays) {
   ensureDefaults();
-  const cfg = store.getAll('duty.easy');
+  const cfg = store.getAll('duty-easy');
   const groups = Array.isArray(cfg.groups) ? cfg.groups : [];
   const rolesAll = Array.isArray(cfg.roles) ? cfg.roles : [];
   const singleRoles = Array.isArray(cfg.singleRoles) ? cfg.singleRoles : rolesAll;
@@ -166,7 +166,7 @@ const functions = {
       if (arr.length) { membersGroup.push({ role: r, names: arr }); members.push({ role: r, names: arr }); }
     });
     const props = { title: '今日值日生提醒', date: today.dateISO, group: today.groupName, members: JSON.stringify(members), columns: JSON.stringify(rg), membersGroup: JSON.stringify(membersGroup), membersSingle: JSON.stringify(membersSingle) };
-    await pluginApi.call('notify.plugin', 'overlayComponent', ['notify.overlay', 'component.duty.reminder', props, 60000, true, 3000]);
+    await pluginApi.call('notify.plugin', 'overlayComponent', ['notify.overlay', 'component.duty.reminder', props, 120000, true, 3000]);
     return true;
   },
   onLowbarEvent: async (payload = {}) => {
@@ -199,17 +199,17 @@ const functions = {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
   getConfig: async () => {
-    try { ensureDefaults(); return { ok: true, config: store.getAll('duty.easy') }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    try { ensureDefaults(); return { ok: true, config: store.getAll('duty-easy') }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
   saveConfig: async (payload = {}) => {
     try {
       ensureDefaults();
-      if (Array.isArray(payload.roles)) store.set('duty.easy', 'roles', payload.roles);
-      if (Array.isArray(payload.groups)) store.set('duty.easy', 'groups', payload.groups);
-      if (payload.rule && typeof payload.rule === 'object') store.set('duty.easy', 'rule', payload.rule);
-      if (payload.singleRoleLists && typeof payload.singleRoleLists === 'object') store.set('duty.easy', 'singleRoleLists', payload.singleRoleLists);
-      if (Array.isArray(payload.singleRoles)) store.set('duty.easy', 'singleRoles', payload.singleRoles);
-      if (payload.singleRoleConditions && typeof payload.singleRoleConditions === 'object') store.set('duty.easy', 'singleRoleConditions', payload.singleRoleConditions);
+      if (Array.isArray(payload.roles)) store.set('duty-easy', 'roles', payload.roles);
+      if (Array.isArray(payload.groups)) store.set('duty-easy', 'groups', payload.groups);
+      if (payload.rule && typeof payload.rule === 'object') store.set('duty-easy', 'rule', payload.rule);
+      if (payload.singleRoleLists && typeof payload.singleRoleLists === 'object') store.set('duty-easy', 'singleRoleLists', payload.singleRoleLists);
+      if (Array.isArray(payload.singleRoles)) store.set('duty-easy', 'singleRoles', payload.singleRoles);
+      if (payload.singleRoleConditions && typeof payload.singleRoleConditions === 'object') store.set('duty-easy', 'singleRoleConditions', payload.singleRoleConditions);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },

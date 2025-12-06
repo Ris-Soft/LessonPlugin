@@ -18,7 +18,7 @@
   // 初始化：从统一配置存储读取
   (async () => {
     try {
-      const cfg = await window.settingsAPI?.configGetAll?.('notify');
+      const cfg = await window.settingsAPI?.configPluginGetAll?.('notify.plugin');
       if (el.enableNotify) el.enableNotify.checked = (cfg?.enabled ?? true);
       if (el.enableTTS) el.enableTTS.checked = !!cfg?.tts;
       if (el.ttsEngine) el.ttsEngine.value = (cfg?.ttsEngine ?? 'system');
@@ -95,7 +95,7 @@
       const enabled = !!el.enableNotify.checked;
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'enabled', enabled);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'enabled', enabled);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -107,7 +107,7 @@
       const enabled = !!el.enableTTS.checked;
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'tts', enabled);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'tts', enabled);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -120,7 +120,7 @@
       const val = el.ttsEngine.value || 'system';
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsEngine', val);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'ttsEngine', val);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -167,7 +167,7 @@
       const val = el.ttsVoice.value || '';
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsVoiceURI', val);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'ttsVoiceURI', val);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -179,7 +179,7 @@
       const v = Number(el.ttsPitch.value || 1);
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsPitch', v);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'ttsPitch', v);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -193,7 +193,7 @@
       const v = Number(el.ttsRate.value || 1);
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsRate', v);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'ttsRate', v);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -209,7 +209,7 @@
       const norm = Math.round(v);
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'systemSoundVolume', norm);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'systemSoundVolume', norm);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -229,7 +229,7 @@
       const val = (el.ttsEdgeVoice.value || '').trim();
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsEdgeVoice', val);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'ttsEdgeVoice', val);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();
@@ -243,7 +243,7 @@
       const norm = Math.round(v);
       (async () => {
         try {
-          await window.settingsAPI?.configSet?.('notify', 'ttsVolume', norm);
+          await window.settingsAPI?.configPluginSet?.('notify.plugin', 'ttsVolume', norm);
           await window.settingsAPI?.pluginCall?.('notify.plugin', 'broadcastConfig', []);
         } catch {}
       })();

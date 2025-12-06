@@ -1,14 +1,22 @@
 // 自绘提示框：Alert / Confirm
-function showModal({ title = '提示', message = '', confirmText = '确定', cancelText = null }) {
+function showModal({ title = '提示', message = '', confirmText = '确定', cancelText = null, boxClass = '', stack = false }) {
   return new Promise((resolve) => {
     const old = document.querySelector('.modal-overlay');
-    if (old) old.remove();
+    if (old && !stack) old.remove();
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
     const box = document.createElement('div'); box.className = 'modal-box';
+    if (boxClass) {
+      try { box.classList.add(boxClass); } catch {}
+    }
     const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
     const msg = document.createElement('div'); msg.className = 'modal-message';
     if (message instanceof Node) {
       msg.appendChild(message);
+      try {
+        if (message.classList && (message.classList.contains('config-editor') || message.classList.contains('modal-body'))) {
+          msg.classList.add('compact');
+        }
+      } catch {}
     } else {
       msg.textContent = String(message || '');
     }

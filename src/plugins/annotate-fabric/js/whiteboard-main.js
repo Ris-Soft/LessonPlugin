@@ -36,6 +36,7 @@ import { createHistory } from './whiteboard-history.js';
     fabric.EraserBrush = EraserBrush;
   }
   const board = document.getElementById('board');
+  board.style.position = 'relative';
   const el = document.createElement('canvas');
   el.style.position = 'absolute'; el.style.inset = '0';
   board.appendChild(el);
@@ -245,15 +246,21 @@ import { createHistory } from './whiteboard-history.js';
 
   const eraseCursor = document.createElement('div');
   eraseCursor.id = 'eraseCursor';
+  eraseCursor.style.position = 'absolute';
+  eraseCursor.style.left = '0px';
+  eraseCursor.style.top = '0px';
+  eraseCursor.style.pointerEvents = 'none';
   board.appendChild(eraseCursor);
   function resizeEraseCursor(size) {
-    const px = Math.max(10, Math.floor(Number(size) || 80));
-    eraseCursor.style.width = px + 'px';
-    eraseCursor.style.height = px + 'px';
+    const s = Math.max(10, Math.floor(Number(size) || 80));
+    const bw = 2;
+    eraseCursor.style.width = Math.max(2, s - bw * 2) + 'px';
+    eraseCursor.style.height = Math.max(2, s - bw * 2) + 'px';
     eraseCursor.style.borderRadius = '50%';
-    eraseCursor.style.border = '2px dashed #ffd166';
-    eraseCursor.style.boxShadow = '0 0 0 1px #000, 0 0 0 3px #fff';
-    eraseCursor.style.mixBlendMode = 'difference';
+    eraseCursor.style.border = bw + 'px solid #ffffff';
+    eraseCursor.style.boxShadow = 'none';
+    eraseCursor.style.mixBlendMode = 'normal';
+    eraseCursor.style.background = 'transparent';
     eraseCursor.style.zIndex = '1000';
   }
   resizeEraseCursor(state.eraseSize);
@@ -405,7 +412,8 @@ import { createHistory } from './whiteboard-history.js';
     const sp = getPointerScreen(canvas, opt);
     resizeEraseCursor(state.eraseSize);
     const half = (Number(state.eraseSize) || 80) / 2;
-    eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`;
+    eraseCursor.style.left = `${sp.x - half}px`;
+    eraseCursor.style.top = `${sp.y - half}px`;
     if (draggingErase && !(fabric && fabric.EraserBrush)) { const p = getPointerCanvas(canvas, fabric, opt); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: p.x - size/2, top: p.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); e.stopPropagation(); }
     if (draggingPan) {
       const dx = (typeof e.movementX === 'number') ? e.movementX : (sp.x - lastScreenX);
@@ -418,8 +426,8 @@ import { createHistory } from './whiteboard-history.js';
   canvas.on('mouse:up', () => { if ((state.mode === 'erase' || state.mode === 'draw' || draggingPan) && !history.restoring) { try { history.recordHistory(); } catch {} } draggingErase = false; draggingPan = false; history.updateUndoRedoUI(); });
   canvas.on('mouse:wheel', (opt) => { const e = opt.e; let delta = e.deltaY; let zoom = canvas.getZoom(); zoom *= 0.999 ** delta; zoom = Math.max(0.2, Math.min(3, zoom)); const p = typeof canvas.getPointer === 'function' ? canvas.getPointer(e) : { x: e.offsetX, y: e.offsetY }; canvas.zoomToPoint(new fabric.Point(p.x, p.y), zoom); resizeEraseCursor(state.eraseSize); try { if (!history.restoring) history.recordHistory(); } catch {} history.updateUndoRedoUI(); opt.e.preventDefault(); opt.e.stopPropagation(); });
   canvas.upperCanvasEl.addEventListener('touchstart', (e) => { if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.twoFingerPan && e.touches.length >= 2) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
-  canvas.upperCanvasEl.addEventListener('touchstart', (e) => { if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.twoFingerPan && e.touches.length >= 2) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { const sp = getPointerScreen(canvas, { e }); resizeEraseCursor(state.eraseSize); const half = (Number(state.eraseSize) || 80) / 2; eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`; if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
-  canvas.upperCanvasEl.addEventListener('touchmove', (e) => { if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) { const sp = getPointerScreen(canvas, { e }); const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y; if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); } else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); } e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { const sp = getPointerScreen(canvas, { e }); resizeEraseCursor(state.eraseSize); const half = (Number(state.eraseSize) || 80) / 2; eraseCursor.style.transform = `translate(${sp.x - half}px, ${sp.y - half}px)`; if (state.twoFingerPan && e.touches.length >= 2) { e.preventDefault(); } else if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
+  canvas.upperCanvasEl.addEventListener('touchstart', (e) => { if (state.mode === 'pan' && e.touches.length === 1) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.twoFingerPan && e.touches.length >= 2) { draggingPan = true; const sp = getPointerScreen(canvas, { e }); lastScreenX = sp.x; lastScreenY = sp.y; e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { const sp = getPointerScreen(canvas, { e }); resizeEraseCursor(state.eraseSize); const half = (Number(state.eraseSize) || 80) / 2; eraseCursor.style.left = `${sp.x - half}px`; eraseCursor.style.top = `${sp.y - half}px`; if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
+  canvas.upperCanvasEl.addEventListener('touchmove', (e) => { if ((state.mode === 'pan' && e.touches.length === 1 && draggingPan) || (state.twoFingerPan && e.touches.length === 2 && draggingPan)) { const sp = getPointerScreen(canvas, { e }); const dx = sp.x - lastScreenX; const dy = sp.y - lastScreenY; lastScreenX = sp.x; lastScreenY = sp.y; if (fabric && fabric.Point && typeof canvas.relativePan === 'function') { canvas.relativePan(new fabric.Point(dx, dy)); } else { const vt = canvas.viewportTransform; vt[4] += dx; vt[5] += dy; canvas.setViewportTransform(vt); } e.preventDefault(); } else if (state.mode === 'erase' && e.touches.length >= 1) { const sp = getPointerScreen(canvas, { e }); resizeEraseCursor(state.eraseSize); const half = (Number(state.eraseSize) || 80) / 2; eraseCursor.style.left = `${sp.x - half}px`; eraseCursor.style.top = `${sp.y - half}px`; if (state.twoFingerPan && e.touches.length >= 2) { e.preventDefault(); } else if (!(fabric && fabric.EraserBrush)) { const tp = e.touches[0]; const rect = canvas.upperCanvasEl.getBoundingClientRect(); const cx = tp.clientX - rect.left; const cy = tp.clientY - rect.top; const inv = fabric.util.invertTransform(canvas.viewportTransform || [1,0,0,1,0,0]); const pt = fabric.util.transformPoint(new fabric.Point(cx, cy), inv); const size = Number(state.eraseSize) || 80; const r = new fabric.Rect({ left: pt.x - size/2, top: pt.y - size/2, width: size, height: size, fill: 'rgba(0,0,0,1)', selectable: false, evented: false }); r.globalCompositeOperation = 'destination-out'; r.isEraser = true; canvas.add(r); if (canvas.requestRenderAll) canvas.requestRenderAll(); else canvas.renderAll(); e.preventDefault(); } } }, { passive: false });
   canvas.upperCanvasEl.addEventListener('touchend', (e) => { draggingPan = false; if ((state.mode === 'draw' || state.mode === 'erase') && !history.restoring) { try { history.recordHistory(); } catch {} } history.updateUndoRedoUI(); }, { passive: false });
 
   const bgWhite = document.getElementById('bgWhite');

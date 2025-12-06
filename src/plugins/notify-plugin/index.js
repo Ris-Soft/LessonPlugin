@@ -113,7 +113,7 @@ function createRuntimeWindow() {
   try {
     runtimeWin.webContents.on('did-finish-load', () => {
       try {
-        const cfg = store.getAll('notify');
+        const cfg = store.getAll('notify-plugin');
         runtimeWin?.webContents?.send('notify:config:update', cfg);
         log('runtime:broadcast_config');
       } catch {}
@@ -177,7 +177,7 @@ async function playSoundHeadless(which = 'in') {
     try { await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)); } catch {}
     try {
       if (volumeLib && typeof volumeLib.setVolume === 'function') {
-        const target = Math.max(0, Math.min(100, Number(store.get('notify','systemSoundVolume') ?? 80)));
+        const target = Math.max(0, Math.min(100, Number(store.get('notify-plugin','systemSoundVolume') ?? 80)));
         if (previousVolume == null && typeof volumeLib.getVolume === 'function') {
           try { previousVolume = await volumeLib.getVolume(); } catch {}
         }
@@ -371,7 +371,7 @@ module.exports = {
       const win = createRuntimeWindow();
       if (!win || win.isDestroyed()) return false;
       try {
-        const cfg = store.getAll('notify');
+        const cfg = store.getAll('notify-plugin');
         win.webContents.send('notify:config:update', cfg);
         return true;
       } catch {

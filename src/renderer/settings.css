@@ -937,6 +937,8 @@ select option:selected {
   white-space: pre-wrap;
   padding: 20px;
 }
+.modal-message.compact { padding: 0; }
+.modal-box.config-wide-modal { width: 900px; max-width: 94vw; }
 
 /* 统一模态内容区域为可滚动，避免内容溢出容器 */
 .modal-body {
@@ -1936,3 +1938,52 @@ a.topnav-item { text-decoration: none; }
 .app-menu-item i { font-size: 18px; }
 .app-menu-item:hover { background: rgba(255, 255, 255, 0.06); }
 .app-menu-sep { height: 1px; margin: 4px; background: var(--border); }
+.config-editor input[type="text"],
+.config-editor input[type="number"],
+.config-editor select,
+.config-editor textarea {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  padding: 6px 8px;
+}
+
+.config-editor textarea { min-height: 80px; }
+
+.config-editor select:focus-visible,
+.config-editor input:focus-visible,
+.config-editor textarea:focus-visible {
+  outline: 2px solid #0f1318;
+}
+.config-editor {
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.config-editor .setting-item {
+  grid-template-columns: 32px 1fr minmax(180px, 40%);
+}
+.config-editor .setting-action {
+  min-width: 0;
+  margin-left: auto;
+}
+.config-editor .setting-action input,
+.config-editor .setting-action select,
+.config-editor .setting-action textarea { width: 100%; }
+.config-editor textarea { resize: vertical; }
+.json-editor { display: grid; gap: 6px; }
+.json-node { border: 1px solid var(--border); background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px; }
+.json-header { display: flex; align-items: center; gap: 8px; }
+.json-key { font-weight: 600; }
+.json-children { margin-top: 6px; padding-left: 12px; }
+.json-toggle { width: 24px; height: 24px; }
+
+/* 可选择文本区域 */
+#page-about, #page-about * { user-select: text !important; -webkit-user-select: text !important; }
+.modal-box.plugin-about .modal-body,
+.modal-box.component-about .modal-body,
+.config-editor,
+.config-editor *,
+.json-editor,
+.json-editor * { user-select: text !important; -webkit-user-select: text !important; }

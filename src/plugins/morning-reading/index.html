@@ -405,8 +405,8 @@
     let currentIndex = null; // 当前正在编辑的条目索引（未选择为 null）
     let currentBoardIndex = null;
     async function init() {
-      await window.settingsAPI?.configEnsureDefaults('morningReading', { periods: [], boardPeriods: [] });
-      const cfg = await window.settingsAPI?.configGetAll('morningReading');
+      await window.settingsAPI?.configEnsureDefaults('morning-reading', { periods: [], boardPeriods: [] });
+      const cfg = await window.settingsAPI?.configGetAll('morning-reading');
       periods = Array.isArray(cfg?.periods) ? cfg.periods : [];
       boardPeriods = Array.isArray(cfg?.boardPeriods) ? cfg.boardPeriods : [];
       renderList();
@@ -446,9 +446,9 @@
           </div>`;
         // 事件
         const chk = item.querySelector('input[type=checkbox]');
-        chk.addEventListener('change', async (e) => { p.enabled = e.target.checked; await window.settingsAPI?.configSet('morningReading', 'periods', periods); await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]); });
+        chk.addEventListener('change', async (e) => { p.enabled = e.target.checked; await window.settingsAPI?.configSet('morning-reading', 'periods', periods); await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]); });
         item.querySelector('[data-op=edit]').addEventListener('click', () => { fillEditor(p, idx); });
-        item.querySelector('[data-op=del]').addEventListener('click', async () => { periods.splice(idx, 1); await window.settingsAPI?.configSet('morningReading', 'periods', periods); await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]); renderList(); });
+        item.querySelector('[data-op=del]').addEventListener('click', async () => { periods.splice(idx, 1); await window.settingsAPI?.configSet('morning-reading', 'periods', periods); await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]); renderList(); });
         listEl.appendChild(item);
       });
     }
@@ -473,9 +473,9 @@
             <button class="btn danger" data-op="del"><i class="ri-delete-bin-line"></i> 删除</button>
           </div>`;
         const chk = item.querySelector('input[type=checkbox]');
-        chk.addEventListener('change', async (e) => { p.enabled = e.target.checked; await window.settingsAPI?.configSet('morningReading', 'boardPeriods', boardPeriods); await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]); });
+        chk.addEventListener('change', async (e) => { p.enabled = e.target.checked; await window.settingsAPI?.configSet('morning-reading', 'boardPeriods', boardPeriods); await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]); });
         item.querySelector('[data-op=edit]').addEventListener('click', () => { fillBoardEditor(p, idx); });
-        item.querySelector('[data-op=del]').addEventListener('click', async () => { boardPeriods.splice(idx, 1); await window.settingsAPI?.configSet('morningReading', 'boardPeriods', boardPeriods); await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]); renderBoardList(); });
+        item.querySelector('[data-op=del]').addEventListener('click', async () => { boardPeriods.splice(idx, 1); await window.settingsAPI?.configSet('morning-reading', 'boardPeriods', boardPeriods); await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]); renderBoardList(); });
         listEl.appendChild(item);
       });
     }
@@ -592,7 +592,7 @@
       if (currentIndex == null) return;
       const cur = readEditor();
       periods[currentIndex] = { ...periods[currentIndex], ...cur };
-      await window.settingsAPI?.configSet('morningReading', 'periods', periods);
+      await window.settingsAPI?.configSet('morning-reading', 'periods', periods);
       await window.settingsAPI?.pluginCall('morning.reading', 'setSchedule', [periods]);
       renderList();
     });
@@ -611,7 +611,7 @@
       if (currentBoardIndex == null) return;
       const cur = readBoardEditor();
       boardPeriods[currentBoardIndex] = { ...boardPeriods[currentBoardIndex], ...cur };
-      await window.settingsAPI?.configSet('morningReading', 'boardPeriods', boardPeriods);
+      await window.settingsAPI?.configSet('morning-reading', 'boardPeriods', boardPeriods);
       await window.settingsAPI?.pluginCall('morning.reading', 'setBoardSchedule', [boardPeriods]);
       renderBoardList();
     });

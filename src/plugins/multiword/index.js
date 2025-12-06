@@ -1,5 +1,7 @@
 const path = require('path');
 const url = require('url');
+const { app } = require('electron');
+const store = require(path.join(app.getAppPath(), 'src', 'main', 'store.js'));
 let pluginApi = null;
 
 // 运行态状态
@@ -184,7 +186,7 @@ const functions = {
     try {
       if (prefs && typeof prefs === 'object') {
         state.prefs = { ...state.prefs, ...prefs };
-        pluginApi.store.set('multiword:prefs', state.prefs);
+        store.set('multi-word', 'prefs', state.prefs);
         return { ok: true };
       }
       return { ok: false };
@@ -192,7 +194,7 @@ const functions = {
   },
   getPreferences: async () => {
     try {
-      const saved = pluginApi.store.get('multiword:prefs');
+      const saved = store.get('multi-word', 'prefs');
       if (saved && typeof saved === 'object') state.prefs = saved;
       return { ok: true, prefs: state.prefs };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
@@ -233,13 +235,13 @@ const functions = {
     try {
       const s = String(urlStr || '').trim();
       state.wordbankServerUrl = s;
-      pluginApi.store.set('multiword:wordbank:url', s);
+      store.set('multi-word', 'wordbankUrl', s);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
   getWordbankUrl: async () => {
     try {
-      const s = pluginApi.store.get('multiword:wordbank:url');
+      const s = store.get('multi-word', 'wordbankUrl');
       if (typeof s === 'string') state.wordbankServerUrl = s;
       return { ok: true, url: state.wordbankServerUrl };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
@@ -255,6 +257,9 @@ const init = async (api) => {
   api.splash.setStatus('plugin:init', '初始化 多维单词');
   api.splash.setStatus('plugin:init', '可通过动作打开 多维单词 窗口');
   api.splash.setStatus('plugin:init', '多维单词加载完成');
+  try {
+    store.ensureDefaults('multi-word', { prefs: { voice: 'ALL', enableCarousel: true, shuffleAfterCarousel: false }, wordbankUrl: '' });
+  } catch {}
 };
 
 module.exports = {

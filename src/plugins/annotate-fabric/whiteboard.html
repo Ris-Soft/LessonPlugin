@@ -925,13 +925,15 @@
       eraseCursor.id = 'eraseCursor';
       board.appendChild(eraseCursor);
       function resizeEraseCursor(size) {
-        const px = Math.max(10, Math.floor(Number(size) || 80));
-        eraseCursor.style.width = px + 'px';
-        eraseCursor.style.height = px + 'px';
+        const s = Math.max(10, Math.floor(Number(size) || 80));
+        const bw = 2;
+        eraseCursor.style.width = Math.max(2, s - bw * 2) + 'px';
+        eraseCursor.style.height = Math.max(2, s - bw * 2) + 'px';
         eraseCursor.style.borderRadius = '50%';
-        eraseCursor.style.border = '2px dashed #ffd166';
-        eraseCursor.style.boxShadow = '0 0 0 1px #000, 0 0 0 3px #fff';
-        eraseCursor.style.mixBlendMode = 'difference';
+        eraseCursor.style.border = bw + 'px solid #ffffff';
+        eraseCursor.style.boxShadow = 'none';
+        eraseCursor.style.mixBlendMode = 'normal';
+        eraseCursor.style.background = 'transparent';
         eraseCursor.style.zIndex = '1000';
       }
       resizeEraseCursor(state.eraseSize);

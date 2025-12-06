@@ -20,4 +20,7 @@
     "timeISO",
     "pluginName"
   ]
+  ,"configSchema": {
+    "students": { "type": "json", "label": "学生列表", "desc": "[{ name, gender, required }]", "default": [] }
+  }
 }

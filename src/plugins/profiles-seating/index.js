@@ -30,7 +30,7 @@ function ensureDefaults() {
     seats: {},
     backgroundStatus: '默认'
   };
-  try { store.ensureDefaults('profiles.seating', defaults); } catch {}
+  try { store.ensureDefaults('profiles-seating', defaults); } catch {}
 }
 
 const functions = {
@@ -62,14 +62,14 @@ const functions = {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
   getConfig: async () => {
-    try { return { ok: true, config: store.getAll('profiles.seating') }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    try { return { ok: true, config: store.getAll('profiles-seating') }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   },
   saveConfig: async (payload = {}) => {
     try {
-      if (Array.isArray(payload.rows)) store.set('profiles.seating', 'rows', payload.rows);
-      if (Array.isArray(payload.cols)) store.set('profiles.seating', 'cols', payload.cols);
-      if (payload.seats && typeof payload.seats === 'object') store.set('profiles.seating', 'seats', payload.seats);
-      if (typeof payload.backgroundStatus === 'string') store.set('profiles.seating', 'backgroundStatus', payload.backgroundStatus);
+      if (Array.isArray(payload.rows)) store.set('profiles-seating', 'rows', payload.rows);
+      if (Array.isArray(payload.cols)) store.set('profiles-seating', 'cols', payload.cols);
+      if (payload.seats && typeof payload.seats === 'object') store.set('profiles-seating', 'seats', payload.seats);
+      if (typeof payload.backgroundStatus === 'string') store.set('profiles-seating', 'backgroundStatus', payload.backgroundStatus);
       emitUpdate(EVENT_CHANNEL, 'refresh', true);
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }

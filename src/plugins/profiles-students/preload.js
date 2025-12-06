@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld('pluginAPI', {
   ui: {
     ensureStyles: async () => {
       const add = (href) => { try { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = href; document.head.appendChild(link); } catch {} };
-      const paths = ['titlebar.css', 'settings.css', 'remixicon-local.css'];
+      const paths = ['titlebar.css', 'settings.css', 'remixicon-local.css', 'fonts-local.css'];
       for (const p of paths) { try { const url = await ipcRenderer.invoke('asset:url', p); if (url) add(url); } catch {} }
     },
     insertTitlebar: (titleText) => {

@@ -817,7 +817,6 @@ ipcMain.handle('window:control', async (event, action) => {
 ipcMain.handle('settings:showMenu', async (event, coords) => {
   const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
   const menu = Menu.buildFromTemplate([
-    { label: '为项目加入图标', click: () => { try { win?.webContents?.send('settings:openIconAdder'); } catch {} } },
     { label: '刷新设置页', click: () => { try { win?.webContents?.reload(); } catch {} } },
     { type: 'separator' },
     { label: '快速重启程序', click: () => { try { store.set('system', 'openSettingsOnBootOnce', true); } catch {} app.relaunch(); app.exit(0); } },
@@ -874,6 +873,34 @@ ipcMain.on('plugin:event:subscribe', (event, evName) => {
 });
 ipcMain.handle('plugin:event:emit', async (_event, evName, payload) => {
   return pluginManager.emitEvent(evName, payload);
+});
+
+// 动作名：聚合、默认映射与调用
+ipcMain.handle('actions:list', async () => {
+  return pluginManager.listActions();
+});
+ipcMain.handle('actions:getDefaults', async () => {
+  try { return store.getAll('system')?.defaultActions || {}; } catch { return {}; }
+});
+ipcMain.handle('actions:setDefault', async (_e, actionId, pluginId) => {
+  return pluginManager.setDefaultAction(actionId, pluginId);
+});
+ipcMain.handle('actions:call', async (_e, actionId, args, preferredPluginId) => {
+  return pluginManager.callAction(actionId, args, preferredPluginId);
+});
+
+// 行为（behavior）接口：与 actions 区分
+ipcMain.handle('behaviors:list', async () => {
+  return pluginManager.listBehaviors();
+});
+ipcMain.handle('behaviors:getDefaults', async () => {
+  try { return store.getAll('system')?.defaultBehaviors || {}; } catch { return {}; }
+});
+ipcMain.handle('behaviors:setDefault', async (_e, behaviorId, pluginId) => {
+  return pluginManager.setDefaultBehavior(behaviorId, pluginId);
+});
+ipcMain.handle('behaviors:call', async (_e, behaviorId, args, preferredPluginId) => {
+  return pluginManager.callBehavior(behaviorId, args, preferredPluginId);
 });
 
 // 插件变量：列表与取值
@@ -940,6 +967,48 @@ ipcMain.handle('config:set', async (_e, scope, key, value) => {
 });
 ipcMain.handle('config:ensureDefaults', async (_e, scope, defaults) => {
   return store.ensureDefaults(scope, defaults);
+});
+ipcMain.handle('config:listScopes', async () => {
+  try { return store.listPluginScopes(); } catch { return []; }
+});
+// 规范插件配置读写（按插件规范ID，兼容旧点号ID回退）
+ipcMain.handle('config:plugin:getAll', async (_e, pluginKey) => {
+  try {
+    const canon = pluginManager.canonicalizePluginId(pluginKey);
+    const primary = store.getAll(canon);
+    if (primary && Object.keys(primary).length) return primary;
+    const raw = store.getAll(pluginKey);
+    if (raw && Object.keys(raw).length) return raw;
+    const dot = store.getAll(String(canon).replace(/-/g, '.'));
+    return dot || {};
+  } catch { return {}; }
+});
+ipcMain.handle('config:plugin:get', async (_e, pluginKey, key) => {
+  try {
+    const canon = pluginManager.canonicalizePluginId(pluginKey);
+    let val = store.get(canon, key);
+    if (val === undefined) val = store.get(pluginKey, key);
+    if (val === undefined) val = store.get(String(canon).replace(/-/g, '.'), key);
+    return val;
+  } catch { return undefined; }
+});
+ipcMain.handle('config:plugin:set', async (_e, pluginKey, key, value) => {
+  try {
+    const canon = pluginManager.canonicalizePluginId(pluginKey);
+    return store.set(canon, key, value);
+  } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+});
+// 迁移未知作用域到指定插件（覆盖写入，默认删除源）
+ipcMain.handle('config:plugin:migrateScope', async (_e, sourceScope, targetPluginKey, deleteSource = true) => {
+  try {
+    const data = store.getAll(sourceScope);
+    const scope = pluginManager.canonicalizePluginId(targetPluginKey);
+    store.setAll(scope, data);
+    if (deleteSource) store.deleteScope(sourceScope);
+    return { ok: true, targetScope: scope };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 });
 
 // 自动化 IPC

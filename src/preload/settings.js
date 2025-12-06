@@ -36,6 +36,11 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   configGet: (scope, key) => ipcRenderer.invoke('config:get', scope, key),
   configSet: (scope, key, value) => ipcRenderer.invoke('config:set', scope, key, value),
   configEnsureDefaults: (scope, defaults) => ipcRenderer.invoke('config:ensureDefaults', scope, defaults),
+  configListScopes: () => ipcRenderer.invoke('config:listScopes'),
+  configPluginGetAll: (pluginKey) => ipcRenderer.invoke('config:plugin:getAll', pluginKey),
+  configPluginGet: (pluginKey, key) => ipcRenderer.invoke('config:plugin:get', pluginKey, key),
+  configPluginSet: (pluginKey, key, value) => ipcRenderer.invoke('config:plugin:set', pluginKey, key, value),
+  configPluginMigrateScope: (sourceScope, targetPluginKey, deleteSource) => ipcRenderer.invoke('config:plugin:migrateScope', sourceScope, targetPluginKey, deleteSource),
   // 自动化管理 API
   automationList: () => ipcRenderer.invoke('automation:list'),
   automationGet: (id) => ipcRenderer.invoke('automation:get', id),
@@ -51,6 +56,16 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   pluginAutomationCreateShortcut: (pluginId, options) => ipcRenderer.invoke('plugin:automation:createShortcut', pluginId, options),
   // 直接调用插件函数（用于 actions 目标指向 functions 中的函数）
   pluginCall: (targetPluginId, fnName, args) => ipcRenderer.invoke('plugin:call', targetPluginId, fnName, args),
+  // 动作名：聚合、默认映射与调用
+  actionsList: () => ipcRenderer.invoke('actions:list'),
+  actionsGetDefaults: () => ipcRenderer.invoke('actions:getDefaults'),
+  actionsSetDefault: (actionId, pluginId) => ipcRenderer.invoke('actions:setDefault', actionId, pluginId),
+  actionCall: (actionId, args, preferredPluginId) => ipcRenderer.invoke('actions:call', actionId, args, preferredPluginId),
+  // 行为（behavior）：聚合、默认映射与调用
+  behaviorsList: () => ipcRenderer.invoke('behaviors:list'),
+  behaviorsGetDefaults: () => ipcRenderer.invoke('behaviors:getDefaults'),
+  behaviorsSetDefault: (behaviorId, pluginId) => ipcRenderer.invoke('behaviors:setDefault', behaviorId, pluginId),
+  behaviorCall: (behaviorId, args, preferredPluginId) => ipcRenderer.invoke('behaviors:call', behaviorId, args, preferredPluginId),
   // 插件变量：列表与取值
   pluginVariablesList: (pluginId) => ipcRenderer.invoke('plugin:variables:list', pluginId),
   pluginVariableGet: (pluginId, varName) => ipcRenderer.invoke('plugin:variables:get', pluginId, varName),
@@ -95,9 +110,6 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   },
   onMarketInstall: (handler) => {
     ipcRenderer.on('settings:marketInstall', (_e, payload) => handler && handler(payload));
-  },
-  onOpenIconAdder: (handler) => {
-    ipcRenderer.on('settings:openIconAdder', (_e) => handler && handler());
   },
   // 自动化执行确认覆盖层通信
   onAutomationConfirmInit: (handler) => {

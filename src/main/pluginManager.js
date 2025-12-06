@@ -18,7 +18,9 @@ let config = { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelec
   let nameToId = new Map(); // 名称/原始ID/清洗ID -> 规范ID 映射
 let windows = [];
 let pluginWindows = new Map(); // pluginId -> BrowserWindow
-let apiRegistry = new Map(); // pluginId -> Set(functionName)
+let apiRegistry = new Map();
+let actionRegistry = null;
+let behaviorRegistry = null;
 let automationEventRegistry = new Map(); // pluginId -> Array<{ id, name, desc, params, expose }>
 let functionRegistry = new Map(); // pluginId -> Map(fnName -> function)
 let eventSubscribers = new Map(); // eventName -> Set(webContentsId)
@@ -225,6 +227,9 @@ module.exports.init = function init(paths) {
         })(),
         // 兼容新旧清单：优先顶层 actions，其次回退到 functions.actions（旧格式）
         actions: Array.isArray(meta.actions) ? meta.actions : (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : []),
+        // 新增：behaviors 与 actions 区分（优先顶层 behaviors）
+        behaviors: Array.isArray(meta.behaviors) ? meta.behaviors : [],
+        behaviors: Array.isArray(meta.behaviors) ? meta.behaviors : [],
         // 保留 functions 以备后续扩展（如声明 backend 名称等）
         functions: typeof meta.functions === 'object' ? meta.functions : undefined,
         packages: Array.isArray(meta.packages) ? meta.packages : undefined,
@@ -237,6 +242,15 @@ module.exports.init = function init(paths) {
           try {
             if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
             if (meta && typeof meta.variables === 'object' && meta.variables) return meta.variables;
+          } catch {}
+          return undefined;
+        })(),
+        configSchema: (() => {
+          try {
+            if (Array.isArray(meta.configSchema)) return meta.configSchema;
+            if (meta && typeof meta.configSchema === 'object' && meta.configSchema) return meta.configSchema;
+            if (Array.isArray(meta.config)) return meta.config;
+            if (meta && typeof meta.config === 'object' && meta.config) return meta.config;
           } catch {}
           return undefined;
         })()
@@ -293,6 +307,7 @@ module.exports.init = function init(paths) {
           return undefined;
         })(),
         actions: Array.isArray(meta.actions) ? meta.actions : [],
+        behaviors: Array.isArray(meta.behaviors) ? meta.behaviors : [],
         functions: typeof meta.functions === 'object' ? meta.functions : undefined,
         packages: Array.isArray(meta.packages) ? meta.packages : undefined,
         version: detectedVersion,
@@ -328,6 +343,8 @@ module.exports.init = function init(paths) {
     }
   }
   writeJsonSafe(configPath, config);
+  actionRegistry = null;
+  behaviorRegistry = null;
 };
 
 // 统一插件ID规范化：支持中文名、带点号ID、清洗后ID与规范ID
@@ -342,6 +359,9 @@ function canonicalizePluginId(key) {
   // 回退：若传入本就是规范ID则原样返回
   return normalized || s;
 }
+
+// 暴露规范化函数供主进程其它模块与IPC使用
+module.exports.canonicalizePluginId = canonicalizePluginId;
 
 module.exports.getPlugins = function getPlugins() {
   return manifest.plugins.map((p) => ({
@@ -361,7 +381,8 @@ module.exports.getPlugins = function getPlugins() {
     version: p.version || (config.npmSelection[p.id]?.version || config.npmSelection[p.name]?.version || null),
     studentColumns: Array.isArray(p.studentColumns) ? p.studentColumns : [],
     // 输出标准插件依赖字段 dependencies（数组），兼容旧存储
-    dependencies: Array.isArray(p.dependencies) ? p.dependencies : (Array.isArray(p.pluginDepends) ? p.pluginDepends : undefined)
+    dependencies: Array.isArray(p.dependencies) ? p.dependencies : (Array.isArray(p.pluginDepends) ? p.pluginDepends : undefined),
+    configSchema: (Array.isArray(p.configSchema) || (p.configSchema && typeof p.configSchema === 'object')) ? p.configSchema : undefined
   }));
 };
 
@@ -1412,9 +1433,9 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
     // 更新内存清单（使用稳定目录），若存在则覆盖更新
     const rel = path.relative(path.dirname(manifestPath), finalDir).replace(/\\/g, '/');
-    const updated = {
-      id: pluginId,
-      name: pluginName,
+      const updated = {
+        id: pluginId,
+        name: pluginName,
       local: rel,
       enabled: true,
       icon: meta.icon || null,
@@ -1441,6 +1462,15 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
         try {
           if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
           if (meta && typeof meta.variables === 'object' && meta.variables) return meta.variables;
+        } catch {}
+        return undefined;
+      })(),
+      configSchema: (() => {
+        try {
+          if (Array.isArray(meta.configSchema)) return meta.configSchema;
+          if (meta && typeof meta.configSchema === 'object' && meta.configSchema) return meta.configSchema;
+          if (Array.isArray(meta.config)) return meta.config;
+          if (meta && typeof meta.config === 'object' && meta.config) return meta.config;
         } catch {}
         return undefined;
       })()
@@ -1566,6 +1596,12 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
 function createPluginApi(pluginId) {
   return {
     call: (targetPluginId, fnName, args) => module.exports.callFunction(targetPluginId, fnName, args),
+    callByAction: async (actionId, args) => {
+      try { const res = await module.exports.callAction(actionId, Array.isArray(args) ? args : []); return res; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    },
+    callByBehavior: async (behaviorId, args) => {
+      try { const res = await module.exports.callBehavior(behaviorId, Array.isArray(args) ? args : []); return res; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    },
     emit: (eventName, payload) => module.exports.emitEvent(eventName, payload),
     registerAutomationEvents: (events) => module.exports.registerAutomationEvents(pluginId, events),
     components: {
@@ -1648,6 +1684,178 @@ module.exports.emitEvent = function emitEvent(eventName, payload) {
   return { ok: true, delivered };
 };
 
+// -------- 动作名：聚合、默认映射与调用 --------
+function buildActionRegistry() {
+  const map = new Map();
+  try {
+    for (const p of manifest.plugins) {
+      const acts = Array.isArray(p.actions) ? p.actions : [];
+      for (const a of acts) {
+        const id = String(a?.id || '').trim();
+        const target = String(a?.target || '').trim();
+        if (!id || !target) continue;
+        const arr = map.get(id) || [];
+        arr.push({ pluginId: p.id, pluginName: p.name, target, text: a.text || a.label || '', icon: a.icon || '' });
+        map.set(id, arr);
+      }
+    }
+  } catch {}
+  return map;
+}
+
+module.exports.listActions = function listActions() {
+  try {
+    if (!actionRegistry) actionRegistry = buildActionRegistry();
+    const out = [];
+    for (const [id, providers] of actionRegistry.entries()) {
+      out.push({ id, providers });
+    }
+    return { ok: true, actions: out };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.callAction = async function callAction(actionId, args, preferredPluginId) {
+  try {
+    const id = String(actionId || '').trim();
+    if (!id) return { ok: false, error: 'action_required' };
+    if (!actionRegistry) actionRegistry = buildActionRegistry();
+    const providers = actionRegistry.get(id) || [];
+    if (!providers.length) return { ok: false, error: 'action_not_found' };
+    let targetEntry = null;
+    if (preferredPluginId) {
+      const canon = canonicalizePluginId(preferredPluginId);
+      targetEntry = providers.find((p) => canonicalizePluginId(p.pluginId) === canon);
+    }
+    if (!targetEntry) {
+      let defPid = null;
+      try {
+        const store = require('./store');
+        const sys = store.getAll('system') || {};
+        const defMap = sys.defaultActions || {};
+        defPid = defMap[id];
+      } catch {}
+      if (defPid) {
+        const canon = canonicalizePluginId(defPid);
+        targetEntry = providers.find((p) => canonicalizePluginId(p.pluginId) === canon) || null;
+      }
+    }
+    if (!targetEntry) {
+      // 若只有一个提供者，直接使用
+      if (providers.length === 1) targetEntry = providers[0];
+      else return { ok: false, error: 'multiple_providers' };
+    }
+    return module.exports.callFunction(targetEntry.pluginId, targetEntry.target, Array.isArray(args) ? args : []);
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.setDefaultAction = function setDefaultAction(actionId, pluginId) {
+  try {
+    const store = require('./store');
+    const sys = store.getAll('system') || {};
+    const defMap = Object(sys.defaultActions || {});
+    defMap[String(actionId)] = canonicalizePluginId(pluginId);
+    store.set('system', 'defaultActions', defMap);
+    return { ok: true, defaults: defMap };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+// -------- 行为（behavior）：与 actions 区分的能力集合 --------
+function buildBehaviorRegistry() {
+  const map = new Map();
+  try {
+    for (const p of manifest.plugins) {
+      const defs = Array.isArray(p.behaviors) ? p.behaviors : [];
+      for (const b of defs) {
+        const id = String(b?.id || '').trim();
+        const target = String(b?.target || '').trim();
+        if (!id || !target) continue;
+        const arr = map.get(id) || [];
+        arr.push({ pluginId: p.id, pluginName: p.name, target, text: b.text || b.label || '', icon: b.icon || '' });
+        map.set(id, arr);
+      }
+    }
+  } catch {}
+  return map;
+}
+
+module.exports.listBehaviors = function listBehaviors() {
+  try {
+    if (!behaviorRegistry) behaviorRegistry = buildBehaviorRegistry();
+    const out = [];
+    for (const [id, providers] of behaviorRegistry.entries()) {
+      out.push({ id, providers });
+    }
+    // 回退：若未声明任何 behaviors，则以 actions 作为候选（便于过渡期）
+    if (!out.length) {
+      if (!actionRegistry) actionRegistry = buildActionRegistry();
+      for (const [id, providers] of actionRegistry.entries()) out.push({ id, providers });
+    }
+    return { ok: true, actions: out };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.callBehavior = async function callBehavior(behaviorId, args, preferredPluginId) {
+  try {
+    const id = String(behaviorId || '').trim();
+    if (!id) return { ok: false, error: 'behavior_required' };
+    if (!behaviorRegistry) behaviorRegistry = buildBehaviorRegistry();
+    let providers = behaviorRegistry.get(id) || [];
+    // 回退：未声明 behaviors 时，使用 actions 作为替代
+    if (!providers.length) {
+      if (!actionRegistry) actionRegistry = buildActionRegistry();
+      providers = actionRegistry.get(id) || [];
+    }
+    if (!providers.length) return { ok: false, error: 'behavior_not_found' };
+    let targetEntry = null;
+    if (preferredPluginId) {
+      const canon = canonicalizePluginId(preferredPluginId);
+      targetEntry = providers.find((p) => canonicalizePluginId(p.pluginId) === canon);
+    }
+    if (!targetEntry) {
+      // 使用行为默认映射
+      let defPid = null;
+      try {
+        const store = require('./store');
+        const sys = store.getAll('system') || {};
+        const defMap = sys.defaultBehaviors || {};
+        defPid = defMap[id];
+      } catch {}
+      if (defPid) {
+        const canon = canonicalizePluginId(defPid);
+        targetEntry = providers.find((p) => canonicalizePluginId(p.pluginId) === canon) || null;
+      }
+    }
+    if (!targetEntry) {
+      if (providers.length === 1) targetEntry = providers[0];
+      else return { ok: false, error: 'multiple_providers' };
+    }
+    return module.exports.callFunction(targetEntry.pluginId, targetEntry.target, Array.isArray(args) ? args : []);
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
+module.exports.setDefaultBehavior = function setDefaultBehavior(behaviorId, pluginId) {
+  try {
+    const store = require('./store');
+    const sys = store.getAll('system') || {};
+    const defMap = Object(sys.defaultBehaviors || {});
+    defMap[String(behaviorId)] = canonicalizePluginId(pluginId);
+    store.set('system', 'defaultBehaviors', defMap);
+    return { ok: true, defaults: defMap };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+};
+
 module.exports.inspectZip = async function inspectZip(zipPath) {
   try {
     const pluginsRootLocal = path.dirname(manifestPath);
@@ -1688,6 +1896,7 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
         return undefined;
       })(),
       actions: (Array.isArray(meta?.functions?.actions) ? meta.functions.actions : (Array.isArray(meta.actions) ? meta.actions : [{ id: 'openWindow', icon: 'ri-window-line', text: '打开窗口' }])),
+      behaviors: Array.isArray(meta.behaviors) ? meta.behaviors : [],
       functions: typeof meta.functions === 'object' ? meta.functions : undefined,
       packages: meta.packages,
       version: detectedVersion,

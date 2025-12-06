@@ -126,7 +126,7 @@
     let timer = null;
     function startClock(){ if (timer) clearInterval(timer); tick(); timer = setInterval(tick, 500); }
     async function getActiveMode(){
-      const cfg = await window.pluginAPI?.configGetAll('morningReading');
+      const cfg = await window.pluginAPI?.configGetAll('morning-reading');
       const list = Array.isArray(cfg?.boardPeriods)?cfg.boardPeriods:[];
       const now = new Date();
       const w = now.getDay()===0?7:now.getDay();

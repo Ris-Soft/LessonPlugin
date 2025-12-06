@@ -73,4 +73,30 @@ function ensureDefaults(scope, defaults) {
   return data;
 }
 
-module.exports = { init, getAll, get, set, ensureDefaults };
+function setAll(scope, obj) {
+  const file = scopeFile(scope);
+  const data = Object(obj || {});
+  return writeJSON(file, data);
+}
+
+function deleteScope(scope) {
+  try {
+    const file = scopeFile(scope);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    return true;
+  } catch { return false; }
+}
+
+function listPluginScopes() {
+  try {
+    if (!pluginsDir) return [];
+    if (!fs.existsSync(pluginsDir)) return [];
+    const names = fs.readdirSync(pluginsDir).filter((n) => {
+      const fp = path.join(pluginsDir, n);
+      try { return fs.statSync(fp).isFile() && n.toLowerCase().endsWith('.json'); } catch { return false; }
+    }).map((n) => n.replace(/\.json$/i, ''));
+    return names;
+  } catch { return []; }
+}
+
+module.exports = { init, getAll, get, set, ensureDefaults, listPluginScopes, setAll, deleteScope };

@@ -23,4 +23,8 @@
   ],
   "version": "1.0.0"
   ,"variables": ["timeISO","pluginName"]
+  ,"configSchema": {
+    "periods": { "type": "json", "label": "站立早读时段", "desc": "[{ name,start,end,weekdays,biweek,... }]", "default": [] },
+    "boardPeriods": { "type": "json", "label": "看板时段", "desc": "[{ name,start,end,weekdays,biweek,type }]", "default": [] }
+  }
 }

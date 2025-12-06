@@ -35,7 +35,7 @@
   <body>
     <div class="section">
       <div class="section-title"><i class="ri-file-user-line"></i> 学生列表</div>
-      <div class="muted">学生数据保存在 `profiles.students`，通过底栏操作新增与保存。</div>
+      <div class="muted">学生数据保存在 `profiles-students`，通过底栏操作新增与保存。</div>
       <div id="actions" class="actions" style="display:none; gap:8px; margin:8px 0;">
         <button id="btn-add" class="btn secondary"><i class="ri-user-add-line"></i> 新增学生</button>
         <button id="btn-save" class="btn primary"><i class="ri-save-3-line"></i> 保存</button>
@@ -160,16 +160,16 @@
       async function loadStudents() {
         let list = [];
         if (window.lowbarAPI?.configGet) {
-          await window.lowbarAPI.configEnsureDefaults('profiles', { students: [] });
-          const res = await window.lowbarAPI.configGet('profiles', 'students');
+          await window.lowbarAPI.configEnsureDefaults('profiles-students', { students: [] });
+          const res = await window.lowbarAPI.configGet('profiles-students', 'students');
           list = Array.isArray(res) ? res : [];
         } else if (window.lowbarAPI?.pluginCall) {
           let res = await window.lowbarAPI.pluginCall?.(caller, 'getStudents');
           res = res?.result || res;
           list = Array.isArray(res?.students) ? res.students : [];
         } else {
-          await window.pluginAPI?.configEnsureDefaults('profiles', { students: [] });
-          const res = await window.pluginAPI?.configGet('profiles', 'students');
+          await window.pluginAPI?.configEnsureDefaults('profiles-students', { students: [] });
+          const res = await window.pluginAPI?.configGet('profiles-students', 'students');
           list = Array.isArray(res) ? res : [];
         }
         students = normalizeStudents(list);
@@ -181,12 +181,12 @@
         if ((!Array.isArray(toSave) || toSave.length === 0) && Array.isArray(students) && students.length) {
           toSave = students.map((s) => ({ ...s }));
         }
-        try { if (window.lowbarAPI?.configEnsureDefaults) await window.lowbarAPI.configEnsureDefaults('profiles', { students: [] }); } catch {}
+        try { if (window.lowbarAPI?.configEnsureDefaults) await window.lowbarAPI.configEnsureDefaults('profiles-students', { students: [] }); } catch {}
         // 双写：优先直写配置，再调用后端保存，确保持久化
         if (window.lowbarAPI?.configSet) {
-          try { await window.lowbarAPI.configSet('profiles', 'students', toSave); } catch {}
+          try { await window.lowbarAPI.configSet('profiles-students', 'students', toSave); } catch {}
         } else if (window.pluginAPI?.configSet) {
-          try { await window.pluginAPI.configSet('profiles', 'students', toSave); } catch {}
+          try { await window.pluginAPI.configSet('profiles-students', 'students', toSave); } catch {}
         }
         if (window.lowbarAPI?.pluginCall) {
           try { await window.lowbarAPI.pluginCall?.(caller, 'saveStudents', { students: toSave }); } catch {}

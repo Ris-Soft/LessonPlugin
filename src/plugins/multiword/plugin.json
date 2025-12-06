@@ -9,4 +9,8 @@
     { "id": "openTemplate", "icon": "ri-window-line", "text": "打开多维单词", "target": "openMultiword" }
   ],
   "variables": ["timeISO","pluginName","wordbankUrl"]
+  ,"configSchema": {
+    "wordbankUrl": { "type": "string", "label": "词库服务器地址", "desc": "http(s) URL", "default": "" },
+    "prefs": { "type": "json", "label": "偏好设置", "desc": "{ voice, enableCarousel, shuffleAfterCarousel }", "default": { "voice": "ALL", "enableCarousel": true, "shuffleAfterCarousel": false } }
+  }
 }

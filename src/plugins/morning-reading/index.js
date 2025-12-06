@@ -48,7 +48,7 @@ function handleMinuteTrigger(curHHMM) {
   try {
     const d = new Date();
     const weekday = d.getDay() === 0 ? 7 : d.getDay(); // 1..7
-    const cfg = store.getAll('morningReading') || {};
+    const cfg = store.getAll('morning-reading') || {};
     const periods = Array.isArray(cfg.periods) ? cfg.periods : [];
     const boardPeriods = Array.isArray(cfg.boardPeriods) ? cfg.boardPeriods : [];
     log('trigger', curHHMM, { weekday });
@@ -184,7 +184,7 @@ function isBoardPeriodActive() {
   try {
     const now = new Date();
     const weekday = now.getDay() === 0 ? 7 : now.getDay();
-    const cfg = store.getAll('morningReading') || {};
+    const cfg = store.getAll('morning-reading') || {};
     const boardPeriods = Array.isArray(cfg.boardPeriods) ? cfg.boardPeriods : [];
     const base = store.get('system', 'semesterStart') || store.get('system', 'offsetBaseDate');
     const biweekOff = !!store.get('system', 'biweekOffset');
@@ -224,8 +224,8 @@ module.exports = {
   init: (api) => {
     pluginApi = api;
     try {
-      store.ensureDefaults('morningReading', { periods: [], boardPeriods: [] });
-      const cfg = store.getAll('morningReading') || {};
+      store.ensureDefaults('morning-reading', { periods: [], boardPeriods: [] });
+      const cfg = store.getAll('morning-reading') || {};
       const times = Array.from(new Set([
         ...computeTimesFromPeriods(cfg.periods || []),
         ...computeTimesFromPeriods(cfg.boardPeriods || [])
@@ -240,7 +240,7 @@ module.exports = {
     setSchedule: (periods) => {
       try {
         if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
-        const cfg = store.getAll('morningReading') || {};
+        const cfg = store.getAll('morning-reading') || {};
         const times = Array.from(new Set([
           ...computeTimesFromPeriods(Array.isArray(periods) ? periods : []),
           ...computeTimesFromPeriods(cfg.boardPeriods || [])
@@ -251,7 +251,7 @@ module.exports = {
     setBoardSchedule: (periods) => {
       try {
         if (!pluginApi) return { ok: false, error: 'plugin_api_unavailable' };
-        const cfg = store.getAll('morningReading') || {};
+        const cfg = store.getAll('morning-reading') || {};
         const times = Array.from(new Set([
           ...computeTimesFromPeriods(cfg.periods || []),
           ...computeTimesFromPeriods(Array.isArray(periods) ? periods : [])

@@ -38,9 +38,9 @@ const functions = {
     try {
       if (payload?.type === 'left.click') {
         if (payload.id === 'add') {
-          const list = Array.isArray(store.get('profiles', 'students')) ? store.get('profiles', 'students') : [];
+          const list = Array.isArray(store.get('profiles-students', 'students')) ? store.get('profiles-students', 'students') : [];
           list.push({ required: true, name: '', gender: '未选择' });
-          store.set('profiles', 'students', list);
+          store.set('profiles-students', 'students', list);
           emitUpdate(EVENT_CHANNEL, 'refresh', true);
         } else if (payload.id === 'save') {
           emitUpdate(EVENT_CHANNEL, 'students.save', true);
@@ -65,8 +65,8 @@ const functions = {
   },
   getStudents: async () => {
     try {
-      try { store.ensureDefaults('profiles', { students: [] }); } catch {}
-      const arr = store.get('profiles', 'students');
+      try { store.ensureDefaults('profiles-students', { students: [] }); } catch {}
+      const arr = store.get('profiles-students', 'students');
       return { ok: true, students: Array.isArray(arr) ? arr : [] };
     } catch (e) { return { ok: false, students: [], error: e?.message || String(e) }; }
   },
@@ -75,7 +75,7 @@ const functions = {
       if (!Array.isArray(payload?.students)) {
         return { ok: false, error: 'invalid_students' };
       }
-      store.set('profiles', 'students', payload.students);
+      store.set('profiles-students', 'students', payload.students);
       try { emitUpdate(EVENT_CHANNEL, 'refresh', true); } catch {}
       return { ok: true };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }

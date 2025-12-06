@@ -302,7 +302,7 @@ async function showParamsEditorForEvent(paramDefs, initial, pluginId) {
         input.placeholder = String(def?.hint || def?.desc || def?.name || '');
         // 插件变量插入按钮（仅字符串类型）
         const insBtn = document.createElement('button'); insBtn.className='btn secondary'; insBtn.title='插入插件变量'; insBtn.innerHTML = '<i class="ri-braces-line"></i>';
-        insBtn.onclick = async () => { try { if (type !== 'string') return; await openVarOverlaySimple(pluginId, input); } catch (e) { await showAlert('变量加载失败：' + (e?.message || '未知错误')); } };
+        insBtn.onclick = async () => { try { if (!['string','text'].includes(String(type).toLowerCase())) return; await openVarOverlaySimple(pluginId, input); } catch (e) { await showAlert('变量加载失败：' + (e?.message || '未知错误')); } };
         const wrap = document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr auto'; wrap.style.gap='8px'; wrap.appendChild(input); wrap.appendChild(insBtn);
         row.appendChild(label); row.appendChild(wrap);
       }

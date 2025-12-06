@@ -18,4 +18,10 @@
     "profiles.students"
   ],
   "npmDependencies": {}
+  ,"configSchema": {
+    "rows": { "type": "json", "label": "排定义", "desc": "行头数组，含过道/普通", "default": [] },
+    "cols": { "type": "json", "label": "列定义", "desc": "列头数组，含过道/普通", "default": [] },
+    "seats": { "type": "json", "label": "座位映射", "desc": "{ rowId-colId: { name } }", "default": {} },
+    "backgroundStatus": { "type": "string", "label": "背景状态", "desc": "默认/其他", "default": "默认" }
+  }
 }

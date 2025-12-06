@@ -79,7 +79,6 @@ function renderPlugin(item) {
     </div>
   `;
 
-  // 初始根据启用状态禁用/启用动作按钮
   try {
     el.querySelectorAll('.action-btn').forEach((btn) => { btn.disabled = !item.enabled; });
   } catch {}
@@ -110,7 +109,6 @@ function renderPlugin(item) {
     }
   } catch {}
 
-  // 为左侧操作区添加“...”溢出按钮与菜单，并在宽度不足时收纳多余操作
   try {
     const actionsLeft = el.querySelector('.actions-left');
     const actionsBox = el.querySelector('.card-actions');
@@ -125,7 +123,6 @@ function renderPlugin(item) {
       actionsLeft.appendChild(overflowMenu);
 
       const recompute = () => {
-        // 将菜单中的按钮放回左侧，清空菜单，用于重新计算
         try {
           const moved = Array.from(overflowMenu.querySelectorAll('.action-btn'));
           moved.forEach(btn => {
@@ -134,30 +131,26 @@ function renderPlugin(item) {
         } catch {}
         overflowMenu.innerHTML = '';
 
-        // 临时不换行以便检测 scrollWidth
         const prevWrap = actionsLeft.style.flexWrap;
         actionsLeft.style.flexWrap = 'nowrap';
 
         const getLeftBtns = () => Array.from(actionsLeft.children).filter(n => n.classList && n.classList.contains('action-btn'));
 
-        // 第一阶段：不含展开按钮的宽度判断
         moreBtn.style.display = 'none';
         let safety = 100;
         while (actionsLeft.scrollWidth > actionsLeft.clientWidth && safety-- > 0) {
           const btns = getLeftBtns();
-          if (btns.length <= 0) break; // 极窄时允许全部收纳到菜单
+          if (btns.length <= 0) break;
           overflowMenu.appendChild(btns[btns.length - 1]);
         }
 
         const hasOverflow = overflowMenu.children.length > 0;
 
-        // 第二阶段：若发生溢出，则加入展开按钮并再次收纳，确保连同展开按钮一起不溢出
         if (hasOverflow) {
-          // 第二阶段测量时，先使用“仅图标”的展开按钮占位
           moreBtn.style.display = '';
           moreBtn.classList.remove('text');
           moreBtn.innerHTML = '<i class="ri-arrow-down-s-line"></i>';
-          moreBtn.style.visibility = 'hidden'; // 占位但不可见
+          moreBtn.style.visibility = 'hidden';
           safety = 100;
           while (actionsLeft.scrollWidth > actionsLeft.clientWidth && safety-- > 0) {
             const btns = getLeftBtns();
@@ -167,22 +160,17 @@ function renderPlugin(item) {
           moreBtn.style.visibility = '';
         }
 
-        // 还原换行策略
         actionsLeft.style.flexWrap = prevWrap || '';
 
-        // 根据是否有溢出决定展开按钮显示
         const visibleCount = getLeftBtns().length;
         if (overflowMenu.children.length) {
           moreBtn.style.display = '';
-          // 有至少一个可见按钮 -> 展开按钮仅图标
           if (visibleCount >= 1) {
             moreBtn.classList.remove('text');
             moreBtn.innerHTML = '<i class="ri-arrow-down-s-line"></i>';
           } else {
-            // 可见按钮为 0 -> 展开按钮显示文字
             moreBtn.classList.add('text');
             moreBtn.innerHTML = '<i class="ri-arrow-down-s-line"></i> 展开操作';
-            // 防退路：若添加文字导致再次溢出，回退为仅图标
             const wrapPrev = actionsLeft.style.flexWrap;
             actionsLeft.style.flexWrap = 'nowrap';
             if (actionsLeft.scrollWidth > actionsLeft.clientWidth) {
@@ -196,17 +184,14 @@ function renderPlugin(item) {
         }
       };
 
-      // 初次计算（在下一帧，确保布局稳定）
       setTimeout(recompute, 0);
 
-      // 随容器尺寸变化重新计算
       try {
         const ro = new ResizeObserver(() => recompute());
         ro.observe(actionsBox);
       } catch {}
       window.addEventListener('resize', recompute);
 
-      // 打开/关闭菜单
       let isOpen = false;
       moreBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -236,43 +221,41 @@ function renderPlugin(item) {
     btn.addEventListener('click', async () => {
       const act = btn.dataset.action;
       const meta = (item.actions || []).find(a => a.id === act);
-      // 若 actions 配置了 target（指向插件 index.js 的 functions 中的函数），则直接调用
       if (meta && typeof meta.target === 'string' && meta.target) {
         const key = item.id || item.name;
         await window.settingsAPI?.pluginCall?.(key, meta.target, Array.isArray(meta.args) ? meta.args : []);
         console.log(key, meta.target, meta.args);
         return;
       }
-  // 内置动作：安装并链接插件的 Node 模块依赖（调用主进程 ensureDeps）
-  if (act === 'installDeps' || act === 'installNpm') {
-    btn.disabled = true; btn.textContent = '安装依赖中...';
-    const key = item.id || item.name;
-    const status = await window.settingsAPI?.pluginDepsStatus?.(key);
-    if (!status?.ok) {
-      await showAlert(`无法查询依赖状态：${status?.error || '未知错误'}`);
-      btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装依赖`;
-      return;
-    }
-    const ensure = await window.settingsAPI?.pluginEnsureDeps?.(key);
-    if (!ensure?.ok) {
-      await showAlert(`依赖安装/链接失败：${ensure?.error || '未知错误'}`);
-    } else {
-      await showAlertWithLogs('依赖处理完成', `已确保并链接插件依赖：${item.name}`, Array.isArray(ensure.logs) ? ensure.logs : []);
-      try {
-        const list = await fetchPlugins();
-        const cur = Array.isArray(list) ? list.find(p => (p.id === key) || (p.name === key)) : null;
-        if (cur && cur.enabled) {
-          await window.settingsAPI?.togglePlugin?.(key, false);
-          const restarted = await window.settingsAPI?.togglePlugin?.(key, true);
-          if (Array.isArray(restarted?.logs) && restarted.logs.length) {
-            await showLogModal('插件重启日志', restarted.logs);
-          }
-          showToast(`已重启插件：${item.name}`, { type: 'success', duration: 2000 });
+      if (act === 'installDeps' || act === 'installNpm') {
+        btn.disabled = true; btn.textContent = '安装依赖中...';
+        const key = item.id || item.name;
+        const status = await window.settingsAPI?.pluginDepsStatus?.(key);
+        if (!status?.ok) {
+          await showAlert(`无法查询依赖状态：${status?.error || '未知错误'}`);
+          btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装依赖`;
+          return;
         }
-      } catch {}
-    }
-    btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装依赖`;
-  }
+        const ensure = await window.settingsAPI?.pluginEnsureDeps?.(key);
+        if (!ensure?.ok) {
+          await showAlert(`依赖安装/链接失败：${ensure?.error || '未知错误'}`);
+        } else {
+          await showAlertWithLogs('依赖处理完成', `已确保并链接插件依赖：${item.name}`, Array.isArray(ensure.logs) ? ensure.logs : []);
+          try {
+            const list = await fetchPlugins();
+            const cur = Array.isArray(list) ? list.find(p => (p.id === key) || (p.name === key)) : null;
+            if (cur && cur.enabled) {
+              await window.settingsAPI?.togglePlugin?.(key, false);
+              const restarted = await window.settingsAPI?.togglePlugin?.(key, true);
+              if (Array.isArray(restarted?.logs) && restarted.logs.length) {
+                await showLogModal('插件重启日志', restarted.logs);
+              }
+              showToast(`已重启插件：${item.name}`, { type: 'success', duration: 2000 });
+            }
+          } catch {}
+        }
+        btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 安装依赖`;
+      }
     });
   });
   const uninstallBtn = el.querySelector('.uninstall-btn');

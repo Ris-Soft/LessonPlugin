@@ -18,6 +18,7 @@
       .card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.35); }
       .card h4 { margin: 0 0 8px 0; font-size: 18px; display: flex; align-items: center; gap: 8px; }
       .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); font-size: 12px; }
+      .subhead { display:flex; align-items:center; gap:8px; margin:8px 0 4px 0; color: var(--muted); font-size: 13px; }
       .table { margin-top: 8px; overflow-x: auto; }
       .table table { width: 100%; border-collapse: separate; border-spacing: 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow: hidden; }
       .table thead th { font-weight: 700; color: var(--muted); text-align: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 14px; }
@@ -28,6 +29,7 @@
       .rot table { width:100%; border-collapse: separate; border-spacing:0; background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow:hidden }
       .rot-name { width: 120px; text-align: left; font-weight: 700; color: var(--fg); padding-left: 8px; }
       .rot-names { text-align: left; }
+      .rot-names.hot { border-radius:10px; background: rgba(138,180,248,0.12); outline: 2px solid rgba(138,180,248,0.35); }
       .muted { color: var(--muted); }
       .today { outline: 2px solid rgba(72,207,173,0.5); }
       .header { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -57,8 +59,9 @@
           (item.rolesGroup||[]).forEach(r=>{ const th=document.createElement('th'); th.textContent=r; trh.appendChild(th) }); thead.appendChild(trh); table.appendChild(thead);
           const tbody=document.createElement('tbody'); const r1=document.createElement('tr'); const tdLabel=document.createElement('td'); tdLabel.className='label-lg'; tdLabel.textContent=item.groupName||''; r1.appendChild(tdLabel);
           (item.rolesGroup||[]).forEach(r=>{ const td=document.createElement('td'); const arr=Array.isArray(item.groupMembers?.[r])?item.groupMembers[r]:[]; td.textContent=arr.length?arr.join('、'):'未设置'; r1.appendChild(td) }); tbody.appendChild(r1); table.appendChild(tbody); tableWrap.appendChild(table); card.appendChild(tableWrap);
+          const sub=el('div','subhead'); sub.innerHTML=`<i class=\"ri-repeat-2-line\"></i> 轮班预览`; card.appendChild(sub);
           const rotWrap=el('div','rot'); const rot=document.createElement('table'); const rotBody=document.createElement('tbody');
-          (item.rolesGroup||[]).forEach(r=>{ const soloArr=Array.isArray(item.singleMembers?.[r])?item.singleMembers[r]:[]; if(!soloArr.length) return; const tr=document.createElement('tr'); const lc=document.createElement('td'); lc.className='rot-name'; lc.textContent=r; const rc=document.createElement('td'); rc.className='rot-names'; rc.textContent=soloArr.join('、'); tr.appendChild(lc); tr.appendChild(rc); rotBody.appendChild(tr) }); rot.appendChild(rotBody); rotWrap.appendChild(rot); card.appendChild(rotWrap);
+          (item.rolesGroup||[]).forEach(r=>{ const soloArr=Array.isArray(item.singleMembers?.[r])?item.singleMembers[r]:[]; if(!soloArr.length) return; const tr=document.createElement('tr'); const lc=document.createElement('td'); lc.className='rot-name'; lc.textContent=r; const rc=document.createElement('td'); rc.className='rot-names hot'; rc.textContent=soloArr.join('、'); tr.appendChild(lc); tr.appendChild(rc); rotBody.appendChild(tr) }); rot.appendChild(rotBody); rotWrap.appendChild(rot); card.appendChild(rotWrap);
           wrap.appendChild(card);
         });
       }

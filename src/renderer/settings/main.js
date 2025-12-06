@@ -16,6 +16,8 @@ async function main() {
     market: document.getElementById('page-market'),
     components: document.getElementById('page-components'),
     general: document.getElementById('page-general'),
+    config: document.getElementById('page-config'),
+    defaults: document.getElementById('page-defaults'),
     automation: document.getElementById('page-automation'),
     npm: document.getElementById('page-npm'),
     debug: document.getElementById('page-debug'),
@@ -45,6 +47,8 @@ async function main() {
         window.renderInstalled?.();
       } else if (page === 'general') {
         initGeneralSettings();
+      } else if (page === 'config') {
+        try { initConfigOverview(); } catch {}
       } else if (page === 'automation') {
         initAutomationSettings();
       } else if (page === 'debug') {
@@ -63,6 +67,8 @@ async function main() {
         })();
       } else if (page === 'components') {
         try { window.initComponentsPage?.(); } catch {}
+      } else if (page === 'defaults') {
+        try { window.initDefaultsPage?.(); } catch {}
       } else if (page === 'about') {
         initAboutPage();
       }
@@ -79,15 +85,17 @@ async function main() {
       for (const key of Object.keys(pages)) {
         pages[key].hidden = key !== page;
       }
-      if (page === 'npm') {
-      window.renderInstalled?.();
-    } else if (page === 'general') {
-      initGeneralSettings();
-    } else if (page === 'automation') {
-      initAutomationSettings();
-    } else if (page === 'debug') {
-      initDebugSettings();
-    } else if (page === 'market') {
+    if (page === 'npm') {
+    window.renderInstalled?.();
+  } else if (page === 'general') {
+    initGeneralSettings();
+  } else if (page === 'config') {
+    try { initConfigOverview(); } catch {}
+  } else if (page === 'automation') {
+    initAutomationSettings();
+  } else if (page === 'debug') {
+    initDebugSettings();
+  } else if (page === 'market') {
       initMarketPage();
     } else if (page === 'plugins') {
       (async () => {
@@ -101,6 +109,8 @@ async function main() {
       })();
     } else if (page === 'components') {
       try { window.initComponentsPage?.(); } catch {}
+    } else if (page === 'defaults') {
+      try { window.initDefaultsPage?.(); } catch {}
     } else if (page === 'about') {
       initAboutPage();
     }
@@ -155,7 +165,6 @@ async function main() {
   const container = document.getElementById('plugins');
   const list = await fetchPlugins();
   container.innerHTML = '';
-  // 需求：无动作的插件不应在插件列表显示（但不影响自动化编辑器的插件选择）
   const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
   filtered.forEach((p) => container.appendChild(renderPlugin(p)));
 
