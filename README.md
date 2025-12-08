@@ -1,4 +1,4 @@
-# LessonPlugin
+# OrbiBoard
 
 基于 Electron 的以 JavaScript 为核心的插件化大屏课堂辅助工具。
 
@@ -82,7 +82,7 @@ module.exports = {
 
 ## 统一配置存储
 
-- 路径：用户数据目录下 `LessonPlugin/config`（主进程 `store.js` 管理）。
+- 路径：用户数据目录下 `OrbiBoard/config`（主进程 `store.js` 管理）。
 - `system.json`：通用设置（如 `splashEnabled`、`preciseTimeEnabled`、`timeOffset`、`autoOffsetDaily`、`offsetBaseDate`、`semesterStart` 等）。
 - `plugins/*.json`：插件私有配置。
 
@@ -90,7 +90,7 @@ module.exports = {
 
 ## 自动化
 
-- 触发器：时间（HH:MM）、协议（`LessonPlugin://task/<text>`）。
+- 触发器：时间（HH:MM）、协议（`OrbiBoard://task/<text>`）。
 - 条件组：AND/OR；支持时间等值、星期/月/日集合、单双周（基于 `semesterStart`）。
 - 动作：
   - 插件功能：选择插件与事件；参数数组通过模态框结构化编辑（字符串/数字/布尔/对象JSON/数组JSON）。

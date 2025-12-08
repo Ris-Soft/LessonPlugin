@@ -6,7 +6,7 @@ let pluginsDir = '';
 
 function init(app) {
   try {
-    rootDir = path.join(app.getPath('userData'), 'LessonPlugin', 'config');
+    rootDir = path.join(app.getPath('userData'), 'OrbiBoard', 'config');
     pluginsDir = path.join(rootDir, 'plugins');
     fs.mkdirSync(rootDir, { recursive: true });
     fs.mkdirSync(pluginsDir, { recursive: true });

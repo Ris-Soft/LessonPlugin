@@ -282,7 +282,7 @@ async function initConfigOverview() {
     splashEnabled: true,
     splashQuoteEnabled: true,
     splashBgStyle: 'default',
-    splashProgramName: 'LessonPlugin',
+    splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具',
     autostartEnabled: false,
     autostartHigh: false,

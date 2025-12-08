@@ -34,7 +34,7 @@ function initAboutPage() {
   // 复制版本信息到剪贴板
   copyBtn?.addEventListener('click', async () => {
     const merged = [
-      `LessonPlugin ${vEl?.textContent || '—'}`,
+      `OrbiBoard ${vEl?.textContent || '—'}`,
       `Electron ${eEl?.textContent || '—'}`,
       `Node ${nEl?.textContent || '—'}`,
       `Chrome ${cEl?.textContent || '—'}`,

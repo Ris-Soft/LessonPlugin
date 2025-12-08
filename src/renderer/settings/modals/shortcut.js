@@ -38,7 +38,7 @@ async function showShortcutCreateDialog(pluginItem, chosen, pluginId, action) {
     // 字符串预览（示例，实际创建时由主进程生成具体ID）
     const protoPreview = document.createElement('div'); protoPreview.className = 'muted';
     const sample = `plugin:${pluginId}:${Math.random().toString(16).slice(2,10)}`;
-    protoPreview.textContent = `协议字符串预览：LessonPlugin://task/${encodeURIComponent(sample)}`;
+    protoPreview.textContent = `协议字符串预览：OrbiBoard://task/${encodeURIComponent(sample)}`;
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; canvas.className = 'preview-canvas';
     // 左列放画布，右列放文本容器，避免跨行造成空白
     meta.appendChild(info); meta.appendChild(protoPreview);

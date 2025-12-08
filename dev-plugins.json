@@ -1,0 +1,19 @@
+{
+  "paths": [
+    "../annotate-fabric",
+    "../clock-timer",
+    "../duty-easy",
+    "../example-plugin",
+    "../morning-reading",
+    "../multiword",
+    "../music-radio",
+    "../notify-plugin",
+    "../profiles-seating",
+    "../profiles-students",
+    "../rollcall-random",
+    "../screen-compass",
+    "../smart-listening",
+    "../ui-lowbar",
+    "../ui-lowbar-caller"
+  ]
+}

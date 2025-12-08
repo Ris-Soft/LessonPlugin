@@ -188,7 +188,7 @@ class AutomationManager {
       const fgColor = String(options?.fgColor || '#ffffff');
       const iconDataUrl = String(options?.iconDataUrl || '').trim();
 
-      // 1) 创建自动化项：使用协议触发（LessonPlugin://task/<text>）
+      // 1) 创建自动化项：使用协议触发（OrbiBoard://task/<text>）
       const protoText = `plugin:${String(pluginId || '').trim()}:${uuidv4().slice(0, 8)}`;
       const item = this.create({ name, source: 'shortcut', triggers: [{ type: 'protocol', text: protoText }], actions, confirm: { enabled: false, timeout: 0 } });
 
@@ -225,20 +225,20 @@ class AutomationManager {
       if (process.platform === 'win32') {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
         shortcutPath = path.join(desktop, safeFile);
-        const urlLine = `URL=LessonPlugin://task/${encodeURIComponent(protoText)}`;
+        const urlLine = `URL=OrbiBoard://task/${encodeURIComponent(protoText)}`;
         const iconLines = icoOk ? `IconFile=${icoPath}\r\nIconIndex=0` : '';
         const content = `[InternetShortcut]\r\n${urlLine}\r\n${iconLines}\r\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
       } else if (process.platform === 'darwin') {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.command';
         shortcutPath = path.join(desktop, safeFile);
-        const content = `#!/bin/bash\nopen \"LessonPlugin://task/${encodeURIComponent(protoText)}\"\n`;
+        const content = `#!/bin/bash\nopen \"OrbiBoard://task/${encodeURIComponent(protoText)}\"\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
         try { fs.chmodSync(shortcutPath, 0o755); } catch {}
       } else {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.desktop';
         shortcutPath = path.join(desktop, safeFile);
-        const execLine = `Exec=xdg-open "LessonPlugin://task/${encodeURIComponent(protoText)}"`;
+        const execLine = `Exec=xdg-open "OrbiBoard://task/${encodeURIComponent(protoText)}"`;
         const iconLine = pngOk ? `Icon=${pngPath}` : '';
         const content = `[Desktop Entry]\nType=Application\nName=${name}\n${execLine}\n${iconLine}\nTerminal=false\nCategories=Utility;\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }

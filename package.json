@@ -1,34 +1,33 @@
 {
-  "name": "lessonplugin",
+  "name": "orbiboard",
   "version": "1.0.0",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "run": "electron .",
     "dev": "node scripts/dev-server.js",
-    "dev:plugins": "node scripts/dev-plugins.js",
-    "pack:plugins": "node scripts/pack-plugins.js",
+    "link:plugins": "node scripts/link-plugins.js",
     "build": "electron-builder",
     "build:linux": "electron-builder --linux"
   },
   "keywords": [],
   "author": {
-    "name": "LessonPlugin",
+  "name": "OrbiBoard",
     "email": "753307914@qq.com"
   },
   "license": "ISC",
   "description": "基于Electron的以JavaScript为核心的插件化大屏课堂辅助工具",
   "build": {
     "asar": false,
-    "appId": "com.lesson.plugin",
-    "productName": "LessonPlugin",
+    "appId": "com.orbiboard",
+    "productName": "OrbiBoard",
     "icon": "logo.png",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "win": {
       "icon": "icon.ico"
     },
     "linux": {
-      "maintainer": "LessonPlugin <753307914@qq.com>",
+      "maintainer": "OrbiBoard <753307914@qq.com>",
       "icon": "logo.png",
       "target": [
         "deb",
@@ -42,7 +41,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "LessonPlugin",
+      "shortcutName": "OrbiBoard",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     }

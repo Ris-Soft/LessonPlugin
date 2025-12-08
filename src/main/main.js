@@ -32,8 +32,8 @@ let tray = null;
 let splashReady = false;
 let splashQueue = [];
 let automationManager = null;
-// 判断是否通过协议参数启动（LessonPlugin://...），用于控制是否创建主窗口
-const hasProtocolArgAtBoot = Array.isArray(process.argv) && process.argv.some((s) => /^LessonPlugin:\/\//i.test(String(s || '')));
+// 判断是否通过协议参数启动（OrbiBoard://...），用于控制是否创建主窗口
+const hasProtocolArgAtBoot = Array.isArray(process.argv) && process.argv.some((s) => /^OrbiBoard:\/\//i.test(String(s || '')));
 
 let __lastProtoTask = { text: '', ts: 0 };
 let __lastProtoStore = { key: '', ts: 0 };
@@ -146,7 +146,7 @@ function createTray() {
   // 解析 RemixIcon 位图（优先用户数据 renderer/icons，其次应用内置 src/renderer/icons）
   const resolveMenuIcon = (riName) => {
     try {
-      const userIconsRoot = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer', 'icons');
+      const userIconsRoot = path.join(app.getPath('userData'), 'OrbiBoard', 'renderer', 'icons');
       const candidates = [
         path.join(userIconsRoot, `${riName}.png`),
         path.join(userIconsRoot, `${riName}.ico`),
@@ -229,7 +229,7 @@ function createTray() {
     { label: '退出', icon: resolveMenuIcon('ri-close-circle-line'), click: () => app.quit() }
   ]);
 
-  tray.setToolTip('LessonPlugin');
+  tray.setToolTip('OrbiBoard');
   tray.setContextMenu(buildMenu());
 
   // 监听主题变化以刷新菜单项图标
@@ -280,9 +280,9 @@ app.whenReady().then(async () => {
     createSplashWindow();
   }
 
-  const userRoot = path.join(app.getPath('userData'), 'LessonPlugin');
-  const devPluginsOverride = String(process.env.LP_DEV_PLUGINS || '').trim();
-  userPluginsRoot = devPluginsOverride ? devPluginsOverride : path.join(userRoot, 'plugins');
+  const userRoot = path.join(app.getPath('userData'), 'OrbiBoard');
+  const devPluginsOverride = '';
+  userPluginsRoot = path.join(userRoot, 'plugins');
   userComponentsRoot = path.join(userRoot, 'components');
   const userRendererRoot = path.join(userRoot, 'renderer');
   shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
@@ -293,8 +293,7 @@ app.whenReady().then(async () => {
   try { fs.mkdirSync(userRendererRoot, { recursive: true }); } catch {}
   // 可选：强制同步内置插件到用户目录（用于开发或修复用户目录旧版本）
   try {
-    const forceSyncEnv = String(process.env.LP_FORCE_PLUGIN_SYNC || '').toLowerCase();
-    const shouldForceSync = !devPluginsOverride && (forceSyncEnv === '1' || forceSyncEnv === 'true');
+    const shouldForceSync = true;
     if (shouldForceSync) {
       const shippedEntries = fs.readdirSync(shippedPluginsRoot).filter((n) => {
         const p = path.join(shippedPluginsRoot, n);
@@ -489,29 +488,24 @@ app.whenReady().then(async () => {
     } catch {}
   } catch {}
 
-  // 镜像公共资源到用户数据目录（供插件通过 ../../renderer 引用）
   try {
-    const copyIfDifferent = (src, dest) => {
-      try {
-        const sStat = fs.statSync(src);
-        const dStat = fs.existsSync(dest) ? fs.statSync(dest) : null;
-        if (!dStat || sStat.size !== dStat.size || sStat.mtimeMs > dStat.mtimeMs) {
-          fs.copyFileSync(src, dest);
+    const mirror = (src, dst) => {
+      try { fs.mkdirSync(dst, { recursive: true }); } catch {}
+      const stack = [{ s: src, d: dst }];
+      while (stack.length) {
+        const { s, d } = stack.pop();
+        if (!fs.existsSync(s)) continue;
+        const items = fs.readdirSync(s);
+        for (const it of items) {
+          const sp = path.join(s, it);
+          const dp = path.join(d, it);
+          const st = fs.statSync(sp);
+          if (st.isDirectory()) { try { fs.mkdirSync(dp, { recursive: true }); } catch {} stack.push({ s: sp, d: dp }); }
+          else { try { fs.copyFileSync(sp, dp); } catch {} }
         }
-      } catch {}
+      }
     };
-    // 需要的文件：标题栏样式、Remixicon 字体与样式
-    const filesToMirror = [
-      'titlebar.css',
-      'settings.css',
-      'remixicon-local.css',
-      'remixicon.woff2'
-    ];
-    for (const f of filesToMirror) {
-      const src = path.join(shippedRendererRoot, f);
-      const dest = path.join(userRendererRoot, f);
-      if (fs.existsSync(src)) copyIfDifferent(src, dest);
-    }
+    mirror(shippedRendererRoot, userRendererRoot);
   } catch {}
 
   const manifestPath = path.join(userPluginsRoot, 'plugins.json');
@@ -540,7 +534,7 @@ app.whenReady().then(async () => {
   }
 
   try {
-    const wantWatch = devPluginsOverride && String(process.env.LP_DEV_PLUGINS_WATCH || '1') !== '0';
+    const wantWatch = String(process.env.LP_DEV_PLUGINS_WATCH || '0') !== '0';
     if (wantWatch) {
       const debounce = new Map();
       const list = await pluginManager.getPlugins();
@@ -568,23 +562,23 @@ app.whenReady().then(async () => {
   // 最后对齐并启动自动化计时器（此时插件注册已完成）
   automationManager.init();
 
-  // 注册协议处理（LessonPlugin://task/<text>）
+  // 注册协议处理（OrbiBoard://task/<text>）
   try {
     if (process.defaultApp) {
-      app.setAsDefaultProtocolClient('LessonPlugin', process.execPath, [app.getAppPath()]);
-      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('lessonplugin', process.execPath, [app.getAppPath()]); } catch {}
+      app.setAsDefaultProtocolClient('OrbiBoard', process.execPath, [app.getAppPath()]);
+      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [app.getAppPath()]); } catch {}
     } else {
-      app.setAsDefaultProtocolClient('LessonPlugin');
-      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('lessonplugin'); } catch {}
+      app.setAsDefaultProtocolClient('OrbiBoard');
+      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard'); } catch {}
     }
   } catch {}
   try { ensureLinuxProtocolRegistration(); } catch {}
   app.on('second-instance', (_e, argv) => {
-    // 处理自定义协议（LessonPlugin://task/<text>）
-    const arg = argv.find((s) => /^LessonPlugin:\/\//i.test(s));
+    // 处理自定义协议（OrbiBoard://task/<text>）
+    const arg = argv.find((s) => /^OrbiBoard:\/\//i.test(s));
     if (arg) {
-      const mTask = arg.match(/^LessonPlugin:\/\/task\/(.+)$/i);
-      const mStore = arg.match(/^LessonPlugin:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      const mTask = arg.match(/^OrbiBoard:\/\/task\/(.+)$/i);
+      const mStore = arg.match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
       if (mTask) {
         const text = decodeURIComponent(mTask[1]);
         if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
@@ -608,8 +602,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin') {
     app.on('open-url', (_e, url) => {
       const u = String(url || '');
-      const mTask = u.match(/^LessonPlugin:\/\/task\/(.+)$/i);
-      const mStore = u.match(/^LessonPlugin:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      const mTask = u.match(/^OrbiBoard:\/\/task\/(.+)$/i);
+      const mStore = u.match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
       if (mTask) {
         const text = decodeURIComponent(mTask[1]);
         if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
@@ -679,7 +673,7 @@ ipcMain.handle('plugin:inspectZip', async (_e, zipPath) => {
 });
 ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
   try {
-    const tmpDir = path.join(app.getPath('temp'), 'LessonPlugin');
+    const tmpDir = path.join(app.getPath('temp'), 'OrbiBoard');
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     const safeName = String(fileName || 'plugin.zip').replace(/[^a-zA-Z0-9._-]/g, '_');
     const tmpPath = path.join(tmpDir, `${Date.now()}_${safeName}`);
@@ -695,7 +689,7 @@ ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
 // 新增：安装前ZIP检查（二进制数据）
 ipcMain.handle('plugin:inspectZipData', async (_e, fileName, data) => {
   try {
-    const tmpDir = path.join(app.getPath('temp'), 'LessonPlugin');
+    const tmpDir = path.join(app.getPath('temp'), 'OrbiBoard');
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     const safeName = String(fileName || 'plugin.zip').replace(/[^a-zA-Z0-9._-]/g, '_');
     const tmpPath = path.join(tmpDir, `${Date.now()}_${safeName}`);
@@ -846,7 +840,7 @@ ipcMain.handle('settings:showMenu', async (event, coords) => {
     { label: '刷新设置页', click: () => { try { win?.webContents?.reload(); } catch {} } },
     { type: 'separator' },
     { label: '快速重启程序', click: () => { try { store.set('system', 'openSettingsOnBootOnce', true); } catch {} app.relaunch(); app.exit(0); } },
-    { label: '打开数据目录', click: async () => { try { const root = path.join(app.getPath('userData'), 'LessonPlugin'); try { fs.mkdirSync(root, { recursive: true }); } catch {} await require('electron').shell.openPath(root); } catch {} } },
+    { label: '打开数据目录', click: async () => { try { const root = path.join(app.getPath('userData'), 'OrbiBoard'); try { fs.mkdirSync(root, { recursive: true }); } catch {} await require('electron').shell.openPath(root); } catch {} } },
     { label: '打开安装目录', click: async () => { try { const dir = path.dirname(process.execPath); await require('electron').shell.openPath(dir); } catch {} } },
     { type: 'separator' },
     { label: '退出程序', click: () => app.quit() }
@@ -1118,10 +1112,10 @@ ipcMain.handle('system:getTime', async () => {
 ipcMain.handle('system:getUserDataPath', async () => {
   try { return app.getPath('userData'); } catch (e) { return ''; }
 });
-// 获取数据目录大小（递归计算 %USER_DATA%/LessonPlugin）
+  // 获取数据目录大小（递归计算 %USER_DATA%/OrbiBoard）
 ipcMain.handle('system:getUserDataSize', async () => {
   try {
-    const root = path.join(app.getPath('userData'), 'LessonPlugin');
+    const root = path.join(app.getPath('userData'), 'OrbiBoard');
     const dirSize = (p) => {
       try {
         if (!fs.existsSync(p)) return 0;
@@ -1145,7 +1139,7 @@ ipcMain.handle('system:getUserDataSize', async () => {
 });
 ipcMain.handle('system:openUserData', async () => {
   try {
-    const root = path.join(app.getPath('userData'), 'LessonPlugin');
+    const root = path.join(app.getPath('userData'), 'OrbiBoard');
     try { fs.mkdirSync(root, { recursive: true }); } catch {}
     const res = await require('electron').shell.openPath(root);
     return { ok: !res, error: res || null };
@@ -1162,8 +1156,8 @@ ipcMain.handle('system:changeUserData', async () => {
       return { ok: false, error: '选择的目录与当前目录相同' };
     }
     const currentBase = app.getPath('userData');
-    const currentRoot = path.join(currentBase, 'LessonPlugin');
-    const nextRoot = path.join(targetBase, 'LessonPlugin');
+    const currentRoot = path.join(currentBase, 'OrbiBoard');
+    const nextRoot = path.join(targetBase, 'OrbiBoard');
     try { fs.mkdirSync(nextRoot, { recursive: true }); } catch {}
     const copyDir = (src, dst) => {
       if (!fs.existsSync(src)) return;
@@ -1199,10 +1193,10 @@ ipcMain.handle('system:changeUserData', async () => {
     return { ok: false, error: e?.message || String(e) };
   }
 });
-// 卸载前清理用户数据（删除 %APPDATA%/LessonPlugin）
+// 卸载前清理用户数据（删除 %APPDATA%/OrbiBoard）
 ipcMain.handle('system:cleanupUserData', async () => {
   try {
-    const root = path.join(app.getPath('userData'), 'LessonPlugin');
+    const root = path.join(app.getPath('userData'), 'OrbiBoard');
     if (fs.existsSync(root)) {
       // 关闭可能打开的窗口以释放文件句柄
       try { module.exports?.closeAllWindows?.(); } catch {}
@@ -1247,7 +1241,7 @@ ipcMain.handle('system:getAutostart', async () => {
     if (process.platform === 'linux') {
       const configDir = process.env.XDG_CONFIG_HOME || path.join(require('os').homedir(), '.config');
       const autoDir = path.join(configDir, 'autostart');
-      const filePath = path.join(autoDir, 'LessonPlugin.desktop');
+      const filePath = path.join(autoDir, 'OrbiBoard.desktop');
       let enabled = false;
       if (fs.existsSync(filePath)) {
         try {
@@ -1270,14 +1264,14 @@ ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
       const configDir = process.env.XDG_CONFIG_HOME || path.join(require('os').homedir(), '.config');
       const autoDir = path.join(configDir, 'autostart');
       try { fs.mkdirSync(autoDir, { recursive: true }); } catch {}
-      const filePath = path.join(autoDir, 'LessonPlugin.desktop');
+      const filePath = path.join(autoDir, 'OrbiBoard.desktop');
       if (enabled) {
         const execPath = process.env.APPIMAGE || process.execPath;
         const iconPng = path.join(app.getAppPath(), 'logo.png');
   const lines = [
           '[Desktop Entry]',
           'Type=Application',
-          'Name=LessonPlugin',
+          'Name=OrbiBoard',
           `Exec=${execPath}`,
           fs.existsSync(iconPng) ? `Icon=${iconPng}` : '',
           'Terminal=false',
@@ -1307,7 +1301,7 @@ ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
 function ensureUserDataShortcut() {
   try {
     const programDir = path.dirname(process.execPath);
-    const userRoot = path.join(app.getPath('userData'), 'LessonPlugin');
+    const userRoot = path.join(app.getPath('userData'), 'OrbiBoard');
     let fileName = '';
     let content = '';
     if (process.platform === 'win32') {
@@ -1328,7 +1322,7 @@ function ensureUserDataShortcut() {
     }
   } catch {}
 }
-// 应用启动前尝试应用数据目录重定向（从程序目录标记文件读取）
+  // 应用启动前尝试应用数据目录重定向（从程序目录标记文件读取）
 function applyUserDataOverride() {
   try {
     const programDir = path.dirname(process.execPath);
@@ -1355,23 +1349,23 @@ function ensureLinuxProtocolRegistration() {
     try { fs.mkdirSync(appsDir, { recursive: true }); } catch {}
     const execPath = process.env.APPIMAGE || process.execPath;
     const iconPng = path.join(app.getAppPath(), 'logo.png');
-    const desktopName = 'lessonplugin.desktop';
+    const desktopName = 'orbiboard.desktop';
     const filePath = path.join(appsDir, desktopName);
     const lines = [
       '[Desktop Entry]',
       'Type=Application',
-      'Name=LessonPlugin',
+      'Name=OrbiBoard',
     `Exec=${execPath} %u`,
       fs.existsSync(iconPng) ? `Icon=${iconPng}` : '',
       'Terminal=false',
       'Categories=Utility;',
-      'MimeType=x-scheme-handler/lessonplugin;x-scheme-handler/LessonPlugin;'
+      'MimeType=x-scheme-handler/orbiboard;x-scheme-handler/OrbiBoard;'
     ].filter(Boolean).join('\n');
   fs.writeFileSync(filePath, lines, 'utf-8');
   try {
     const spawn = require('child_process').spawn;
-    spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/lessonplugin'], { shell: true });
-    spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/LessonPlugin'], { shell: true });
+    spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/orbiboard'], { shell: true });
+    spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/OrbiBoard'], { shell: true });
     try { spawn('update-desktop-database', [appsDir], { shell: true }); } catch {}
   } catch {}
   } catch {}
@@ -1380,7 +1374,7 @@ function ensureLinuxProtocolRegistration() {
 // 图标目录与释放（将Canvas生成的PNG写入用户数据 renderer/icons）
 ipcMain.handle('icons:dir', async () => {
   try {
-    const dir = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer', 'icons');
+    const dir = path.join(app.getPath('userData'), 'OrbiBoard', 'renderer', 'icons');
     try { fs.mkdirSync(dir, { recursive: true }); } catch {}
     return dir;
   } catch (e) {
@@ -1389,7 +1383,7 @@ ipcMain.handle('icons:dir', async () => {
 });
 ipcMain.handle('icons:write', async (_e, fileName, dataUrl) => {
   try {
-    const dir = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer', 'icons');
+    const dir = path.join(app.getPath('userData'), 'OrbiBoard', 'renderer', 'icons');
     try { fs.mkdirSync(dir, { recursive: true }); } catch {}
     const safe = String(fileName || 'icon.png').replace(/[^a-zA-Z0-9._-]/g, '_');
     const target = path.join(dir, safe);
@@ -1406,7 +1400,7 @@ ipcMain.handle('icons:write', async (_e, fileName, dataUrl) => {
 // 资源路径解析：为插件窗口提供统一的资源URL（优先用户数据镜像，其次应用内置）
 ipcMain.handle('asset:url', async (_e, relPath) => {
   try {
-    const userRoot = path.join(app.getPath('userData'), 'LessonPlugin', 'renderer');
+    const userRoot = path.join(app.getPath('userData'), 'OrbiBoard', 'renderer');
     const shippedRoot = path.join(app.getAppPath(), 'src', 'renderer');
     const candidates = [path.join(userRoot, relPath), path.join(shippedRoot, relPath)];
     const found = candidates.find((p) => fs.existsSync(p));

@@ -2,14 +2,14 @@ directories:
   output: dist
   buildResources: build
 asar: false
-appId: com.lesson.plugin
-productName: LessonPlugin
+appId: com.orbiboard
+productName: OrbiBoard
 icon: logo.png
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 win:
   icon: icon.ico
 linux:
-  maintainer: LessonPlugin <753307914@qq.com>
+  maintainer: OrbiBoard <753307914@qq.com>
   icon: logo.png
   target:
     - deb
@@ -21,7 +21,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: LessonPlugin
+  shortcutName: OrbiBoard
   runAfterFinish: true
   deleteAppDataOnUninstall: false
 files: []

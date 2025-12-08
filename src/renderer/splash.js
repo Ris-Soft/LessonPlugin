@@ -75,17 +75,17 @@ async function loadQuote() {
     localQuotes: [],
     splashQuoteEnabled: true,
     splashBgStyle: 'default',
-    splashProgramName: 'LessonPlugin',
+    splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具'
   });
   // 应用程序名称与描述、背景样式
   try {
-    const name = (await window.splashAPI.configGet('system', 'splashProgramName')) || 'LessonPlugin';
+    const name = (await window.splashAPI.configGet('system', 'splashProgramName')) || 'OrbiBoard';
     const desc = (await window.splashAPI.configGet('system', 'splashProgramDesc')) || '插件化大屏课堂辅助工具';
     const style = (await window.splashAPI.configGet('system', 'splashBgStyle')) || 'default';
     const brandTitle = document.querySelector('.brand h1');
     const brandSub = document.querySelector('.brand .subtitle');
-    if (brandTitle) brandTitle.textContent = String(name || 'LessonPlugin');
+    if (brandTitle) brandTitle.textContent = String(name || 'OrbiBoard');
     if (brandSub) brandSub.textContent = String(desc || '插件化大屏课堂辅助工具');
     const root = document.documentElement;
     const body = document.body;
@@ -168,7 +168,7 @@ async function loadQuote() {
     }
   } catch (e) {
     const last = await window.splashAPI.configGet('system', 'lastQuote');
-    if (showQuote && quoteEl) quoteEl.textContent = last || '「正在启动…」—— LessonPlugin';
+    if (showQuote && quoteEl) quoteEl.textContent = last || '「正在启动…」—— OrbiBoard';
     if (showQuote) startQuoteCountdownFromText(quoteEl?.textContent || '');
   }
 }

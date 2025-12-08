@@ -13,7 +13,7 @@ let originalConsole = null;
 function init(options = {}) {
   try {
     const userRoot = app.getPath('userData');
-    logDir = path.join(userRoot, 'LessonPlugin', 'logs');
+    logDir = path.join(userRoot, 'OrbiBoard', 'logs');
     logFile = path.join(logDir, 'backend.log');
     fs.mkdirSync(logDir, { recursive: true });
     enabled = !!options.enabled;

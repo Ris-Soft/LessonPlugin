@@ -32,7 +32,7 @@ async function initGeneralSettings() {
     splashEnabled: true,
     splashQuoteEnabled: true,
     splashBgStyle: 'default',
-    splashProgramName: 'LessonPlugin',
+    splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具',
     autostartEnabled: false,
     autostartHigh: false,
@@ -217,7 +217,7 @@ async function initGeneralSettings() {
       if (def) def.checked = true;
     }
   }
-  if (splashProgramName) splashProgramName.value = String(cfg.splashProgramName || 'LessonPlugin');
+  if (splashProgramName) splashProgramName.value = String(cfg.splashProgramName || 'OrbiBoard');
   if (splashProgramDesc) splashProgramDesc.value = String(cfg.splashProgramDesc || '插件化大屏课堂辅助工具');
 
   async function updateSplashPreview() {
@@ -231,7 +231,7 @@ async function initGeneralSettings() {
       const brandSub = doc.querySelector('.brand .subtitle');
       const quoteEl = doc.getElementById('quote');
 
-      const name = splashProgramName?.value?.trim() || 'LessonPlugin';
+      const name = splashProgramName?.value?.trim() || 'OrbiBoard';
       const desc = splashProgramDesc?.value?.trim() || '插件化大屏课堂辅助工具';
       const quoteEnabled = !!(document.getElementById('splash-quote-enabled')?.checked);
       const style = getSelectedBgStyle();
@@ -311,7 +311,7 @@ async function initGeneralSettings() {
       const frame = splashPreviewFrame;
       if (!frame || !frame.contentWindow || !frame.contentWindow.document) return;
       const doc = frame.contentWindow.document;
-      const name = splashProgramName?.value?.trim() || 'LessonPlugin';
+      const name = splashProgramName?.value?.trim() || 'OrbiBoard';
       await renderPreviewQuoteFromSource(doc, name, true);
     });
   }
