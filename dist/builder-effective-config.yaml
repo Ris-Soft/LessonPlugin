@@ -25,4 +25,4 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
 files: []
-electronVersion: 38.2.2
+electronVersion: 38.7.2
