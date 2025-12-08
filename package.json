@@ -6,6 +6,8 @@
     "start": "electron .",
     "run": "electron .",
     "dev": "node scripts/dev-server.js",
+    "dev:plugins": "node scripts/dev-plugins.js",
+    "pack:plugins": "node scripts/pack-plugins.js",
     "build": "electron-builder",
     "build:linux": "electron-builder --linux"
   },

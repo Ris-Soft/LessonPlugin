@@ -280,9 +280,9 @@ app.whenReady().then(async () => {
     createSplashWindow();
   }
 
-  // 将插件根目录迁移到用户数据目录，避免升级或安装覆盖应用资源导致用户插件与配置丢失
   const userRoot = path.join(app.getPath('userData'), 'LessonPlugin');
-  userPluginsRoot = path.join(userRoot, 'plugins');
+  const devPluginsOverride = String(process.env.LP_DEV_PLUGINS || '').trim();
+  userPluginsRoot = devPluginsOverride ? devPluginsOverride : path.join(userRoot, 'plugins');
   userComponentsRoot = path.join(userRoot, 'components');
   const userRendererRoot = path.join(userRoot, 'renderer');
   shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
@@ -294,7 +294,7 @@ app.whenReady().then(async () => {
   // 可选：强制同步内置插件到用户目录（用于开发或修复用户目录旧版本）
   try {
     const forceSyncEnv = String(process.env.LP_FORCE_PLUGIN_SYNC || '').toLowerCase();
-    const shouldForceSync = true;
+    const shouldForceSync = !devPluginsOverride && (forceSyncEnv === '1' || forceSyncEnv === 'true');
     if (shouldForceSync) {
       const shippedEntries = fs.readdirSync(shippedPluginsRoot).filter((n) => {
         const p = path.join(shippedPluginsRoot, n);
@@ -357,10 +357,10 @@ app.whenReady().then(async () => {
   } catch {}
   // 首次运行填充内置插件与默认配置（仅当用户插件目录为空时）
   try {
-    const entries = fs.readdirSync(userPluginsRoot).filter((n) => {
+    const entries = fs.existsSync(userPluginsRoot) ? fs.readdirSync(userPluginsRoot).filter((n) => {
       const p = path.join(userPluginsRoot, n);
       return fs.existsSync(p) && fs.statSync(p).isDirectory();
-    });
+    }) : [];
     const needSeed = entries.length === 0;
     if (needSeed) {
       // 复制 shipped plugins 下的各插件目录与 config.json 到用户目录
@@ -516,6 +516,9 @@ app.whenReady().then(async () => {
 
   const manifestPath = path.join(userPluginsRoot, 'plugins.json');
   const configPath = path.join(userPluginsRoot, 'config.json');
+  try { if (!fs.existsSync(userPluginsRoot)) fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch {}
+  try { if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, JSON.stringify({ enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} }, null, 2), 'utf-8'); } catch {}
+  try { if (!fs.existsSync(manifestPath)) fs.writeFileSync(manifestPath, JSON.stringify({ plugins: [] }, null, 2), 'utf-8'); } catch {}
 
   pluginManager.init({ manifestPath, configPath });
 
@@ -535,6 +538,29 @@ app.whenReady().then(async () => {
   } catch (err) {
     sendSplashProgress({ stage: 'error', message: `插件加载失败: ${err.message}` });
   }
+
+  try {
+    const wantWatch = devPluginsOverride && String(process.env.LP_DEV_PLUGINS_WATCH || '1') !== '0';
+    if (wantWatch) {
+      const debounce = new Map();
+      const list = await pluginManager.getPlugins();
+      for (const p of (list || [])) {
+        const baseDir = p.local ? path.join(path.dirname(manifestPath), p.local) : null;
+        if (!baseDir || !fs.existsSync(baseDir)) continue;
+        try {
+          const watcher = fs.watch(baseDir, { recursive: true }, () => {
+            const key = p.id || p.name;
+            const last = debounce.get(key) || 0;
+            const now = Date.now();
+            if (now - last < 300) return;
+            debounce.set(key, now);
+            (async () => { try { await pluginManager.toggle(key, false); await pluginManager.toggle(key, true); } catch {} })();
+          });
+          watcher.on('error', () => {});
+        } catch {}
+      }
+    }
+  } catch {}
 
   // 创建“打开用户数据”快捷脚本（每次启动检查，缺失则补齐）
   ensureUserDataShortcut();
