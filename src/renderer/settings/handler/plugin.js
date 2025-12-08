@@ -394,3 +394,123 @@ function renderPlugin(item) {
   });
   return el;
 }
+
+function renderPluginIcon(item) {
+  const el = document.createElement('div');
+  el.className = 'plugin-tile';
+  const iconClass = item.icon || 'ri-puzzle-line';
+  el.innerHTML = `
+    <div class="tile-icon"><i class="${iconClass}"></i></div>
+    <div class="tile-label">${item.name}</div>
+  `;
+  if (!item.enabled) {
+    el.classList.add('disabled');
+    const mark = document.createElement('div');
+    mark.className = 'tile-status';
+    mark.textContent = '禁用';
+    el.appendChild(mark);
+  }
+  const first = Array.isArray(item.actions) ? item.actions.find(a => typeof a.target === 'string' && a.target) : null;
+  el.addEventListener('click', async () => {
+    const key = item.id || item.name;
+    if (!item.enabled) { showToast('插件未启用', { type: 'warning', duration: 2000 }); return; }
+    if (first) {
+      await window.settingsAPI?.pluginCall?.(key, first.target, Array.isArray(first.args) ? first.args : []);
+    } else {
+      showToast('该插件没有动作', { type: 'warning', duration: 2000 });
+    }
+  });
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const x = e.clientX;
+    const y = e.clientY;
+    const overlayOld = document.querySelector('.app-menu-overlay');
+    try { overlayOld && overlayOld.remove(); } catch {}
+    const overlay = document.createElement('div');
+    overlay.className = 'app-menu-overlay';
+    const menu = document.createElement('div');
+    menu.className = 'app-menu';
+    const items = [];
+    const rest = Array.isArray(item.actions) ? item.actions.filter(a => a !== first) : [];
+    if (first) items.push({ icon: first.icon || 'ri-play-line', text: (first.text || first.id || '执行'), run: () => window.settingsAPI?.pluginCall?.(item.id || item.name, first.target, Array.isArray(first.args) ? first.args : []) });
+    rest.forEach(a => items.push({ icon: a.icon || 'ri-play-line', text: a.text || a.id || '执行', run: () => window.settingsAPI?.pluginCall?.(item.id || item.name, a.target, Array.isArray(a.args) ? a.args : []) }));
+    items.push({ sep: true });
+    items.push({ icon: 'ri-information-line', text: '关于插件', run: () => showPluginAboutModal(item) });
+    items.push({ icon: 'ri-links-line', text: '创建快捷方式', run: async () => {
+      const pluginId = item.id || item.name;
+      const metaActions = Array.isArray(item.actions) ? item.actions.filter(a => typeof a.target === 'string' && a.target) : [];
+      let eventDefs = [];
+      try { const evRes = await window.settingsAPI?.pluginAutomationListEvents?.(pluginId); eventDefs = Array.isArray(evRes?.events) ? evRes.events : []; } catch {}
+      const candidates = [];
+      for (const a of metaActions) { candidates.push({ kind: 'meta', id: a.id || a.target, label: a.text || a.id || a.target, icon: a.icon || item.icon || 'ri-links-line', target: a.target, args: Array.isArray(a.args) ? a.args : [] }); }
+      for (const e of eventDefs) { candidates.push({ kind: 'event', id: e.id || e.name, label: e.name || e.id, icon: item.icon || 'ri-links-line', def: e }); }
+      if (!candidates.length) { await showAlert('该插件未定义可用于快捷方式的动作'); return; }
+      let chosen = null; let params = [];
+      if (candidates.length === 1) { chosen = candidates[0]; if (chosen.kind === 'event' && Array.isArray(chosen.def?.params) && chosen.def.params.length) { const edited = await showParamsEditorForEvent(chosen.def.params, []); if (edited === null) return; params = edited; } else if (chosen.kind === 'meta') { params = Array.isArray(chosen.args) ? chosen.args : []; } }
+      else { const sel = await showActionSelector(candidates); if (!sel) return; chosen = candidates.find(c => c.kind === sel.kind && c.id === sel.id); if (!chosen) return; if (chosen.kind === 'event' && Array.isArray(chosen.def?.params) && chosen.def.params.length) { const edited = await showParamsEditorForEvent(chosen.def.params, []); if (edited === null) return; params = edited; } else if (chosen.kind === 'meta') { params = Array.isArray(chosen.args) ? chosen.args : []; } }
+      const eventName = (chosen.kind === 'meta') ? chosen.target : (chosen.def?.name || chosen.def?.id);
+      const action = (chosen.kind === 'meta') ? { type: 'pluginAction', pluginId, target: eventName, params: Array.isArray(params) ? params : [] } : { type: 'pluginEvent', pluginId, event: eventName, params: Array.isArray(params) ? params : [] };
+      const ok = await showShortcutCreateDialog(item, chosen, pluginId, action);
+      if (ok?.res) { const proto = ok.res?.protocolText ? `LessonPlugin://task/${encodeURIComponent(ok.res.protocolText)}` : ''; const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式'; await showAlert(msg); }
+    } });
+    items.push({ icon: item.enabled ? 'ri-toggle-line' : 'ri-toggle-fill', text: item.enabled ? '禁用插件' : '启用插件', run: async () => { const key = item.id || item.name; const res = await window.settingsAPI?.togglePlugin?.(key, !item.enabled); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); await renderPluginsByMode(mode); try { overlay.remove(); } catch {}; if (Array.isArray(res?.logs) && res.logs.length) { try { await showLogModal('插件初始化日志', res.logs); } catch {} } } });
+    items.push({ icon: 'ri-delete-bin-line', text: '卸载插件', run: async () => { const { confirmed, dep } = await showUninstallConfirm(item); if (!confirmed) return; const key = item.id || item.name; try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch {} } } } } catch {} const out = await window.settingsAPI?.uninstallPlugin?.(key); if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; } const container = document.getElementById('plugins'); const list = await fetchPlugins(); container.innerHTML = ''; const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin'); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); if (mode === 'icon') { filtered.forEach((p) => container.appendChild(renderPluginIcon(p))); container.classList.add('icons-view'); } else { filtered.forEach((p) => container.appendChild(renderPlugin(p))); container.classList.remove('icons-view'); } showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 }); } });
+    items.forEach(it => {
+      if (it.sep) { const s = document.createElement('div'); s.className = 'app-menu-sep'; menu.appendChild(s); return; }
+      const btn = document.createElement('div');
+      btn.className = 'app-menu-item';
+      btn.innerHTML = `<i class="${it.icon}"></i><span>${it.text}</span>`;
+      btn.addEventListener('click', () => {
+        try { overlay.remove(); } catch {}
+        try { Promise.resolve().then(() => it.run()).catch(() => {}); } catch {}
+      });
+      menu.appendChild(btn);
+    });
+    overlay.appendChild(menu);
+    document.body.appendChild(overlay);
+    if (x && y) { menu.style.left = x + 'px'; menu.style.top = y + 'px'; }
+    const margin = 8;
+    const w = menu.offsetWidth;
+    const h = menu.offsetHeight;
+    let left = Math.min(Math.max(margin, x), (window.innerWidth || document.documentElement.clientWidth) - w - margin);
+    let top = Math.min(Math.max(margin, y), (window.innerHeight || document.documentElement.clientHeight) - h - margin);
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    const close = (ev) => { const t = ev.target; if (!menu.contains(t)) { try { overlay.remove(); document.removeEventListener('mousedown', close); } catch {} } };
+    document.addEventListener('mousedown', close);
+  });
+  return el;
+}
+
+async function renderPluginsByMode(mode) {
+  const container = document.getElementById('plugins');
+  const list = await fetchPlugins();
+  container.innerHTML = '';
+  const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin');
+  if (mode === 'icon') {
+    filtered.forEach((p) => container.appendChild(renderPluginIcon(p)));
+    container.classList.add('icons-view');
+  } else {
+    filtered.forEach((p) => container.appendChild(renderPlugin(p)));
+    container.classList.remove('icons-view');
+  }
+}
+
+window.initPluginsPage = async function() {
+  const mode = (localStorage.getItem('pluginsViewMode') || 'card');
+  const card = document.getElementById('view-card');
+  const icon = document.getElementById('view-icon');
+  if (card) card.checked = mode !== 'icon';
+  if (icon) icon.checked = mode === 'icon';
+  await renderPluginsByMode(mode);
+  const switcher = document.getElementById('plugins-view-switch');
+  if (switcher) {
+    switcher.addEventListener('click', async (e) => {
+      const tgt = e.target;
+      const val = tgt && tgt.value ? tgt.value : (tgt && tgt.getAttribute('for') ? (tgt.getAttribute('for') === 'view-icon' ? 'icon' : 'card') : null);
+      if (!val) return;
+      localStorage.setItem('pluginsViewMode', val);
+      await renderPluginsByMode(val);
+    });
+  }
+};

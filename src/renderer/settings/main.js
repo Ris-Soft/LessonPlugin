@@ -36,7 +36,7 @@ async function main() {
     }
   } catch {}
   navItems.forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       navItems.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       const page = btn.dataset.page;
@@ -56,15 +56,7 @@ async function main() {
       } else if (page === 'market') {
         initMarketPage();
       } else if (page === 'plugins') {
-        (async () => {
-          try {
-            const container = document.getElementById('plugins');
-            const list = await fetchPlugins();
-            container.innerHTML = '';
-            const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
-            filtered.forEach((p) => container.appendChild(renderPlugin(p)));
-          } catch {}
-        })();
+        try { await window.initPluginsPage?.(); } catch {}
       } else if (page === 'components') {
         try { window.initComponentsPage?.(); } catch {}
       } else if (page === 'defaults') {
@@ -77,7 +69,7 @@ async function main() {
 
   // 已移除全局安装进度展示（global-progress）
 
-  const navigateToPage = (page) => {
+  const navigateToPage = async (page) => {
     try {
       const btn = Array.from(navItems).find(b => b.dataset.page === page);
       navItems.forEach((b) => b.classList.remove('active'));
@@ -98,15 +90,7 @@ async function main() {
   } else if (page === 'market') {
       initMarketPage();
     } else if (page === 'plugins') {
-      (async () => {
-        try {
-          const container = document.getElementById('plugins');
-          const list = await fetchPlugins();
-          container.innerHTML = '';
-          const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
-          filtered.forEach((p) => container.appendChild(renderPlugin(p)));
-        } catch {}
-      })();
+      try { await window.initPluginsPage?.(); } catch {}
     } else if (page === 'components') {
       try { window.initComponentsPage?.(); } catch {}
     } else if (page === 'defaults') {
@@ -116,10 +100,10 @@ async function main() {
     }
     } catch {}
   };
-  window.settingsAPI?.onNavigate?.((page) => navigateToPage(page));
+  window.settingsAPI?.onNavigate?.((page) => { try { navigateToPage(page); } catch {} });
   window.settingsAPI?.onOpenPluginInfo?.(async (pluginKey) => {
     try {
-      navigateToPage('plugins');
+      await navigateToPage('plugins');
       const list = await fetchPlugins();
       const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
       const item = filtered.find((p) => (p.id || p.name) === pluginKey);
@@ -133,7 +117,7 @@ async function main() {
 
   window.settingsAPI?.onOpenStoreItem?.(async (payload) => {
     try {
-      navigateToPage('market');
+      await navigateToPage('market');
       const base = await getMarketBase();
       const catlog = await fetchMarket('/api/market/catalog');
       const type = String(payload?.type || 'plugin');
@@ -150,7 +134,7 @@ async function main() {
 
   window.settingsAPI?.onMarketInstall?.(async (payload) => {
     try {
-      navigateToPage('market');
+      await navigateToPage('market');
       const catlog = await fetchMarket('/api/market/catalog');
       const type = String(payload?.type || 'plugin');
       const id = String(payload?.id || '').trim();
@@ -163,10 +147,7 @@ async function main() {
 
   // 渲染插件列表
   const container = document.getElementById('plugins');
-  const list = await fetchPlugins();
-  container.innerHTML = '';
-  const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0);
-  filtered.forEach((p) => container.appendChild(renderPlugin(p)));
+  try { await window.initPluginsPage?.(); } catch {}
 
   // 打开设置页时检查缺失依赖并提示安装（避免占用启动时间）
   let depsPrompted = false;

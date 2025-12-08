@@ -75,7 +75,7 @@
       let membersSingle=[]
       try{const mg=p.get('membersGroup');if(mg)membersGroup=JSON.parse(mg)}catch{}
       try{const ms=p.get('membersSingle');if(ms)membersSingle=JSON.parse(ms)}catch{}
-      const groupItems=membersGroup.length?membersGroup:members.filter(m=>Array.isArray(m?.names)&&m.names.length>1)
+      const groupItems=membersGroup.length?membersGroup:members.filter(m=>Array.isArray(m?.names)&&m.names.length>=1)
       const singleItems=membersSingle.length?membersSingle:members.filter(m=>Array.isArray(m?.names)&&m.names.length===1)
       const cols=[]
       const base=colsFromParam.length?colsFromParam:(groupItems.length?groupItems:members)

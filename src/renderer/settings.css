@@ -395,6 +395,15 @@ header {
   margin: 20px;
 }
 
+/* 插件页标题区域：左文案 + 右视图切换器 */
+#page-plugins > .plugins-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+#page-plugins > .plugins-header .header-left { display: grid; gap: 4px; }
+#page-plugins > .plugins-header .header-right { justify-self: end; }
+
 header h1 {
   margin: 0 0 6px 0;
 }
@@ -414,6 +423,42 @@ main {
   gap: 12px;
   padding: 10px 20px 20px;
 }
+
+/* 图标视图 */
+.plugins.icons-view {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 16px;
+}
+.plugin-tile {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 16px 10px;
+  cursor: default;
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+  position: relative;
+}
+.plugin-tile:hover {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.plugin-tile .tile-icon i {
+  font-size: 34px;
+  color: #ffffff;
+}
+.plugin-tile .tile-label {
+  margin-top: 8px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--fg);
+}
+.plugin-tile.disabled .tile-icon i { color: #94a3b8; opacity: 0.6; }
+.plugin-tile.disabled .tile-label { color: #94a3b8; }
+.plugin-tile .tile-status { position: absolute; top: 8px; right: 8px; font-size: 11px; color: #ffffff; border: 1px solid var(--border); border-radius: 999px; padding: 2px 6px; background: rgba(220, 38, 38, 0.35); }
 
 /* 通用设置表单 */
 .form {
@@ -1933,7 +1978,7 @@ a.topnav-item { text-decoration: none; }
 
 /* 自绘应用菜单 */
 .app-menu-overlay { position: fixed; inset: 0; z-index: 2000; background: transparent; }
-.app-menu { position: absolute; min-width: 200px; background: #1b1f2a; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); padding: 6px 4px; }
+.app-menu { position: absolute; min-width: 200px; background: #1b1f2a; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); padding: 6px 4px; max-height: 70vh; overflow-y: auto; overflow-x: hidden; }
 .app-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--fg); cursor: pointer; border-radius: 6px; }
 .app-menu-item i { font-size: 18px; }
 .app-menu-item:hover { background: rgba(255, 255, 255, 0.06); }

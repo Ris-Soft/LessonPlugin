@@ -45,9 +45,19 @@
       </div>
       <main id="content">
         <section id="page-plugins">
-          <header>
-            <h1>插件管理</h1>
-            <p>对已安装的插件进行管理或配置</p>
+          <header class="plugins-header">
+            <div class="header-left">
+              <h1>插件管理</h1>
+              <p>对已安装的插件进行管理或配置</p>
+            </div>
+            <div class="header-right">
+              <div id="plugins-view-switch" class="options compact" role="group" aria-label="视图类型">
+                <input type="radio" id="view-card" name="pluginsView" value="card" />
+                <label for="view-card"><i class="ri-layout-3-line"></i> 卡片</label>
+                <input type="radio" id="view-icon" name="pluginsView" value="icon" />
+                <label for="view-icon"><i class="ri-apps-2-line"></i> 图标</label>
+              </div>
+            </div>
           </header>
           <div id="drop-install" class="drop-install">
             <i class="ri-folder-zip-line"></i>
