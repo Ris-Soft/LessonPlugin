@@ -223,12 +223,36 @@ class AutomationManager {
       const desktop = this.app.getPath('desktop');
       let shortcutPath = '';
       if (process.platform === 'win32') {
-        const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
+        const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.lnk';
         shortcutPath = path.join(desktop, safeFile);
-        const urlLine = `URL=OrbiBoard://task/${encodeURIComponent(protoText)}`;
-        const iconLines = icoOk ? `IconFile=${icoPath}\r\nIconIndex=0` : '';
-        const content = `[InternetShortcut]\r\n${urlLine}\r\n${iconLines}\r\n`;
-        try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+        const execPath = process.execPath;
+        const args = `OrbiBoard://task/${encodeURIComponent(protoText)}`;
+        let created = false;
+        try {
+          const ps = [
+            `$ws = New-Object -ComObject WScript.Shell;`,
+            `$s = $ws.CreateShortcut(\"${shortcutPath.replace(/\\/g,'\\\\')}\");`,
+            `$s.TargetPath = \"${execPath.replace(/\\/g,'\\\\')}\";`,
+            `$s.Arguments = \"${args}\";`,
+            icoOk ? `$s.IconLocation = \"${icoPath.replace(/\\/g,'\\\\')},0\";` : ``,
+            `$s.WorkingDirectory = \"${path.dirname(execPath).replace(/\\/g,'\\\\')}\";`,
+            `$s.Save()`
+          ].filter(Boolean).join(' ');
+          await new Promise((resolve, reject) => {
+            const p = spawn('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-Command', ps], { windowsHide: true });
+            p.on('error', reject);
+            p.on('exit', (code) => { if (code === 0 && fs.existsSync(shortcutPath)) resolve(); else reject(new Error('powershell_failed')); });
+          });
+          created = true;
+        } catch {}
+        if (!created) {
+          const fallbackFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
+          shortcutPath = path.join(desktop, fallbackFile);
+          const urlLine = `URL=OrbiBoard://task/${encodeURIComponent(protoText)}`;
+          const iconLines = icoOk ? `IconFile=${icoPath}\r\nIconIndex=0` : '';
+          const content = `[InternetShortcut]\r\n${urlLine}\r\n${iconLines}\r\n`;
+          try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+        }
       } else if (process.platform === 'darwin') {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.command';
         shortcutPath = path.join(desktop, safeFile);
@@ -238,9 +262,11 @@ class AutomationManager {
       } else {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.desktop';
         shortcutPath = path.join(desktop, safeFile);
-        const execLine = `Exec=xdg-open "OrbiBoard://task/${encodeURIComponent(protoText)}"`;
+        const execPath = process.env.APPIMAGE || process.execPath;
+        const execLine = `Exec="${execPath}" "OrbiBoard://task/${encodeURIComponent(protoText)}"`;
+        const tryExecLine = `TryExec=${execPath}`;
         const iconLine = pngOk ? `Icon=${pngPath}` : '';
-        const content = `[Desktop Entry]\nType=Application\nName=${name}\n${execLine}\n${iconLine}\nTerminal=false\nCategories=Utility;\n`;
+        const content = `[Desktop Entry]\nType=Application\nName=${name}\n${execLine}\n${tryExecLine}\n${iconLine}\nTerminal=false\nCategories=Utility;\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
         try { fs.chmodSync(shortcutPath, 0o755); } catch {}
       }

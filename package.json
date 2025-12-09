@@ -23,6 +23,9 @@
     "productName": "OrbiBoard",
     "icon": "logo.png",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "protocols": [
+      { "name": "OrbiBoard", "schemes": ["orbiboard", "OrbiBoard"] }
+    ],
     "win": {
       "icon": "icon.ico"
     },
