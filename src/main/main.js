@@ -562,6 +562,23 @@ app.whenReady().then(async () => {
   // 最后对齐并启动自动化计时器（此时插件注册已完成）
   automationManager.init();
 
+  try {
+    const arg = (Array.isArray(process.argv) ? process.argv.find((s) => /^OrbiBoard:\/\//i.test(String(s || ''))) : null);
+    if (arg) {
+      const mTask = String(arg).match(/^OrbiBoard:\/\/task\/(.+)$/i);
+      const mStore = String(arg).match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      if (mTask) {
+        const text = decodeURIComponent(mTask[1]);
+        if (!__shouldSkipTask(text)) { try { await automationManager.invokeProtocol(text); } catch {} }
+      } else if (mStore) {
+        const install = !!mStore[1];
+        const type = mStore[2];
+        const id = decodeURIComponent(mStore[3]);
+        __openStore(install, type, id);
+      }
+    }
+  } catch {}
+
   // 注册协议处理（OrbiBoard://task/<text>）
   try {
     if (process.defaultApp) {
@@ -579,6 +596,7 @@ app.whenReady().then(async () => {
     if (arg) {
       const mTask = arg.match(/^OrbiBoard:\/\/task\/(.+)$/i);
       const mStore = arg.match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      const mOpen = arg.match(/^OrbiBoard:\/\/open\/settings$/i);
       if (mTask) {
         const text = decodeURIComponent(mTask[1]);
         if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
@@ -587,6 +605,13 @@ app.whenReady().then(async () => {
         const type = mStore[2];
         const id = decodeURIComponent(mStore[3]);
         __openStore(install, type, id);
+      } else if (mOpen) {
+        try {
+          if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
+          if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+          settingsWindow.show();
+          settingsWindow.focus();
+        } catch {}
       }
     }
     // 若为普通重复启动（非协议调用），打开设置页面；协议调用不创建主窗口
@@ -604,6 +629,7 @@ app.whenReady().then(async () => {
       const u = String(url || '');
       const mTask = u.match(/^OrbiBoard:\/\/task\/(.+)$/i);
       const mStore = u.match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
+      const mOpen = u.match(/^OrbiBoard:\/\/open\/settings$/i);
       if (mTask) {
         const text = decodeURIComponent(mTask[1]);
         if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
@@ -612,6 +638,13 @@ app.whenReady().then(async () => {
         const type = mStore[2];
         const id = decodeURIComponent(mStore[3]);
         __openStore(install, type, id);
+      } else if (mOpen) {
+        try {
+          if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
+          if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+          settingsWindow.show();
+          settingsWindow.focus();
+        } catch {}
       }
     });
   }
@@ -847,6 +880,18 @@ ipcMain.handle('settings:showMenu', async (event, coords) => {
   ]);
   try { menu.popup({ window: win }); } catch {}
   return { ok: true };
+});
+
+ipcMain.handle('system:openSettings', async () => {
+  try {
+    if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
+    if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+    settingsWindow.show();
+    settingsWindow.focus();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 });
 
 // NPM 管理 IPC

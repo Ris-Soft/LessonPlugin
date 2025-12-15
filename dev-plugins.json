@@ -10,6 +10,7 @@
     "../notify-plugin",
     "../profiles-seating",
     "../profiles-students",
+    "../profiles-selector",
     "../rollcall-random",
     "../screen-compass",
     "../smart-listening",

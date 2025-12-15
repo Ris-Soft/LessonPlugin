@@ -36,6 +36,12 @@
       .btn{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--fg);cursor:pointer}
       .btn.small{padding:4px 8px}
       .muted{color:var(--muted)}
+      body{overflow:auto}
+      ::-webkit-scrollbar{width:10px}
+      ::-webkit-scrollbar-thumb{background:rgba(138,180,248,0.35);border-radius:10px;border:2px solid rgba(0,0,0,0)}
+      ::-webkit-scrollbar-thumb:hover{background:rgba(138,180,248,0.55)}
+      ::-webkit-scrollbar-track{background:rgba(255,255,255,0.06);border-radius:10px}
+      *{scrollbar-color: rgba(138,180,248,0.55) rgba(255,255,255,0.06); scrollbar-width: thin}
     </style>
   </head>
   <body>
@@ -56,6 +62,7 @@
           <button class="icon-btn" id="groupNext"><i class="ri-arrow-right-s-line"></i></button>
         </div>
         <div id="calibSingles"></div>
+        <div id="calibDynamics"></div>
         <div id="calibMsg" class="muted" style="margin-top:6px"></div>
       </div>
     </div>
@@ -115,13 +122,19 @@
       function previewLocal(){ }
       function computeGroupPreview(){ try{ const cfg=cfgCache; if(!cfg) return group||''; const groups=Array.isArray(cfg.groups)?cfg.groups:[]; const rule=cfg.rule||{}; let gi= Number.isFinite(rule.currentGroupIndex) ? rule.currentGroupIndex : 0; return groups[gi]?.name||'' }catch{ return group||'' } }
       function computeSinglePreview(role){ try{ const cfg=cfgCache; if(!cfg) return ''; const lists= typeof cfg.singleRoleLists==='object' && cfg.singleRoleLists ? cfg.singleRoleLists : {}; const rule=cfg.rule||{}; const indices= typeof rule.singleRoleIndices==='object' && rule.singleRoleIndices ? rule.singleRoleIndices : {}; const arr=Array.isArray(lists[role])?lists[role]:[]; if(!arr.length) return '未设置'; const base= Number.isFinite(indices[role]) ? indices[role] : 0; const pick=arr[base]||''; return String(pick||'') }catch{ return '' } }
-      function renderCalibDisplay(){ try{ const gp=document.getElementById('calibGroupPreview'); gp.textContent=computeGroupPreview(); Object.keys(singleValueEls).forEach(r=>{ singleValueEls[r].textContent=computeSinglePreview(r) }) }catch{} }
+      function computeDynamicActive(roleDyn){ try{ const cfg=cfgCache; if(!cfg) return ''; const rule=cfg.rule||{}; const gi= Number.isFinite(rule.currentGroupIndex) ? rule.currentGroupIndex : 0; const dyn= typeof rule.dynamicActiveRole==='object' && rule.dynamicActiveRole ? rule.dynamicActiveRole : {}; const per= typeof dyn[String(gi)]==='object' && dyn[String(gi)] ? dyn[String(gi)] : {}; const active= String(per[roleDyn]|| roleDyn|| ''); return active }catch{ return '' } }
+      
+      function renderCalibDisplay(){ try{ const gp=document.getElementById('calibGroupPreview'); gp.textContent=computeGroupPreview(); Object.keys(singleValueEls).forEach(r=>{ singleValueEls[r].textContent=computeSinglePreview(r) }); Object.keys(dynamicValueEls).forEach(r=>{ const els=dynamicValueEls[r]||{}; if(els.active) els.active.textContent=computeDynamicActive(r) }) }catch{} }
       async function refreshFromConfig(){ try{ if(!api?.pluginCall) return; let r=await api.pluginCall('duty.easy','getPreview'); r=r?.result||r; const list=Array.isArray(r?.list)?r.list:[]; if(list.length) renderFromItem(list[0]); await loadCfg(); renderCalibDisplay() }catch{} }
       const calibSingles=document.getElementById('calibSingles')
+      const calibDynamics=document.getElementById('calibDynamics')
       const state={ groupDelta:0, singleDelta:{} }
       let dirty=false
       const singleValueEls={}
+      const dynamicValueEls={}
       const makeSingleRow=(role)=>{ const row=document.createElement('div'); row.className='calib-row'; const lab=document.createElement('div'); lab.className='calib-label'; lab.textContent=role; const left=document.createElement('button'); left.className='icon-btn'; left.innerHTML='<i class="ri-arrow-left-s-line"></i>'; const val=document.createElement('div'); val.className='calib-value'; singleValueEls[role]=val; const right=document.createElement('button'); right.className='icon-btn'; right.innerHTML='<i class="ri-arrow-right-s-line"></i>'; left.addEventListener('click',async ()=>{ await persistDelta('single', role, -1) }); right.addEventListener('click',async ()=>{ await persistDelta('single', role, 1) }); row.appendChild(lab); row.appendChild(left); row.appendChild(val); row.appendChild(right); return row }
+      const makeDynamicRoleRow=(roleDyn)=>{ const row=document.createElement('div'); row.className='calib-row'; const lab=document.createElement('div'); lab.className='calib-label'; lab.textContent=roleDyn; const left=document.createElement('button'); left.className='icon-btn'; left.innerHTML='<i class="ri-arrow-left-s-line"></i>'; const active=document.createElement('div'); active.className='calib-value'; const right=document.createElement('button'); right.className='icon-btn'; right.innerHTML='<i class="ri-arrow-right-s-line"></i>'; left.addEventListener('click',async ()=>{ await persistDelta('dynamic-role', roleDyn, -1) }); right.addEventListener('click',async ()=>{ await persistDelta('dynamic-role', roleDyn, 1) }); dynamicValueEls[roleDyn]=(dynamicValueEls[roleDyn]||{}); dynamicValueEls[roleDyn].active=active; row.appendChild(lab); row.appendChild(left); row.appendChild(active); row.appendChild(right); return row }
+      
       async function persistDelta(type, role, step){ try{
         if(!api?.pluginCall) return; let cfgRes=await api.pluginCall('duty.easy','getConfig'); cfgRes=cfgRes?.result||cfgRes; const cfg=cfgRes?.config||{}
         const groups=Array.isArray(cfg.groups)?cfg.groups:[]
@@ -132,6 +145,8 @@
         let gi= Number.isFinite(rule.currentGroupIndex) ? rule.currentGroupIndex : 0
         if(type==='group' && groups.length){ gi=norm(gi+step, groups.length) }
         if(type==='single' && role){ const arr=Array.isArray(lists[role])?lists[role]:[]; if(arr.length){ const base= Number.isFinite(indices[role]) ? indices[role] : 0; indices[role]=norm(base+step, arr.length) } }
+        if(type==='dynamic-role' && role){ const dynAct= typeof rule.dynamicActiveRole==='object' && rule.dynamicActiveRole ? { ...rule.dynamicActiveRole } : {}; const giKey=String(gi); const per= typeof dynAct[giKey]==='object' && dynAct[giKey] ? { ...dynAct[giKey] } : {}; const options=(Array.isArray(cfg.roles)?cfg.roles:[]).filter(rn=>!(Array.isArray(cfg.dynamicRoles)&&cfg.dynamicRoles.includes(rn))); const cur=String(per[role]|| role||''); const idx=Math.max(0, options.indexOf(cur)); const next= options.length ? options[norm(idx+step, options.length)] : cur; per[role]=next; dynAct[giKey]=per; rule.dynamicActiveRole=dynAct }
+        
         const nextRule={ ...rule, currentGroupIndex: gi, singleRoleIndices: indices }
         await api.pluginCall('duty.easy','saveConfig',[{ rule: nextRule }])
         await refreshFromConfig()
@@ -139,8 +154,7 @@
       document.getElementById('groupPrev').addEventListener('click',async ()=>{ await persistDelta('group', null, -1) })
       document.getElementById('groupNext').addEventListener('click',async ()=>{ await persistDelta('group', null, 1) })
       const calibMsg=document.getElementById('calibMsg')
-      async function initCalib(){ try{ await loadCfg(); const roles=Array.isArray(cfgCache?.singleRoles)?cfgCache.singleRoles:[]; const conds= typeof cfgCache?.singleRoleConditions==='object' && cfgCache.singleRoleConditions ? cfgCache.singleRoleConditions : {}; const lists= typeof cfgCache?.singleRoleLists==='object' && cfgCache.singleRoleLists ? cfgCache.singleRoleLists : {}; calibSingles.innerHTML=''; roles.forEach(r=>{ const role=String(r||'').trim(); const arr=Array.isArray(lists[role])?lists[role]:[]; const canShow=matchCond(date, conds[role]||null); if(role && arr.length && canShow) { const row=makeSingleRow(role); calibSingles.appendChild(row); const left=row.querySelector('.icon-btn'); const right=row.querySelectorAll('.icon-btn')[1]; left.addEventListener('click', async ()=>{ await persistDelta('single', role, -1) }); right.addEventListener('click', async ()=>{ await persistDelta('single', role, 1) }); }
-        }); renderCalibDisplay() }catch{} }
+      async function initCalib(){ try{ await loadCfg(); const roles=Array.isArray(cfgCache?.singleRoles)?cfgCache.singleRoles:[]; const conds= typeof cfgCache?.singleRoleConditions==='object' && cfgCache.singleRoleConditions ? cfgCache.singleRoleConditions : {}; const lists= typeof cfgCache?.singleRoleLists==='object' && cfgCache.singleRoleLists ? cfgCache.singleRoleLists : {}; const dynRoles= Array.isArray(cfgCache?.dynamicRoles) ? cfgCache.dynamicRoles : []; const rolesAll= Array.isArray(cfgCache?.roles) ? cfgCache.roles : []; const dynFiltered= dynRoles.filter(n=>rolesAll.includes(n) && n!=='新分工'); calibSingles.innerHTML=''; calibDynamics.innerHTML=''; roles.forEach(r=>{ const role=String(r||'').trim(); const arr=Array.isArray(lists[role])?lists[role]:[]; const canShow=matchCond(date, conds[role]||null); if(role && arr.length && canShow) { const row=makeSingleRow(role); calibSingles.appendChild(row); const left=row.querySelector('.icon-btn'); const right=row.querySelectorAll('.icon-btn')[1]; left.addEventListener('click', async ()=>{ await persistDelta('single', role, -1) }); right.addEventListener('click', async ()=>{ await persistDelta('single', role, 1) }); } }); dynFiltered.forEach(rDyn=>{ const rowA=makeDynamicRoleRow(rDyn); calibDynamics.appendChild(rowA) }); renderCalibDisplay() }catch{} }
       initCalib()
     </script>
   </body>

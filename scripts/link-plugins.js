@@ -28,6 +28,7 @@ function copyDir(src, dst) {
   ensureDir(dst);
   const items = fs.readdirSync(src);
   for (const it of items) {
+    if (it === '.git') continue;
     const sp = path.join(src, it);
     const dp = path.join(dst, it);
     let st;
@@ -42,6 +43,7 @@ function cleanExtra(dst, src) {
   for (const it of items) {
     const dp = path.join(dst, it);
     const sp = path.join(src, it);
+    if (it === '.git') { removeIfExists(dp); continue; }
     if (!fs.existsSync(sp)) removeIfExists(dp);
     else {
       let st;
@@ -77,6 +79,7 @@ function fingerprintDir(root) {
     let names = [];
     try { names = fs.readdirSync(dir); } catch { continue; }
     for (const name of names) {
+      if (name === '.git') continue;
       const subRel = rel ? path.join(rel, name) : name;
       const p = path.join(root, subRel);
       let st;
@@ -123,7 +126,7 @@ function main() {
     lastFinger.set(id, fp);
     try {
       const debounce = { t: 0 };
-      const w = fs.watch(abs, { recursive: true }, () => {
+      const w = fs.watch(abs, { recursive: true }, (eventType, filename) => {
         const now = Date.now();
         if (now - debounce.t < 600) return;
         debounce.t = now;
@@ -133,10 +136,11 @@ function main() {
         if (cur === prev) return;
         try { syncPlugin(abs, target); } catch {}
         lastFinger.set(id, cur);
-        console.log(`[${stamp()}] Synced ${id} → ${target}`);
+        const rel = filename ? String(filename) : '';
+        console.log(`[${stamp()}] Synced ${id}${rel ? `:${rel}` : ''} → ${target}`);
       });
       w.on('error', () => {});
-      console.log(`[${stamp()}] Watching ${abs} → ${target}`);
+      console.log(`[${stamp()}] Watching ${id} → ${target}`);
     } catch {}
   }
   console.log(`[${stamp()}] Plugins root (src): ${devRoot}`);
