@@ -32,14 +32,57 @@ function formatLine(level, args) {
   } catch { return `${ts} [${level}] ${args?.join(' ')}`; }
 }
 
+function detectOrigin() {
+  try {
+    const err = new Error();
+    const stack = String(err.stack || '');
+    const lines = stack.split(/\r?\n/).slice(1);
+    for (const line of lines) {
+      const m = line.match(/\((.*?):\d+:\d+\)|at\s+(?:.*?\s+)?(.*?):\d+:\d+/);
+      const file = m ? (m[1] || m[2]) : null;
+      if (!file) continue;
+      if (file.includes(path.sep + 'backendLog.js')) continue;
+      const norm = file.replace(/\\/g, '/');
+      const idx = norm.lastIndexOf('/plugins/');
+      if (idx >= 0) {
+        const rest = norm.slice(idx + '/plugins/'.length);
+        const seg = rest.split('/')[0];
+        const pid = seg || '';
+        return { sourceType: 'plugin', sourceId: pid, module: pid };
+      }
+      const base = path.basename(file);
+      const name = base.replace(/\.(js|ts|mjs|cjs)$/i, '');
+      return { sourceType: 'system', sourceId: name, module: name };
+    }
+  } catch {}
+  return { sourceType: 'system', sourceId: 'unknown', module: 'unknown' };
+}
+
 function append(level, args) {
   if (!enabled) return;
   const line = formatLine(level, args);
-  buffer.push(line);
+  const origin = detectOrigin();
+  const entry = {
+    ts: new Date().toISOString(),
+    level,
+    text: (() => {
+      try {
+        return args.map(a => {
+          if (typeof a === 'string') return a;
+          try { return JSON.stringify(a); } catch { return String(a); }
+        }).join(' ');
+      } catch { return String(args?.join(' ') || ''); }
+    })(),
+    sourceType: origin.sourceType,
+    sourceId: origin.sourceId,
+    module: origin.module
+  };
+  buffer.push(entry);
   if (buffer.length > maxBuffer) buffer = buffer.slice(buffer.length - maxBuffer);
   try { fs.appendFileSync(logFile, line + '\n', 'utf-8'); } catch {}
   for (const wc of Array.from(subscribers)) {
     try { wc.send('backend:log', line); } catch {}
+    try { wc.send('backend:log:entry', entry); } catch {}
   }
 }
 
@@ -73,13 +116,19 @@ function enableLogging(on) {
 
 function getLast(n = 20) {
   try {
-    // prioritize buffer; if file exists but buffer is empty (first run), read tail of file
-    if (buffer.length) return buffer.slice(Math.max(0, buffer.length - n));
+    if (buffer.length) return buffer.slice(Math.max(0, buffer.length - n)).map(e => `${e.ts} [${e.level}] ${e.text}`);
     if (fs.existsSync(logFile)) {
       const text = fs.readFileSync(logFile, 'utf-8');
       const lines = text.split(/\r?\n/).filter(Boolean);
       return lines.slice(Math.max(0, lines.length - n));
     }
+  } catch {}
+  return [];
+}
+
+function getLastEntries(n = 200) {
+  try {
+    if (buffer.length) return buffer.slice(Math.max(0, buffer.length - n));
   } catch {}
   return [];
 }
@@ -94,5 +143,7 @@ module.exports = {
   init,
   enableLogging,
   getLast,
-  subscribe
+  getLastEntries,
+  subscribe,
+  write: (level, ...args) => { try { append(String(level || 'info'), args); } catch {} }
 };

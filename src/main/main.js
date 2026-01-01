@@ -8,8 +8,9 @@ const https = require('https');
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
 const backendLog = require('./backendLog');
-const AutomationManager = require('./automationManager');
+const AutomationManager = require('./AutomationManager');
 const store = require('./store');
+const autoUpdater = require('./autoUpdater');
 // 让插件管理器可以访问 ipcMain（用于事件回调注册）
 pluginManager._ipcMain = ipcMain;
 
@@ -28,6 +29,7 @@ if (!gotLock) {
 
 let splashWindow = null;
 let settingsWindow = null;
+let consoleWindow = null;
 let tray = null;
 let splashReady = false;
 let splashQueue = [];
@@ -110,6 +112,22 @@ function createSettingsWindow() {
   });
   settingsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
   settingsWindow.on('closed', () => { settingsWindow = null; });
+}
+
+function createConsoleWindow() {
+  consoleWindow = new BrowserWindow({
+    width: 1024,
+    height: 640,
+    resizable: true,
+    frame: false,
+    titleBarStyle: 'hidden',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'console.js')
+    }
+  });
+  consoleWindow.loadFile(path.join(__dirname, '..', 'renderer', 'console.html'));
+  consoleWindow.on('closed', () => { consoleWindow = null; });
 }
 
 function createTray() {
@@ -271,14 +289,17 @@ app.whenReady().then(async () => {
     autoOffsetDaily: 0,
     offsetBaseDate: new Date().toISOString().slice(0, 10),
     developerMode: false,
-    timeZone: 'Asia/Shanghai'
+    timeZone: 'Asia/Shanghai',
+    autoUpdateEnabled: true,
+    updateServerUrl: 'http://localhost:3030'
   });
-  // 后端日志：仅在开发者模式启用时捕获与保存
-  try { backendLog.init({ enabled: !!store.get('system', 'developerMode') }); } catch {}
+  // 后端日志：始终捕获与保存（不再受开发者模式限制）
+  try { backendLog.init({ enabled: true }); } catch {}
   const splashEnabled = store.get('system', 'splashEnabled') !== false;
   if (splashEnabled) {
     createSplashWindow();
   }
+  try { autoUpdater.checkAndUpdate((status) => sendSplashProgress(status)); } catch {}
 
   const userRoot = path.join(app.getPath('userData'), 'OrbiBoard');
   const devPluginsOverride = '';
@@ -582,8 +603,13 @@ app.whenReady().then(async () => {
   // 注册协议处理（OrbiBoard://task/<text>）
   try {
     if (process.defaultApp) {
-      app.setAsDefaultProtocolClient('OrbiBoard', process.execPath, [app.getAppPath()]);
-      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [app.getAppPath()]); } catch {}
+      if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient('OrbiBoard', process.execPath, [path.resolve(process.argv[1])]);
+        try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [path.resolve(process.argv[1])]); } catch {}
+      } else {
+        app.setAsDefaultProtocolClient('OrbiBoard', process.execPath, [app.getAppPath()]);
+        try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [app.getAppPath()]); } catch {}
+      }
     } else {
       app.setAsDefaultProtocolClient('OrbiBoard');
       try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard'); } catch {}
@@ -654,6 +680,35 @@ app.whenReady().then(async () => {
   if (!hasProtocolArgAtBoot) {
     createSettingsWindow();
   }
+  try {
+    app.on('browser-window-created', (_e, win) => {
+      try {
+        const wc = win?.webContents;
+        const info = {
+          id: win.id,
+          title: (() => { try { return win.getTitle(); } catch { return ''; } })(),
+          url: (() => { try { return wc?.getURL?.() || ''; } catch { return ''; } })(),
+          bounds: (() => { try { return win.getBounds(); } catch { return null; } })(),
+          webContentsId: (() => { try { return wc?.id || null; } catch { return null; } })(),
+          isVisible: (() => { try { return win.isVisible(); } catch { return false; } })(),
+          isFocused: (() => { try { return win.isFocused(); } catch { return false; } })(),
+          isMinimized: (() => { try { return win.isMinimized(); } catch { return false; } })(),
+          isMaximized: (() => { try { return win.isMaximized(); } catch { return false; } })(),
+          isFullScreen: (() => { try { return win.isFullScreen(); } catch { return false; } })(),
+          pluginId: (() => {
+            try {
+              const webId = wc?.id;
+              return pluginManager.getPluginIdByWebContentsId(webId);
+            } catch { return null; }
+          })()
+        };
+        console.info('window:created', info);
+      } catch {}
+      try {
+        win.on('closed', () => { try { console.info('window:closed', { id: win.id }); } catch {} });
+      } catch {}
+    });
+  } catch {}
 
   // 若为快速重启触发，则启动后自动打开设置页（仅一次）
   try {
@@ -870,6 +925,14 @@ ipcMain.handle('window:control', async (event, action) => {
 ipcMain.handle('settings:showMenu', async (event, coords) => {
   const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
   const menu = Menu.buildFromTemplate([
+    { label: '打开控制台', click: () => {
+      try {
+        if (!consoleWindow || consoleWindow.isDestroyed()) createConsoleWindow();
+        if (consoleWindow?.isMinimized?.()) consoleWindow.restore();
+        consoleWindow.show();
+        consoleWindow.focus();
+      } catch {}
+    } },
     { label: '刷新设置页', click: () => { try { win?.webContents?.reload(); } catch {} } },
     { type: 'separator' },
     { label: '快速重启程序', click: () => { try { store.set('system', 'openSettingsOnBootOnce', true); } catch {} app.relaunch(); app.exit(0); } },
@@ -889,6 +952,14 @@ ipcMain.handle('system:openSettings', async () => {
     settingsWindow.show();
     settingsWindow.focus();
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+ipcMain.handle('system:update:check', async () => {
+  try {
+    return await autoUpdater.checkAndUpdate((status) => sendSplashProgress(status));
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
@@ -931,7 +1002,12 @@ ipcMain.on('plugin:register', (event, pluginId, functions) => {
   pluginManager.registerFunctions(pluginId, functions, event.sender);
 });
 ipcMain.handle('plugin:call', async (event, targetPluginId, fnName, args) => {
-  return pluginManager.callFunction(targetPluginId, fnName, args);
+  try {
+    const callerId = pluginManager.getPluginIdByWebContentsId(event.sender.id);
+    return pluginManager.callFunction(targetPluginId, fnName, args, callerId || null);
+  } catch {
+    return pluginManager.callFunction(targetPluginId, fnName, args, null);
+  }
 });
 ipcMain.on('plugin:event:subscribe', (event, evName) => {
   pluginManager.subscribeEvent(evName, event.sender);
@@ -1025,7 +1101,8 @@ ipcMain.handle('config:set', async (_e, scope, key, value) => {
   const r = store.set(scope, key, value);
   try {
     if (scope === 'system' && key === 'developerMode') {
-      backendLog.enableLogging(!!value);
+      // 不再根据 developerMode 开关日志；保持始终启用
+      backendLog.enableLogging(true);
     }
   } catch {}
   return r;
@@ -1098,6 +1175,16 @@ ipcMain.handle('automation:test', async (_e, id) => {
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }
+});
+// 检查与更新 IPC
+// const autoUpdater = require('./autoUpdater');
+ipcMain.handle('system:checkUpdate', async (_e, checkOnly = false) => {
+  return require('./autoUpdater').checkAndUpdate((payload) => sendSplashProgress(payload), checkOnly);
+});
+// 执行更新（之前 checkOnly 返回有更新后，用户确认执行）
+ipcMain.handle('system:performUpdate', async (_e) => {
+  // 传入 checkOnly=false 以执行更新，复用下载与替换逻辑
+  return require('./autoUpdater').checkAndUpdate((payload) => sendSplashProgress(payload), false);
 });
 
 // 系统与时间相关 IPC
@@ -1489,4 +1576,144 @@ ipcMain.handle('debug:logs:get', async () => {
 });
 ipcMain.on('debug:logs:subscribe', (event) => {
   try { backendLog.subscribe(event.sender); } catch {}
+});
+ipcMain.handle('debug:logs:getEntries', async (_e, count = 500) => {
+  try { return backendLog.getLastEntries(count); } catch { return []; }
+});
+ipcMain.handle('debug:log:write', async (_e, level, ...args) => {
+  try { backendLog.write(level, ...(Array.isArray(args) ? args : [args])); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+});
+ipcMain.handle('console:open', async () => {
+  try {
+    if (!consoleWindow || consoleWindow.isDestroyed()) createConsoleWindow();
+    if (consoleWindow?.isMinimized?.()) consoleWindow.restore();
+    consoleWindow.show();
+    consoleWindow.focus();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('console:metrics', async () => {
+  try {
+    const info = {};
+    try {
+      info.process = {
+        memory: (() => {
+          try {
+            const m = process.memoryUsage();
+            return { rss: m.rss, heapTotal: m.heapTotal, heapUsed: m.heapUsed, external: m.external };
+          } catch { return {}; }
+        })(),
+        cpu: (() => {
+          try {
+            const c = process.cpuUsage();
+            return { user: c.user, system: c.system };
+          } catch { return {}; }
+        })(),
+        uptimeSec: (() => { try { return process.uptime(); } catch { return 0; } })()
+      };
+    } catch {}
+    try {
+      info.appMetrics = (typeof require('electron').app.getAppMetrics === 'function') ? require('electron').app.getAppMetrics() : [];
+    } catch { info.appMetrics = []; }
+    try {
+      const list = await pluginManager.getPlugins();
+      info.plugins = { total: Array.isArray(list) ? list.length : 0, enabled: (Array.isArray(list) ? list.filter(p => p.enabled).length : 0) };
+    } catch { info.plugins = { total: 0, enabled: 0 }; }
+    return { ok: true, info };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('console:listWindows', async () => {
+  try {
+    const { BrowserWindow } = require('electron');
+    const wins = BrowserWindow.getAllWindows();
+    const data = wins.map((w) => {
+      let url = '';
+      try { url = w.webContents.getURL(); } catch {}
+      let title = '';
+      try { title = w.getTitle(); } catch {}
+      let bounds = null;
+      try { bounds = w.getBounds(); } catch {}
+      let webContentsId = null;
+      try { webContentsId = w.webContents.id; } catch {}
+      let pluginId = null;
+      try { pluginId = pluginManager.getPluginIdByWebContentsId(webContentsId); } catch {}
+      return {
+        id: w.id,
+        title,
+        url,
+        isVisible: (() => { try { return w.isVisible(); } catch { return false; } })(),
+        isFocused: (() => { try { return w.isFocused(); } catch { return false; } })(),
+        isMinimized: (() => { try { return w.isMinimized(); } catch { return false; } })(),
+        isMaximized: (() => { try { return w.isMaximized(); } catch { return false; } })(),
+        isFullScreen: (() => { try { return w.isFullScreen(); } catch { return false; } })(),
+        webContentsId,
+        bounds,
+        pluginId
+      };
+    });
+    return { ok: true, windows: data };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('console:openDevTools', async (_e, windowId) => {
+  try {
+    const { webContents } = require('electron');
+    const wc = webContents.fromId(Number(windowId));
+    if (!wc) return { ok: false, error: 'window_not_found' };
+    try { wc.openDevTools({ mode: 'detach' }); } catch {}
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('console:focusWindow', async (_e, windowId) => {
+  try {
+    const { BrowserWindow } = require('electron');
+    const wins = BrowserWindow.getAllWindows();
+    const target = wins.find(w => w.id === Number(windowId));
+    if (!target) return { ok: false, error: 'window_not_found' };
+    try { target.show(); target.focus(); } catch {}
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('console:controlWindow', async (_e, windowId, action) => {
+  try {
+    const { BrowserWindow } = require('electron');
+    const win = BrowserWindow.getAllWindows().find(w => w.id === Number(windowId));
+    if (!win) return { ok: false, error: 'window_not_found' };
+    switch (String(action)) {
+      case 'minimize': try { win.minimize(); } catch {} break;
+      case 'maximize': try { win.isMaximized() ? win.unmaximize() : win.maximize(); } catch {} break;
+      case 'reload': try { win.webContents?.reload(); } catch {} break;
+      case 'close': try { win.close(); } catch {} break;
+      case 'fullscreen': try { win.setFullScreen(!win.isFullScreen()); } catch {} break;
+      case 'hide': try { win.hide(); } catch {} break;
+      default: break;
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('console:exportText', async (_e, text, defaultName = 'backend.log') => {
+  try {
+    const { dialog } = require('electron');
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: '保存日志',
+      defaultPath: defaultName,
+      filters: [{ name: '日志', extensions: ['log', 'txt'] }]
+    });
+    if (canceled || !filePath) return { ok: false, error: 'cancelled' };
+    require('fs').writeFileSync(filePath, String(text || ''), 'utf-8');
+    return { ok: true, path: filePath };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 });

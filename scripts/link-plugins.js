@@ -32,8 +32,25 @@ function copyDir(src, dst) {
     const sp = path.join(src, it);
     const dp = path.join(dst, it);
     let st;
-    try { st = fs.statSync(sp); } catch { continue; }
-    if (st.isDirectory()) copyDir(sp, dp); else { try { fs.copyFileSync(sp, dp); } catch {} }
+    try { st = fs.lstatSync(sp); } catch { continue; }
+    if (st.isDirectory()) {
+      copyDir(sp, dp);
+    } else if (st.isSymbolicLink()) {
+      // 遇到符号链接时，读取目标内容并写入到目标位置（解引用）
+      try {
+        const realPath = fs.realpathSync(sp);
+        const realSt = fs.statSync(realPath);
+        if (realSt.isDirectory()) {
+          copyDir(realPath, dp);
+        } else {
+          fs.copyFileSync(realPath, dp);
+        }
+      } catch (e) {
+        console.warn(`[warn] Failed to resolve symlink ${sp}: ${e.message}`);
+      }
+    } else {
+      try { fs.copyFileSync(sp, dp); } catch {}
+    }
   }
 }
 

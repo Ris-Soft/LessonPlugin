@@ -6,6 +6,7 @@ window.showAppMenu = function(pos) {
   const menu = document.createElement('div');
   menu.className = 'app-menu';
   const items = [
+    { icon: 'ri-terminal-box-line', text: '打开控制台', action: async () => { try { await window.settingsAPI?.consoleOpen?.(); } catch {} } },
     { icon: 'ri-refresh-line', text: '刷新设置页', action: () => { try { location.reload(); } catch {} } },
     { sep: true },
     { icon: 'ri-rocket-line', text: '快速重启程序', action: async () => { try { await window.settingsAPI?.restartApp?.(); } catch {} } },

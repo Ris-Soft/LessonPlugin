@@ -386,6 +386,42 @@ module.exports.getPlugins = function getPlugins() {
   }));
 };
 
+module.exports.listVariables = function listVariables(idOrName) {
+  const p = findPluginByIdOrName(idOrName);
+  if (!p || !p.variables) return { variables: [] };
+  if (Array.isArray(p.variables)) return { variables: p.variables };
+  if (typeof p.variables === 'object') return { variables: Object.keys(p.variables) };
+  return { variables: [] };
+};
+
+module.exports.getVariable = async function getVariable(idOrName, varName) {
+  const p = findPluginByIdOrName(idOrName);
+  if (!p) return null;
+  const canonId = p.id;
+  
+  let targetFn = null;
+  if (Array.isArray(p.variables)) {
+    if (p.variables.includes(varName)) targetFn = varName;
+  } else if (p.variables && typeof p.variables === 'object') {
+    targetFn = p.variables[varName];
+  }
+
+  if (!targetFn) return null;
+
+  const fnMap = functionRegistry.get(canonId);
+  if (!fnMap) return null;
+
+  const impl = fnMap.get(targetFn);
+  if (typeof impl !== 'function') return null;
+
+  try {
+    return await Promise.resolve(impl());
+  } catch (e) {
+    console.error(`[plugin] getVariable error: ${p.name}.${varName}`, e);
+    return null;
+  }
+};
+
 function findPluginByIdOrName(key) {
   const canon = canonicalizePluginId(key);
   // 直接按规范ID匹配；同时兼容名称精确匹配
@@ -426,6 +462,7 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
 
   try {
     if (!enabled) {
+      try { console.info('plugin:toggle', { id: p.id, name: p.name, enabled: false }); } catch {}
       logs.push(`[disable] 开始禁用插件 ${p.name}`);
       // 调用插件导出的生命周期函数进行清理
       try {
@@ -480,6 +517,7 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
       } catch {}
       logs.push(`[disable] 插件 ${p.name} 已禁用`);
     } else {
+      try { console.info('plugin:toggle', { id: p.id, name: p.name, enabled: true }); } catch {}
       logs.push(`[enable] 开始启用插件 ${p.name}`);
       const baseDir = p.local ? path.join(path.dirname(manifestPath), p.local) : null;
       const modPath = baseDir ? path.resolve(baseDir, 'index.js') : null;
@@ -487,7 +525,10 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
       if (modPath && fs.existsSync(modPath)) {
         try {
           // 启用前确保依赖注入到插件目录
-          try { await module.exports.ensureDeps(p.id); } catch {}
+          try {
+            const depsRes = await module.exports.ensureDeps(p.id);
+            try { console.info('plugin:deps', { id: p.id, name: p.name, ok: !!depsRes?.ok }); } catch {}
+          } catch {}
           const mod = require(modPath);
           // 注册函数
           const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -511,12 +552,15 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
             try {
               await Promise.resolve(mod.init(createPluginApi(p.id)));
               logs.push(`[enable] 插件 ${p.name} 初始化完成`);
+              try { console.info('plugin:init_done', { id: p.id, name: p.name }); } catch {}
             } catch (e) {
               logs.push(`[enable] 插件 ${p.name} 初始化失败：${e?.message || e}`);
+              try { console.info('plugin:init_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch {}
             }
           }
         } catch (e) {
           logs.push(`[enable] 启用失败：${e?.message || String(e)}`);
+          try { console.info('plugin:enable_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch {}
         }
       } else {
         logs.push('[enable] 未找到本地入口 index.js，跳过注册/初始化');
@@ -1181,6 +1225,7 @@ module.exports.uninstall = function uninstall(idOrName) {
     const idx = manifest.plugins.findIndex((p) => p.id === idOrName || p.name === idOrName);
     if (idx < 0) return { ok: false, error: 'not_found' };
     const p = manifest.plugins[idx];
+    try { console.info('plugin:uninstall', { id: p.id, name: p.name }); } catch {}
     // 仅支持卸载本地插件
     if (!p.local) return { ok: false, error: 'not_local_plugin' };
     const fullDir = path.join(path.dirname(manifestPath), p.local);
@@ -1517,14 +1562,17 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
             await Promise.resolve(mod.init(createPluginApi(pluginId)));
             progressReporter && progressReporter({ stage: 'plugin:init', message: `插件 ${pluginName} 初始化完成` });
             logs.push(`[install] 插件 ${pluginName} 初始化完成`);
+            try { console.info('plugin:init_done', { id: pluginId, name: pluginName }); } catch {}
           } catch (e) {
             progressReporter && progressReporter({ stage: 'plugin:error', message: `插件 ${pluginName} 初始化失败：${e?.message || e}` });
             logs.push(`[install] 插件 ${pluginName} 初始化失败：${e?.message || e}`);
+            try { console.info('plugin:init_failed', { id: pluginId, name: pluginName, error: e?.message || String(e) }); } catch {}
           }
         }
       }
     } catch {}
 
+    try { console.info('plugin:install_success', { id: pluginId, name: pluginName }); } catch {}
     return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), npmDependencies: updated.npmDependencies, dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined, logs };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -1542,6 +1590,7 @@ module.exports.registerFunctions = function registerFunctions(pluginId, function
     // 如果调用来自不同 webContents（异常情况），仍以最新 sender 为准
     pluginWindows.set(canonId, { webContents: senderWC, isProxy: true });
   }
+  try { console.info('plugin:window_registered', { pluginId: canonId, webContentsId: senderWC.id }); } catch {}
   return { ok: true };
 };
 
@@ -1563,16 +1612,19 @@ module.exports.listAutomationEvents = function listAutomationEvents(pluginId) {
   return { ok: true, events: automationEventRegistry.get(canonId) || [] };
 };
 
-module.exports.callFunction = function callFunction(targetPluginId, fnName, args) {
+module.exports.callFunction = function callFunction(targetPluginId, fnName, args, callerPluginId) {
   return new Promise(async (resolve) => {
     const canonId = canonicalizePluginId(targetPluginId);
+    try { console.info('plugin:call_function:start', { pluginId: canonId, fn: fnName, caller: callerPluginId || null }); } catch {}
     // 优先主进程注册的函数，无需窗口
     const fnMap = functionRegistry.get(canonId);
     if (fnMap && fnMap.has(fnName)) {
       try {
         const result = await Promise.resolve(fnMap.get(fnName)(...(Array.isArray(args) ? args : [])));
+        try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: true, caller: callerPluginId || null }); } catch {}
         return resolve({ ok: true, result });
       } catch (e) {
+        try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: false, error: e?.message || String(e), caller: callerPluginId || null }); } catch {}
         return resolve({ ok: false, error: e.message });
       }
     }
@@ -1585,6 +1637,7 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
     const onResult = (event, id, payload) => {
       if (id !== reqId) return;
       try { module.exports._ipcMain.removeListener('plugin:invoke:result', onResult); } catch {}
+      try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: !!payload?.ok, caller: callerPluginId || null }); } catch {}
       resolve(payload);
     };
     module.exports._ipcMain.on('plugin:invoke:result', onResult);
@@ -1592,10 +1645,20 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
   });
 };
 
+module.exports.getPluginIdByWebContentsId = function getPluginIdByWebContentsId(wcId) {
+  try {
+    for (const [pid, win] of pluginWindows.entries()) {
+      const wc = win?.webContents || win;
+      if (wc && wc.id === wcId) return pid;
+    }
+  } catch {}
+  return null;
+};
+
 // 为插件入口提供主进程侧可用的 API
 function createPluginApi(pluginId) {
   return {
-    call: (targetPluginId, fnName, args) => module.exports.callFunction(targetPluginId, fnName, args),
+    call: (targetPluginId, fnName, args) => module.exports.callFunction(targetPluginId, fnName, args, pluginId),
     callByAction: async (actionId, args) => {
       try { const res = await module.exports.callAction(actionId, Array.isArray(args) ? args : []); return res; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
     },
@@ -1681,6 +1744,7 @@ module.exports.emitEvent = function emitEvent(eventName, payload) {
       }
     } catch {}
   }
+  try { console.info('plugin:event_emit', { event: eventName, delivered }); } catch {}
   return { ok: true, delivered };
 };
 
@@ -1746,6 +1810,7 @@ module.exports.callAction = async function callAction(actionId, args, preferredP
       if (providers.length === 1) targetEntry = providers[0];
       else return { ok: false, error: 'multiple_providers' };
     }
+    try { console.info('plugin:action:start', { actionId: id, pluginId: targetEntry.pluginId, fn: targetEntry.target }); } catch {}
     return module.exports.callFunction(targetEntry.pluginId, targetEntry.target, Array.isArray(args) ? args : []);
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1837,6 +1902,7 @@ module.exports.callBehavior = async function callBehavior(behaviorId, args, pref
       if (providers.length === 1) targetEntry = providers[0];
       else return { ok: false, error: 'multiple_providers' };
     }
+    try { console.info('plugin:behavior:start', { behaviorId: id, pluginId: targetEntry.pluginId, fn: targetEntry.target }); } catch {}
     return module.exports.callFunction(targetEntry.pluginId, targetEntry.target, Array.isArray(args) ? args : []);
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };

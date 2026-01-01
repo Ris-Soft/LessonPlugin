@@ -582,6 +582,7 @@ class AutomationManager {
     if (item?.confirm?.enabled) {
       await this.showConfirmOverlay(item, { ...ctx, itemId: item.id });
     } else {
+      try { console.info('automation:execute', { id: item.id, name: item.name, reason: ctx?.reason || '' }); } catch {}
       await this.executeActions(item.actions || [], { ...ctx, itemId: item.id });
     }
   }
@@ -669,9 +670,12 @@ class AutomationManager {
     for (const act of actions) {
       try {
         const manual = String(ctx?.reason || '') === 'manual_test';
-        if ((act && (act.type === 'pluginEvent' || act.type === 'pluginAction')) && !manual) {
-          continue;
-        }
+        // 修复：不再限制仅 manual 模式下执行插件动作
+        // if ((act && (act.type === 'pluginEvent' || act.type === 'pluginAction')) && !manual) {
+        //   continue;
+        // }
+        try { console.info('automation:action:start', { type: act.type, pluginId: act.pluginId || '', target: act.event || act.target || act.action || '' }); } catch {}
+        this.log('executeAction:start', act.type, act.pluginId || '', act.event || act.target || act.action || '');
         if (act.type === 'pluginEvent') {
           const params = Array.isArray(act.params) ? await Promise.all(act.params.map((x) => expandValue(x))) : [];
           await this.pluginManager.callFunction(act.pluginId, act.event, params);
@@ -754,7 +758,12 @@ class AutomationManager {
           const sec = Math.max(0, isNaN(secVal) ? 0 : secVal);
           await new Promise((resolve) => setTimeout(resolve, Math.round(sec * 1000)));
         }
-      } catch {}
+        try { console.info('automation:action:success', { type: act.type }); } catch {}
+        this.log('executeAction:success', act.type);
+      } catch (e) {
+        try { console.info('automation:action:error', { type: act.type, error: e?.message || String(e) }); } catch {}
+        this.log('executeAction:error', act.type, e?.message || String(e));
+      }
     }
     // 记录上次成功执行时间
     try {

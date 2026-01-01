@@ -86,4 +86,97 @@ function initAboutPage() {
       } catch {}
     });
   }
+
+  // 检查更新逻辑
+  const checkBtn = document.getElementById('about-check-update');
+  const updateStatus = document.getElementById('update-status');
+  const updateInfo = document.getElementById('update-info');
+  const updateDetails = document.getElementById('update-details');
+  const newVersionEl = document.getElementById('update-new-version');
+  const notesEl = document.getElementById('update-notes');
+  const performBtn = document.getElementById('about-perform-update');
+  const progressWrap = document.getElementById('update-progress-wrap');
+  const progressBar = document.getElementById('update-progress-bar');
+  const progressText = document.getElementById('update-progress-text');
+
+  if (checkBtn) {
+    checkBtn.addEventListener('click', async () => {
+      if (checkBtn.disabled) return;
+      checkBtn.disabled = true;
+      checkBtn.innerHTML = '<i class="ri-loader-4-line ri-spin"></i> 检查中...';
+      updateStatus.textContent = '正在检查更新...';
+      updateDetails.hidden = true;
+      
+      try {
+        const res = await window.settingsAPI.checkUpdate(true); // true = checkOnly
+        const now = new Date();
+        updateInfo.textContent = `最后检查时间：${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+        
+        if (!res.ok) {
+          updateStatus.textContent = '检查更新失败';
+          updateStatus.innerHTML += `<span class="muted" style="font-size:13px; margin-left:8px;">${res.error || '未知错误'}</span>`;
+        } else if (res.hasUpdate) {
+          updateStatus.textContent = '发现新版本';
+          newVersionEl.textContent = res.remoteVersion;
+          // 显示更新日志
+          const notes = res.notes || '暂无更新日志';
+          notesEl.innerHTML = notes.replace(/\n/g, '<br/>');
+          updateDetails.hidden = false;
+          // 重置进度条
+          progressWrap.style.display = 'none';
+          performBtn.style.display = 'inline-flex';
+          performBtn.disabled = false;
+        } else {
+          updateStatus.textContent = '当前已是最新版本';
+        }
+      } catch (e) {
+        updateStatus.textContent = '检查更新出错';
+        console.error(e);
+      } finally {
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = '<i class="ri-refresh-line"></i> 检查更新';
+      }
+    });
+  }
+
+  if (performBtn) {
+    performBtn.addEventListener('click', async () => {
+      performBtn.disabled = true;
+      performBtn.style.display = 'none';
+      progressWrap.style.display = 'flex';
+      
+      // 监听进度事件
+      const off = window.settingsAPI.onProgress((payload) => {
+        if (payload && payload.stage === 'update') {
+          const msg = String(payload.message || '');
+          // 尝试提取百分比
+          const m = msg.match(/(\d+)%/);
+          if (m) {
+            const pct = parseInt(m[1], 10);
+            progressBar.style.width = pct + '%';
+            progressText.textContent = pct + '%';
+          }
+          // 如果消息包含“应用更新包”或“启动安装程序”，视为 100%
+          if (msg.includes('应用更新包') || msg.includes('启动安装程序')) {
+             progressBar.style.width = '100%';
+             progressText.textContent = '100%';
+             updateStatus.textContent = '更新完成，正在重启...';
+          }
+        }
+      });
+      
+      try {
+        await window.settingsAPI.performUpdate();
+      } catch (e) {
+        updateStatus.textContent = '更新失败: ' + (e.message || String(e));
+        performBtn.style.display = 'inline-flex';
+        performBtn.disabled = false;
+        progressWrap.style.display = 'none';
+      } finally {
+        // 通常 performUpdate 会重启应用，这里的 finally 可能不会执行
+        // 但如果失败了需要解绑
+        if (off) off(); 
+      }
+    });
+  }
 }

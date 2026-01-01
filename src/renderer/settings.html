@@ -20,11 +20,11 @@
       </div>
       <nav>
         <button class="nav-item active" data-page="plugins"><i class="ri-puzzle-line"></i> 插件管理</button>
-        <button class="nav-item" data-page="market"><i class="ri-store-2-line"></i> 功能市场</button>
+        <button class="nav-item" data-page="market" style="display: none;"><i class="ri-store-2-line"></i> 功能市场</button>
         <button class="nav-item" data-page="components"><i class="ri-layout-3-line"></i> 组件管理</button>
         <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
         <button class="nav-item" data-page="config"><i class="ri-settings-2-line"></i> 配置总览</button>
-        <button class="nav-item" data-page="defaults"><i class="ri-flag-2-line"></i> 默认行为</button>
+        <button class="nav-item" data-page="defaults" style="display: none;"><i class="ri-flag-2-line"></i> 默认行为</button>
         <button class="nav-item" data-page="automation"><i class="ri-timer-line"></i> 自动执行</button>
         <button class="nav-item" data-page="npm"><i class="ri-box-3-line"></i> 依赖管理</button>
         <button class="nav-item" data-page="debug" style="display: none;"><i class="ri-tools-line"></i> 调试功能</button>
@@ -657,6 +657,34 @@
             </div>
           </div>
           <div class="panel">
+            <div class="section-title"><i class="ri-refresh-line"></i> 软件更新</div>
+            <div style="padding: 12px 16px;">
+              <div class="inline" style="align-items: center; justify-content: space-between;">
+                <div>
+                  <div id="update-status" style="font-weight: 500;">当前已是最新版本</div>
+                  <div id="update-info" class="muted" style="font-size: 13px; margin-top: 4px;">最后检查时间：从未</div>
+                </div>
+                <button id="about-check-update" class="btn primary"><i class="ri-refresh-line"></i> 检查更新</button>
+              </div>
+              <div id="update-details" class="update-details" hidden style="margin-top: 16px; background: var(--bg-secondary); border-radius: 8px; padding: 12px;">
+                <div class="inline" style="margin-bottom: 8px;">
+                  <span class="pill primary">新版本 v<span id="update-new-version"></span></span>
+                  <span class="muted" id="update-size"></span>
+                </div>
+                <div id="update-notes" style="font-size: 13px; line-height: 1.5; color: var(--fg-secondary); max-height: 150px; overflow-y: auto;"></div>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                  <button id="about-perform-update" class="btn primary"><i class="ri-download-cloud-2-line"></i> 立即更新</button>
+                  <div id="update-progress-wrap" style="flex: 1; display: none; align-items: center; gap: 8px;">
+                    <div class="progress-bar" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                      <div id="update-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
+                    </div>
+                    <span id="update-progress-text" class="muted" style="font-size: 12px;">0%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
             <div class="contributors">
               <div class="section-title"><i class="ri-team-line"></i> 贡献者</div>
               <ul class="contributors-list horizontal">
@@ -743,79 +771,5 @@
   <script src="./settings/handler/defaults.js"></script>
   <script src="./settings/handler/config.js"></script>
   <script src="./settings/main.js"></script>
-
-
-  </div>
-  </div>
-
-  </section>
-
-  <!-- 关于页面 -->
-  <section id="page-about" hidden>
-    <header>
-      <h1>关于</h1>
-      <p>OrbiBoard — 插件化大屏课堂辅助工具</p>
-    </header>
-    <div class="panel">
-      <div class="about-hero">
-        <img class="about-logo" src="../../icon.ico" alt="OrbiBoard" />
-        <div class="about-title">
-          <div class="name">OrbiBoard</div>
-          <div class="tagline">插件化大屏课堂辅助工具</div>
-        </div>
-        <div class="about-badges">
-          <span class="pill small">版本 <span id="about-version">—</span></span>
-          <span class="pill small">Electron <span id="about-electron">—</span></span>
-          <span class="pill small">Node <span id="about-node">—</span></span>
-          <span class="pill small">Chrome <span id="about-chrome">—</span></span>
-          <span class="pill small">平台 <span id="about-platform">—</span></span>
-        </div>
-      </div>
-      <div class="about-links">
-        <a href="https://github.com/Ris-Soft/LessonPlugin" target="_blank" class="btn"><i
-            class="ri-git-repository-line"></i> 仓库</a>
-        <div class="spacer"></div>
-        <button id="about-copy" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制版本信息</button>
-        <button id="about-open-data" class="btn"><i class="ri-folder-2-line"></i> 打开数据目录</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="contributors">
-        <div class="section-title"><i class="ri-team-line"></i> 贡献者</div>
-        <ul class="contributors-list horizontal">
-          <li>
-            <div class="avatar"><i style="color: white;" class="ri-code-line"></i></div>
-            <div class="name">PYLXU</div>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  </main>
-  </div>
-  </div>
-  <script src="./settings/processor/icon.js"></script>
-  <script src="./settings/processor/text.js"></script>
-  <script src="./settings/processor/install.js"></script>
-  <script src="./settings/modals/message.js"></script>
-  <script src="./settings/modals/editor.js"></script>
-  <script src="./settings/modals/market.js"></script>
-  <script src="./settings/modals/shortcut.js"></script>
-  <script src="./settings/modals/component.js"></script>
-  <script src="./settings/modals/plugin.js"></script>
-  <script src="./settings/handler/about.js"></script>
-  <script src="./settings/handler/automation.js"></script>
-  <script src="./settings/handler/debug.js"></script>
-  <script src="./settings/handler/general.js"></script>
-  <script src="./settings/handler/market.js"></script>
-  <script src="./settings/handler/market.init.js"></script>
-  <script src="./settings/handler/plugin.js"></script>
-  <script src="./settings/handler/components.js"></script>
-  <script src="./settings/handler/npm.js"></script>
-  <script src="./settings/main.js"></script>
-
-
 </body>
-
 </html>

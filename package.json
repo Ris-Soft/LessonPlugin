@@ -5,8 +5,7 @@
   "scripts": {
     "start": "electron .",
     "run": "electron .",
-    "dev": "node scripts/dev-server.js",
-    "link:plugins": "node scripts/link-plugins.js",
+    "dev": "node scripts/link-plugins.js",
     "build": "electron-builder",
     "build:linux": "electron-builder --linux"
   },
@@ -18,7 +17,10 @@
   "license": "ISC",
   "description": "基于Electron的以JavaScript为核心的插件化大屏课堂辅助工具",
   "build": {
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/**"
+    ],
     "appId": "com.orbiboard",
     "productName": "OrbiBoard",
     "icon": "logo.png",

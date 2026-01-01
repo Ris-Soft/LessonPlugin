@@ -140,6 +140,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   openInstallDir: async () => ipcRenderer.invoke('system:openInstallDir'),
   quitApp: async () => ipcRenderer.invoke('system:quit'),
   uninstallAllPlugins: async () => ipcRenderer.invoke('plugin:uninstallAll'),
+  // 检查与更新
+  checkUpdate: (checkOnly) => ipcRenderer.invoke('system:checkUpdate', checkOnly),
+  performUpdate: () => ipcRenderer.invoke('system:performUpdate'),
   // 查询依赖反向引用（依赖此插件的插件与自动化）
   pluginDependents: (idOrName) => ipcRenderer.invoke('plugin:dependents', idOrName)
   ,
@@ -153,4 +156,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
       ipcRenderer.removeListener('backend:log', listener);
     };
   }
+  ,
+  consoleOpen: () => ipcRenderer.invoke('console:open'),
+  backendLogWrite: (level, ...args) => ipcRenderer.invoke('debug:log:write', level, ...args)
 });

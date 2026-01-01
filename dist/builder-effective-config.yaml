@@ -1,7 +1,9 @@
 directories:
   output: dist
   buildResources: build
-asar: false
+asar: true
+asarUnpack:
+  - node_modules/**
 appId: com.orbiboard
 productName: OrbiBoard
 icon: logo.png

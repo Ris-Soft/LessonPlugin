@@ -2,6 +2,7 @@
 async function showCondEditorModal(type, initial) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '1000';
     const box = document.createElement('div'); box.className = 'modal-box';
     const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑条件值';
     const body = document.createElement('div'); body.className = 'modal-body';
@@ -65,6 +66,7 @@ async function openVarOverlaySimple(defaultPluginId, inputEl) {
   if (!withVars.length) { await showAlert('暂无可用插件变量'); return; }
   await new Promise(async (resolveOuter) => {
     const overlay = document.createElement('div'); overlay.className='modal-overlay';
+    overlay.style.zIndex = '1001';
     const box = document.createElement('div'); box.className='modal-box';
     const title = document.createElement('div'); title.className='modal-title'; title.textContent='快速编辑栏';
     const body = document.createElement('div'); body.className='modal-body';
@@ -166,10 +168,11 @@ async function openVarOverlaySimple(defaultPluginId, inputEl) {
 async function showParamsEditor(initial, pluginId) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '1000';
     const box = document.createElement('div'); box.className = 'modal-box';
     const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑参数数组';
     const body = document.createElement('div'); body.className = 'modal-body';
-    const help = document.createElement('div'); help.className = 'muted'; help.textContent = '支持类型：字符串、数字、布尔、对象JSON、数组JSON';
+    // const help = document.createElement('div'); help.className = 'muted'; help.textContent = '支持类型：字符串、数字、布尔、对象JSON、数组JSON';
     const list = document.createElement('div');
     list.className = 'array-list';
     let items = Array.isArray(initial) ? initial.map((x) => x) : [];
@@ -188,7 +191,12 @@ async function showParamsEditor(initial, pluginId) {
     const parseByType = (type, str) => {
       switch (type) {
         case 'string': return String(str || '');
-        case 'number': { const n = Number(str); if (!Number.isFinite(n)) throw new Error('数字格式错误'); return n; }
+        case 'number': {
+          if (String(str).includes('${')) return String(str);
+          const n = Number(str); 
+          if (!Number.isFinite(n)) throw new Error('数字格式错误'); 
+          return n; 
+        }
         case 'boolean': { const s = String(str).trim().toLowerCase(); return s === 'true' || s === '1' || s === 'yes'; }
         case 'object': { const o = JSON.parse(str || '{}'); if (Array.isArray(o) || typeof o !== 'object' || o === null) throw new Error('对象必须为JSON Object'); return o; }
         case 'array': { const a = JSON.parse(str || '[]'); if (!Array.isArray(a)) throw new Error('数组必须为JSON Array'); return a; }
@@ -205,14 +213,54 @@ async function showParamsEditor(initial, pluginId) {
           .forEach(([v,l]) => { const o=document.createElement('option'); o.value=v; o.textContent=l; typeSel.appendChild(o); });
         const curType = typeOfVal(val);
         typeSel.value = curType === 'object' ? 'object' : (curType === 'array' ? 'array' : curType);
-        const input = document.createElement('input'); input.type = 'text'; input.value = stringifyByType(typeSel.value, val);
+        
+        const wrap = document.createElement('div');
+        let input;
+        
+        if (typeSel.value === 'boolean') {
+             wrap.style.display='flex'; wrap.style.alignItems='center';
+             const label = document.createElement('label'); label.className = 'switch';
+             input = document.createElement('input'); input.type = 'checkbox';
+             const s = String(val).trim().toLowerCase();
+             input.checked = s === 'true' || s === '1' || s === 'yes';
+             const slider = document.createElement('span'); slider.className = 'slider';
+             label.appendChild(input); label.appendChild(slider);
+             wrap.appendChild(label);
+        } else {
+             wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr auto'; wrap.style.gap='8px';
+             input = document.createElement('input'); input.type = 'text'; input.value = stringifyByType(typeSel.value, val);
+             // 插件变量插入按钮（仅字符串类型）
+             const ins = document.createElement('button'); ins.className='btn secondary'; ins.title='插入插件变量'; ins.innerHTML = '<i class="ri-braces-line"></i>';
+             ins.onclick = async () => {
+               try {
+                 if (typeSel.value !== 'string' && typeSel.value !== 'number') {
+                   await showAlert('仅字符串/数字类型支持插入变量');
+                   return;
+                 }
+                 await openVarOverlaySimple(pluginId, input);
+               } catch (e) {
+                 await showAlert('变量加载失败：' + (e?.message || '未知错误'));
+               }
+             };
+             wrap.appendChild(input); wrap.appendChild(ins);
+        }
+
         const del = document.createElement('button'); del.className='btn secondary'; del.innerHTML = '<i class="ri-delete-bin-line"></i>';
         del.onclick = () => { items.splice(i,1); renderItems(); };
-        typeSel.onchange = () => { try { input.value = stringifyByType(typeSel.value, parseByType(typeSel.value, input.value)); } catch { input.value = stringifyByType(typeSel.value, typeSel.value==='array'?[]:{}); } };
-        // 插件变量插入按钮（仅字符串类型）
-        const ins = document.createElement('button'); ins.className='btn secondary'; ins.title='插入插件变量'; ins.innerHTML = '<i class="ri-braces-line"></i>';
-        ins.onclick = async () => { try { if (typeSel.value !== 'string') return; await openVarOverlaySimple(pluginId, input); } catch (e) { await showAlert('变量加载失败：' + (e?.message || '未知错误')); } };
-        const wrap = document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr auto'; wrap.style.gap='8px'; wrap.appendChild(input); wrap.appendChild(ins);
+        
+        typeSel.onchange = () => {
+             // 切换类型时重置值为默认并重绘
+             const newType = typeSel.value;
+             let newVal;
+             if (newType === 'boolean') newVal = false;
+             else if (newType === 'number') newVal = 0;
+             else if (newType === 'object') newVal = {};
+             else if (newType === 'array') newVal = [];
+             else newVal = '';
+             items[i] = newVal;
+             renderItems();
+        };
+
         row.appendChild(typeSel); row.appendChild(wrap); row.appendChild(del);
         list.appendChild(row);
       });
@@ -234,7 +282,13 @@ async function showParamsEditor(initial, pluginId) {
         for (const row of Array.from(list.children)) {
           const typeSel = row.querySelector('select');
           const input = row.querySelector('input');
-          const val = parseByType(typeSel.value, input.value || '');
+          let rawVal;
+          if (typeSel.value === 'boolean') {
+             rawVal = input.checked ? 'true' : 'false';
+          } else {
+             rawVal = input.value || '';
+          }
+          const val = parseByType(typeSel.value, rawVal);
           result.push(val);
         }
         document.body.removeChild(overlay);
@@ -244,12 +298,12 @@ async function showParamsEditor(initial, pluginId) {
       }
     };
 
-    const desc = document.createElement('div'); desc.className='modal-desc muted'; desc.textContent='提示：对象/数组请输入合法JSON；布尔值输入 true/false';
+    // const desc = document.createElement('div'); desc.className='modal-desc muted'; desc.textContent='提示：对象/数组请输入合法JSON；布尔值输入 true/false';
     box.appendChild(title);
-    body.appendChild(help);
+    // body.appendChild(help);
     body.appendChild(list);
     body.appendChild(addBar);
-    body.appendChild(desc);
+    // body.appendChild(desc);
     box.appendChild(body);
     actions.appendChild(cancel); actions.appendChild(save);
     box.appendChild(actions);
@@ -262,6 +316,7 @@ async function showParamsEditor(initial, pluginId) {
 async function showParamsEditorForEvent(paramDefs, initial, pluginId) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '1000';
     const box = document.createElement('div'); box.className = 'modal-box';
     const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '编辑插件事件参数';
   const body = document.createElement('div'); body.className = 'modal-body';
@@ -271,7 +326,12 @@ async function showParamsEditorForEvent(paramDefs, initial, pluginId) {
     const parseByType = (type, str) => {
       switch (String(type || 'string')) {
         case 'string': return String(str || '');
-        case 'number': { const n = Number(str); if (!Number.isFinite(n)) throw new Error('数字格式错误'); return n; }
+        case 'number': {
+          if (String(str).includes('${')) return String(str);
+          const n = Number(str); 
+          if (!Number.isFinite(n)) throw new Error('数字格式错误'); 
+          return n; 
+        }
         case 'boolean': { const s = String(str).trim().toLowerCase(); return s === 'true' || s === '1' || s === 'yes'; }
         case 'object': { const o = JSON.parse(str || '{}'); if (Array.isArray(o) || typeof o !== 'object' || o === null) throw new Error('对象必须为JSON Object'); return o; }
         case 'array': { const a = JSON.parse(str || '[]'); if (!Array.isArray(a)) throw new Error('数组必须为JSON Array'); return a; }
@@ -302,7 +362,7 @@ async function showParamsEditorForEvent(paramDefs, initial, pluginId) {
         input.placeholder = String(def?.hint || def?.desc || def?.name || '');
         // 插件变量插入按钮（仅字符串类型）
         const insBtn = document.createElement('button'); insBtn.className='btn secondary'; insBtn.title='插入插件变量'; insBtn.innerHTML = '<i class="ri-braces-line"></i>';
-        insBtn.onclick = async () => { try { if (!['string','text'].includes(String(type).toLowerCase())) return; await openVarOverlaySimple(pluginId, input); } catch (e) { await showAlert('变量加载失败：' + (e?.message || '未知错误')); } };
+        insBtn.onclick = async () => { try { if (!['string','text','number'].includes(String(type).toLowerCase())) return; await openVarOverlaySimple(pluginId, input); } catch (e) { await showAlert('变量加载失败：' + (e?.message || '未知错误')); } };
         const wrap = document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr auto'; wrap.style.gap='8px'; wrap.appendChild(input); wrap.appendChild(insBtn);
         row.appendChild(label); row.appendChild(wrap);
       }
@@ -346,6 +406,7 @@ async function showParamsEditorForEvent(paramDefs, initial, pluginId) {
 async function showAutomationJsonEditorModal(initial) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '1000';
     const box = document.createElement('div'); box.className = 'modal-box';
     const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '源JSON编辑器';
     const body = document.createElement('div'); body.className = 'modal-body';
