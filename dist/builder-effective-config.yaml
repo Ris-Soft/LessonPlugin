@@ -4,6 +4,10 @@ directories:
 asar: true
 asarUnpack:
   - node_modules/**
+files:
+  - filter:
+      - '**/*'
+      - '!dev-plugins/**'
 appId: com.orbiboard
 productName: OrbiBoard
 icon: logo.png
@@ -31,5 +35,4 @@ nsis:
   shortcutName: OrbiBoard
   runAfterFinish: true
   deleteAppDataOnUninstall: false
-files: []
 electronVersion: 38.7.2

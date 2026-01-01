@@ -8,7 +8,7 @@ const https = require('https');
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
 const backendLog = require('./backendLog');
-const AutomationManager = require('./AutomationManager');
+const AutomationManager = require('./automationManager');
 const store = require('./store');
 const autoUpdater = require('./autoUpdater');
 // 让插件管理器可以访问 ipcMain（用于事件回调注册）

@@ -38,6 +38,9 @@ function copyDir(src, dst) {
     } else if (st.isSymbolicLink()) {
       // 遇到符号链接时，读取目标内容并写入到目标位置（解引用）
       try {
+        // 先删除目标文件（如果是符号链接）
+        removeIfExists(dp);
+        
         const realPath = fs.realpathSync(sp);
         const realSt = fs.statSync(realPath);
         if (realSt.isDirectory()) {
@@ -161,6 +164,9 @@ function main() {
     } catch {}
   }
   console.log(`[${stamp()}] Plugins root (src): ${devRoot}`);
+  if (process.argv.includes('--once')) {
+    process.exit(0);
+  }
   setInterval(() => {}, 1 << 30); // keep alive
 }
 
