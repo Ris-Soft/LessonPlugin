@@ -1,17 +1,18 @@
 {
   "name": "orbiboard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "run": "electron .",
     "dev": "node scripts/link-plugins.js",
     "build": "electron-builder",
-    "build:linux": "electron-builder --linux"
+    "build:linux": "electron-builder --linux",
+    "publish-update": "node scripts/publish.js"
   },
   "keywords": [],
   "author": {
-  "name": "OrbiBoard",
+    "name": "OrbiBoard",
     "email": "753307914@qq.com"
   },
   "license": "ISC",
@@ -21,12 +22,22 @@
     "asarUnpack": [
       "node_modules/**"
     ],
+    "files": [
+      "**/*",
+      "!dev-plugins/**"
+    ],
     "appId": "com.orbiboard",
     "productName": "OrbiBoard",
     "icon": "logo.png",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "protocols": [
-      { "name": "OrbiBoard", "schemes": ["orbiboard", "OrbiBoard"] }
+      {
+        "name": "OrbiBoard",
+        "schemes": [
+          "orbiboard",
+          "OrbiBoard"
+        ]
+      }
     ],
     "win": {
       "icon": "icon.ico"
@@ -58,6 +69,7 @@
   "dependencies": {
     "edge-tts": "^1.0.1",
     "extract-zip": "^2.0.1",
+    "formdata-node": "^6.0.3",
     "loudness": "^0.4.2",
     "tar": "^7.5.2",
     "uuid": "^13.0.0"
