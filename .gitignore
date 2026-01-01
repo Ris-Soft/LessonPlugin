@@ -3,3 +3,4 @@ dist/*
 src/plugins/
 dev-plugins/
 renderer/
+.admin_password

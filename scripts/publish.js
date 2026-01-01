@@ -305,19 +305,34 @@ async function main() {
           reqUpload.write(`--${boundary}${crlf}`);
           reqUpload.write(`Content-Disposition: form-data; name="adminPassword"${crlf}${crlf}`);
           reqUpload.write(`${adminPassword}${crlf}`);
-          // Files
-          for (const [key, filePath] of Object.entries(uploadMap)) {
-            if (!filePath || !fs.existsSync(filePath)) continue;
+          // Files (streaming)
+          const entries = Object.entries(uploadMap).filter(([_, p]) => p && fs.existsSync(p));
+          const writeNextFile = (idx) => {
+            if (idx >= entries.length) {
+              reqUpload.write(`--${boundary}--${crlf}`);
+              reqUpload.end();
+              return;
+            }
+            const [key, filePath] = entries[idx];
             const filename = path.basename(filePath);
             reqUpload.write(`--${boundary}${crlf}`);
             reqUpload.write(`Content-Disposition: form-data; name="${key}"; filename="${filename}"${crlf}`);
             reqUpload.write(`Content-Type: application/octet-stream${crlf}${crlf}`);
-            const content = fs.readFileSync(filePath);
-            reqUpload.write(content);
-            reqUpload.write(crlf);
-          }
-          reqUpload.write(`--${boundary}--${crlf}`);
-          reqUpload.end();
+            const stream = fs.createReadStream(filePath);
+            stream.on('error', () => {
+              // 跳过该文件继续下一个
+              reqUpload.write(crlf);
+              writeNextFile(idx + 1);
+            });
+            stream.on('end', () => {
+              reqUpload.write(crlf);
+              writeNextFile(idx + 1);
+            });
+            stream.on('data', (chunk) => {
+              reqUpload.write(chunk);
+            });
+          };
+          writeNextFile(0);
         });
       };
       let result = await doUpload();
