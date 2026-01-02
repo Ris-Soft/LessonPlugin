@@ -1,0 +1,9 @@
+{
+  "id": "widget-calendar",
+  "name": "日历",
+  "version": "1.0.0",
+  "type": "component",
+  "group": "desktop.widgets",
+  "description": "月历视图。",
+  "entry": "index.html"
+}

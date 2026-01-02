@@ -35,4 +35,5 @@ nsis:
   shortcutName: OrbiBoard
   runAfterFinish: true
   deleteAppDataOnUninstall: false
+  include: build/installer.nsh
 electronVersion: 38.7.2

@@ -16,7 +16,7 @@ async function showComponentAboutModal(componentItem) {
   const groupText = componentItem.group || '未分组';
   const entryText = componentItem.entry || 'index.html';
   let entryUrl = componentItem.url;
-  try { if (!entryUrl) { const res = await window.settingsAPI?.componentEntryUrl?.(componentItem.id); entryUrl = res; } } catch {}
+  try { if (!entryUrl) { const res = await window.settingsAPI?.componentEntryUrl?.(componentItem.id); entryUrl = res; } } catch (e) {}
   const norm = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   let pluginMeta = null;
   try {
@@ -26,7 +26,7 @@ async function showComponentAboutModal(componentItem) {
       const compKey = norm(idKey);
       pluginMeta = all.find(p => norm(p.id || p.name) === compKey) || null;
     }
-  } catch {}
+  } catch (e) {}
   const versionText = (pluginMeta?.version || componentItem.version || componentItem.detectedVersion || '') || '未知版本';
   const authorText = (() => {
     const a = pluginMeta?.author || componentItem.author;
@@ -92,9 +92,9 @@ async function showComponentAboutModal(componentItem) {
   try {
     const openBtn = metaGrid.querySelector('#open-entry');
     const copyBtn = metaGrid.querySelector('#copy-entry');
-    openBtn && openBtn.addEventListener('click', () => { try { window.open(entryUrl, '_blank', 'noreferrer'); } catch {} });
-    copyBtn && copyBtn.addEventListener('click', async () => { try { await navigator.clipboard.writeText(entryUrl); showToast('已复制入口地址'); } catch {} });
-  } catch {}
+    openBtn && openBtn.addEventListener('click', () => { try { window.open(entryUrl, '_blank', 'noreferrer'); } catch (e) {} });
+    copyBtn && copyBtn.addEventListener('click', async () => { try { await navigator.clipboard.writeText(entryUrl); showToast('已复制入口地址'); } catch (e) {} });
+  } catch (e) {}
 
   const actions = document.createElement('div'); actions.className = 'modal-actions';
   const uninstallBtn = document.createElement('button'); uninstallBtn.className = 'btn danger'; uninstallBtn.textContent = '卸载组件';
@@ -108,7 +108,7 @@ async function showComponentAboutModal(componentItem) {
     const out = await window.settingsAPI?.uninstallPlugin?.(key);
     if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
     document.body.removeChild(overlay);
-    try { await window.initComponentsPage(); } catch {}
+    try { await window.initComponentsPage(); } catch (e) {}
   };
 
   body.appendChild(infoGroup);

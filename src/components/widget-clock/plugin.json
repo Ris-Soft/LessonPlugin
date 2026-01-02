@@ -1,0 +1,9 @@
+{
+  "id": "widget-clock",
+  "name": "极简时钟",
+  "version": "1.0.0",
+  "type": "component",
+  "group": "desktop.widgets",
+  "description": "一个简单的数字时钟组件。",
+  "entry": "index.html"
+}

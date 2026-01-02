@@ -1,17 +1,17 @@
 window.showAppMenu = function(pos) {
   const old = document.querySelector('.app-menu-overlay');
-  if (old) try { old.remove(); } catch {}
+  if (old) try { old.remove(); } catch (e) {}
   const overlay = document.createElement('div');
   overlay.className = 'app-menu-overlay';
   const menu = document.createElement('div');
   menu.className = 'app-menu';
   const items = [
-    { icon: 'ri-terminal-box-line', text: '打开控制台', action: async () => { try { await window.settingsAPI?.consoleOpen?.(); } catch {} } },
-    { icon: 'ri-refresh-line', text: '刷新设置页', action: () => { try { location.reload(); } catch {} } },
+    { icon: 'ri-terminal-box-line', text: '打开控制台', action: async () => { try { await window.settingsAPI?.consoleOpen?.(); } catch (e) {} } },
+    { icon: 'ri-refresh-line', text: '刷新设置页', action: () => { try { location.reload(); } catch (e) {} } },
     { sep: true },
-    { icon: 'ri-rocket-line', text: '快速重启程序', action: async () => { try { await window.settingsAPI?.restartApp?.(); } catch {} } },
-    { icon: 'ri-folder-open-line', text: '打开数据目录', action: async () => { try { await window.settingsAPI?.openUserData?.(); } catch {} } },
-    { icon: 'ri-folder-2-line', text: '打开安装目录', action: async () => { try { await window.settingsAPI?.openInstallDir?.(); } catch {} } },
+    { icon: 'ri-rocket-line', text: '快速重启程序', action: async () => { try { await window.settingsAPI?.restartApp?.(); } catch (e) {} } },
+    { icon: 'ri-folder-open-line', text: '打开数据目录', action: async () => { try { await window.settingsAPI?.openUserData?.(); } catch (e) {} } },
+    { icon: 'ri-folder-2-line', text: '打开安装目录', action: async () => { try { await window.settingsAPI?.openInstallDir?.(); } catch (e) {} } },
   ];
   try {
     if (window.__isDev__) {
@@ -23,7 +23,7 @@ window.showAppMenu = function(pos) {
           const res = await window.settingsAPI?.uninstallAllPlugins?.();
           if (res?.ok) {
             await showToast(`已卸载 ${Array.isArray(res.removed) ? res.removed.length : 0} 个插件`);
-            try { location.reload(); } catch {}
+            try { location.reload(); } catch (e) {}
           } else {
             await showAlert(res?.error || '卸载失败');
           }
@@ -32,17 +32,17 @@ window.showAppMenu = function(pos) {
         }
       }});
     }
-  } catch {}
+  } catch (e) {}
   items.push(
     { sep: true },
-    { icon: 'ri-close-circle-line', text: '退出程序', action: async () => { try { await window.settingsAPI?.quitApp?.(); } catch {} } }
+    { icon: 'ri-close-circle-line', text: '退出程序', action: async () => { try { await window.settingsAPI?.quitApp?.(); } catch (e) {} } }
   );
   items.forEach(it => {
     if (it.sep) { const s = document.createElement('div'); s.className = 'app-menu-sep'; menu.appendChild(s); return; }
     const btn = document.createElement('div');
     btn.className = 'app-menu-item';
     btn.innerHTML = `<i class="${it.icon}"></i><span>${it.text}</span>`;
-    btn.addEventListener('click', async () => { try { await it.action(); } catch {} try { overlay.remove(); } catch {} });
+    btn.addEventListener('click', async () => { try { await it.action(); } catch (e) {} try { overlay.remove(); } catch (e) {} });
     menu.appendChild(btn);
   });
   overlay.appendChild(menu);
@@ -63,7 +63,7 @@ window.showAppMenu = function(pos) {
   }
   const close = (e) => {
     const t = e.target;
-    if (!menu.contains(t)) { try { overlay.remove(); document.removeEventListener('mousedown', close); } catch {} }
+    if (!menu.contains(t)) { try { overlay.remove(); document.removeEventListener('mousedown', close); } catch (e) {} }
   };
   document.addEventListener('mousedown', close);
 };

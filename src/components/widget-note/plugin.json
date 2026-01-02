@@ -1,0 +1,9 @@
+{
+  "id": "widget-note",
+  "name": "便签",
+  "version": "1.0.0",
+  "type": "component",
+  "group": "desktop.widgets",
+  "description": "简单的文本便签。",
+  "entry": "index.html"
+}

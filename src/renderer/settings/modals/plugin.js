@@ -66,7 +66,7 @@ async function showPluginAboutModal(pluginItem) {
   const chips = document.createElement('div'); chips.className = 'chips';
   // 计算依赖满足状态（插件依赖为数组，NPM 依赖为对象）
   let installedList = [];
-  try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch {}
+  try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch (e) {}
   const norm = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
   const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
@@ -123,7 +123,7 @@ async function showPluginAboutModal(pluginItem) {
     try {
       const evRes = await window.settingsAPI?.pluginAutomationListEvents?.(pluginId);
       eventDefs = Array.isArray(evRes?.events) ? evRes.events : [];
-    } catch {}
+    } catch (e) {}
     const candidates = [];
     for (const a of metaActions) {
       candidates.push({ kind: 'meta', id: a.id || a.target, label: a.text || a.id || a.target, icon: a.icon || pluginItem.icon || 'ri-links-line', target: a.target, args: Array.isArray(a.args) ? a.args : [] });

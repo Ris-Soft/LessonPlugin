@@ -9,7 +9,7 @@ async function initConfigOverview() {
     const plugins = await window.settingsAPI?.getPlugins?.();
     const scopes = [];
     const sysVals = await window.settingsAPI?.configGetAll?.('system');
-    try { await window.settingsAPI?.configEnsureDefaults?.('system', systemDefaults); } catch {}
+    try { await window.settingsAPI?.configEnsureDefaults?.('system', systemDefaults); } catch (e) {}
     scopes.push({ id: 'system', name: '主程序', icon: 'ri-settings-3-line', schema: systemSchema, values: sysVals || {} });
     for (const p of (Array.isArray(plugins) ? plugins : [])) {
       const id = p.id || p.name;
@@ -21,13 +21,13 @@ async function initConfigOverview() {
           const older = await window.settingsAPI?.configGetAll?.(dotId);
           if (older && Object.keys(older).length) vals = older;
         }
-      } catch {}
+      } catch (e) {}
       const schema = (Array.isArray(p.configSchema) || (p.configSchema && typeof p.configSchema === 'object')) ? p.configSchema : null;
       if (schema) {
         const defs = Array.isArray(schema) ? schema : Object.keys(schema).map((k) => ({ key: k, default: schema[k]?.default }));
         const defaults = {};
         defs.forEach((d) => { if (d && d.key !== undefined && d.default !== undefined) defaults[d.key] = d.default; });
-        if (Object.keys(defaults).length) { try { await window.settingsAPI?.configEnsureDefaults?.(id, defaults); } catch {} }
+        if (Object.keys(defaults).length) { try { await window.settingsAPI?.configEnsureDefaults?.(id, defaults); } catch (e) {} }
       }
       scopes.push({ id, name: p.name || id, icon: p.icon || 'ri-puzzle-line', schema, values: vals || {}, kind: 'plugin' });
     }
@@ -43,7 +43,7 @@ async function initConfigOverview() {
         if (!hasVals) continue;
         scopes.push({ id: s, name: `未知插件（${s}）`, icon: 'ri-question-line', schema: null, values: vals, kind: 'unknown' });
       }
-    } catch {}
+    } catch (e) {}
     return scopes;
   }
 
@@ -215,7 +215,7 @@ async function initConfigOverview() {
               else if (scope.kind === 'plugin') await window.settingsAPI?.configPluginSet?.(scope.id, key, val);
               else await window.settingsAPI?.configSet?.(scope.id, key, val);
               scope.values[key] = val; showToast(`已保存 ${key}`, { type: 'success', duration: 1200 });
-            } catch {}
+            } catch (e) {}
           };
           if (input.type === 'text' || input.type === 'number') { input.addEventListener('change', handler); }
           else if (input.type === 'checkbox') { input.addEventListener('change', handler); }
@@ -254,6 +254,31 @@ async function initConfigOverview() {
       await showModal({ title: `配置项 — ${scope.name}`, message: content, confirmText: '关闭', cancelText: null });
     };
     card.addEventListener('click', open);
+    card.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (scope.id === 'system') {
+        showToast('主程序配置不可删除', { type: 'error' });
+        return;
+      }
+      const sure = await showModal({
+        title: '删除配置',
+        message: `确定要删除 "${scope.name}" (${scope.id}) 的所有配置吗？\n此操作将清空该组所有已保存的设置项，且不可恢复。`,
+        confirmText: '删除',
+        cancelText: '取消',
+        stack: true
+      });
+      if (sure) {
+        try {
+          await window.settingsAPI?.configDeleteScope?.(scope.id);
+          showToast(`已删除 ${scope.name} 配置`, { type: 'success' });
+          cached = await loadAll();
+          await render(cached, searchInput?.value || '');
+        } catch (err) {
+          showToast(`删除失败: ${err.message}`, { type: 'error' });
+        }
+      }
+    });
     return card;
   }
 

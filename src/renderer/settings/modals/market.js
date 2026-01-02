@@ -110,7 +110,7 @@ async function showStorePluginModal(item) {
   title.style.alignItems = 'center';
   title.innerHTML = `<span><i class="${item.icon || 'ri-puzzle-line'}"></i> 插件详情 — ${item.name} <span class=\"pill small plugin-version\">${versionText}</span></span>`;
   const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
-  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch (e) {} });
   title.appendChild(closeBtn);
 
   const depsObj = (item && typeof item.npmDependencies === 'object' && item.npmDependencies) ? item.npmDependencies : null;
@@ -120,7 +120,7 @@ async function showStorePluginModal(item) {
     : '<span class="muted">无依赖</span>';
   // 依赖满足状态：获取已安装插件列表并进行版本对比
   let installedList = [];
-  try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch {}
+  try { const res = await window.settingsAPI?.getPlugins?.(); installedList = Array.isArray(res) ? res : []; } catch (e) {}
   const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
   const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
   const satisfies = (ver, range) => {
@@ -197,7 +197,7 @@ async function showStorePluginModal(item) {
             if (typeof svc === 'string' && svc) return svc;
             const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase');
             return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/';
-          } catch { return 'http://localhost:3030/'; }
+          } catch (e) { return 'http://localhost:3030/'; }
         })();
         let autoJson = null;
         if (item.automation) {
@@ -234,7 +234,7 @@ async function showStorePluginModal(item) {
           await window.settingsAPI?.automationToggle?.(id, true);
           await showAlert('已安装并启用');
         }
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         const btn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.dataset.page === 'automations');
         btn?.click?.();
       } catch (e) {
@@ -269,7 +269,7 @@ async function showStorePluginModal(item) {
         } else {
           actionBtn.disabled = true; actionBtn.innerHTML = '<i class="ri-checkbox-circle-line"></i> 已安装'; actionBtn.dataset.action = 'installed';
         }
-      } catch {
+      } catch (e) {
         actionBtn.disabled = false; actionBtn.innerHTML = '<i class="ri-download-2-line"></i> 安装'; actionBtn.dataset.action = 'install';
         uninstallBtn.hidden = true;
       }
@@ -289,7 +289,7 @@ async function showStorePluginModal(item) {
                 if (typeof svc === 'string' && svc) return svc;
                 const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase');
                 return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/';
-              } catch { return 'http://localhost:3030/'; }
+              } catch (e) { return 'http://localhost:3030/'; }
             })();
             const url = new URL(item.zip, base).toString();
             const res = await fetch(url);
@@ -348,7 +348,7 @@ async function showStorePluginModal(item) {
 
                 // 依赖引导由统一安装入口处理，此处移除本地弹窗
               }
-            } catch {}
+            } catch (e) {}
               // 将 inspect 得到的依赖信息合并到 item，确保统一安装入口能正确触发 NPM 安装向导
               const depsObj = (inspect && typeof inspect.npmDependencies === 'object' && !Array.isArray(inspect.npmDependencies) && inspect.npmDependencies) ? inspect.npmDependencies : null;
               const enrichedItem = {
@@ -383,7 +383,7 @@ async function showStorePluginModal(item) {
           actionBtn.disabled = false; actionBtn.innerHTML = '<i class="ri-download-2-line"></i> 安装';
           return;
         }
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         const activeTab = Array.from(document.querySelectorAll('#page-market .store-tabs .sub-item')).find(b => b.classList.contains('active'));
         activeTab?.click?.();
       } catch (e) {
@@ -409,15 +409,15 @@ async function showStorePluginModal(item) {
           if (Array.isArray(dep?.automations)) {
             for (const a of dep.automations) {
               if (a.enabled) {
-                try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch {}
+                try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {}
               }
             }
           }
-        } catch {}
+        } catch (e) {}
         const out = await window.settingsAPI?.uninstallPlugin?.(key);
         if (!out?.ok) throw new Error(out?.error || '卸载失败');
         showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 });
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         const activeTab = Array.from(document.querySelectorAll('#page-market .store-tabs .sub-item')).find(b => b.classList.contains('active'));
         activeTab?.click?.();
       } catch (e) {
@@ -445,7 +445,7 @@ async function showStorePluginModal(item) {
           if (typeof svc === 'string' && svc) return svc;
           const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase');
           return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/';
-        } catch { return 'http://localhost:3030/'; }
+        } catch (e) { return 'http://localhost:3030/'; }
       })();
       let mdText = null;
       if (item.readme) {
@@ -488,7 +488,7 @@ async function showStorePluginModal(item) {
         const box = document.getElementById('npm-deps-box');
         const deps = (pluginJson && typeof pluginJson.npmDependencies === 'object') ? pluginJson.npmDependencies : (typeof item.npmDependencies === 'object' ? item.npmDependencies : null);
         if (box && deps && Object.keys(deps).length) {
-          const installed = await (async () => { try { const r = await window.settingsAPI?.npmListInstalled?.(); return (r?.ok && Array.isArray(r.packages)) ? r.packages : []; } catch { return []; } })();
+          const installed = await (async () => { try { const r = await window.settingsAPI?.npmListInstalled?.(); return (r?.ok && Array.isArray(r.packages)) ? r.packages : []; } catch (e) { return []; } })();
           const has = (name) => installed.some(p => p.name === name && Array.isArray(p.versions) && p.versions.length);
           const html2 = Object.keys(deps).map(name => {
             const ok = has(name);
@@ -499,7 +499,7 @@ async function showStorePluginModal(item) {
           }).join(' ');
           box.innerHTML = html2;
         }
-      } catch {}
+      } catch (e) {}
 
       // 自动化预览：加载并呈现触发/条件/动作
       if ((item.type || 'plugin') === 'automation') {
@@ -528,11 +528,11 @@ async function showStorePluginModal(item) {
             <div style="margin-top:8px;">执行动作</div>
             ${renderActs(autoJson?.actions)}
           `;
-        } catch {
+        } catch (e) {
           autoContent.innerHTML = '<div class="muted">未能加载自动化示例</div>';
         }
       }
-    } catch {
+    } catch (e) {
       readmeBox.innerHTML = renderMarkdown(item.description || '暂无说明');
     }
   })();

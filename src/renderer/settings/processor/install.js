@@ -77,7 +77,7 @@
         btnCancel.className = 'btn secondary';
         btnCancel.innerHTML = '<i class="ri-close-line"></i> 取消';
         btnCancel.addEventListener('click', () => {
-          try { overlay.remove(); } catch {}
+          try { overlay.remove(); } catch (e) {}
           resolve(false);
         });
         
@@ -85,7 +85,7 @@
         btnConfirm.className = 'btn primary';
         btnConfirm.innerHTML = '<i class="ri-download-2-line"></i> 确认安装';
         btnConfirm.addEventListener('click', () => {
-          try { overlay.remove(); } catch {}
+          try { overlay.remove(); } catch (e) {}
           resolve(true);
         });
         
@@ -106,12 +106,12 @@
         // 点击遮罩关闭
         overlay.addEventListener('click', (e) => {
           if (e.target === overlay) {
-            try { overlay.remove(); } catch {}
+            try { overlay.remove(); } catch (e) {}
             resolve(false);
           }
         });
       });
-    } catch { return true; }
+    } catch (e) { return true; }
   }
   async function resolveMarketBase() {
     try {
@@ -119,7 +119,7 @@
       if (typeof svc === 'string' && svc) return svc;
       const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase');
       return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/';
-    } catch {
+    } catch (e) {
       return 'http://localhost:3030/';
     }
   }
@@ -240,18 +240,18 @@
           npmBox.appendChild(npmTitle); npmBox.appendChild(npmList);
           body.appendChild(npmBox);
         }
-      } catch {}
+      } catch (e) {}
       actions.appendChild(btnCancel); actions.appendChild(btnSkip); actions.appendChild(btnNext);
       body.appendChild(header); body.appendChild(tip); body.appendChild(list); body.appendChild(actions);
       box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
-      btnCancel.addEventListener('click', () => { try{overlay.remove();}catch{} resolve({ proceed:false, selected:[] }); });
-      btnSkip.addEventListener('click', () => { try{overlay.remove();}catch{} resolve({ proceed:true, selected:[] }); });
+      btnCancel.addEventListener('click', () => { try{overlay.remove();}catch (e) {} resolve({ proceed:false, selected:[] }); });
+      btnSkip.addEventListener('click', () => { try{overlay.remove();}catch (e) {} resolve({ proceed:true, selected:[] }); });
       btnNext.addEventListener('click', () => {
         const selected = inputs.filter(i => !!i.checked).map(i => {
           const mi = findMarketItem(i.dataset.depName);
           return { name: i.dataset.depName, range: i.dataset.depRange, market: mi };
         });
-        try{overlay.remove();}catch{} resolve({ proceed:true, selected });
+        try{overlay.remove();}catch (e) {} resolve({ proceed:true, selected });
       });
     });
   }
@@ -285,7 +285,7 @@
       const filtered = items.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
       container.innerHTML = '';
       filtered.forEach((p) => container.appendChild(renderPlugin(p)));
-    } catch {}
+    } catch (e) {}
   }
 
   async function performInstall(kind, opts) {
@@ -414,12 +414,12 @@
       document.body.appendChild(overlay);
 
       btnCancel.addEventListener('click', () => {
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         resolve({ proceed: false });
       });
 
       btnConfirm.addEventListener('click', () => {
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         resolve({ proceed: true });
       });
     });
@@ -560,7 +560,7 @@
               tarGuideShown = true;
               await showLinuxTarGuide(msg);
             }
-          } catch {}
+          } catch (e) {}
         }
 
         completed++;
@@ -577,7 +577,7 @@
       }
 
       btnNext.addEventListener('click', () => {
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         resolve({ success: !hasError });
       });
     });
@@ -666,12 +666,12 @@
       document.body.appendChild(overlay);
 
       btnCancel.addEventListener('click', () => {
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         resolve({ proceed: false, installed: [] });
       });
 
       btnConfirm.addEventListener('click', () => {
-        try { overlay.remove(); } catch {}
+        try { overlay.remove(); } catch (e) {}
         resolve({ proceed: true, installed: allNpmDeps });
       });
     });
@@ -681,7 +681,7 @@
     const { kind, item, zipPath, zipName, zipData, pkg, preselectedDeps } = options || {};
     // 第一步：安装确认（风险告知）
     const okConfirm = await showInstallConfirm(item || {});
-    if (!okConfirm) return;
+    if (!okConfirm) return false;
     
     // 第二步：插件依赖引导（如无传入预选依赖，则进行引导）
     let selected = Array.isArray(preselectedDeps) ? preselectedDeps : [];
@@ -693,29 +693,29 @@
         const needGuide = deps.length > 0;
         if (needGuide) {
           const g = await showDependsGuide(item, installed, deps);
-          if (!g.proceed) return;
+          if (!g.proceed) return false;
           selected = g.selected;
           await installSelectedDeps(selected);
         }
       }
-    } catch {}
+    } catch (e) {}
 
     // 第三步：NPM 依赖安装向导
     let npmInstallResult = { proceed: true, installed: [] };
     try {
       npmInstallResult = await showNpmInstallWizard(item);
-      if (!npmInstallResult.proceed) return;
+      if (!npmInstallResult.proceed) return false;
     } catch (e) {
       console.error('NPM安装向导失败:', e);
       await showAlert(`NPM依赖处理失败：${e?.message || '未知错误'}`);
-      return;
+      return false;
     }
 
     // 第四步：执行插件安装
     const res = await performInstall(kind, { item, zipPath, zipName, zipData, pkg });
     if (!res?.ok) {
       await showAlert(`插件安装失败：${res?.error || '未知错误'}`);
-      return;
+      return false;
     }
 
     // 第五步：安装完成后确保依赖链接
@@ -754,10 +754,11 @@
         }
         showToast(`已重启插件：${pluginInfo.name}`, { type: 'success', duration: 2000 });
       }
-    } catch {}
+    } catch (e) {}
 
     // 刷新插件列表
     await refreshPluginsList();
+    return true;
   }
 
   window.unifiedPluginInstall = unifiedPluginInstall;

@@ -7,6 +7,19 @@ async function fetchJson(path) {
   return await res.json();
 }
 
+const compareVersions = (v1, v2) => {
+  const p1 = String(v1 || '0').split('.').map(x => parseInt(x) || 0);
+  const p2 = String(v2 || '0').split('.').map(x => parseInt(x) || 0);
+  const len = Math.max(p1.length, p2.length);
+  for (let i = 0; i < len; i++) {
+    const n1 = p1[i] || 0;
+    const n2 = p2[i] || 0;
+    if (n1 > n2) return 1;
+    if (n1 < n2) return -1;
+  }
+  return 0;
+};
+
 // 自动安装 NPM 依赖的函数（与 modals/market.js 中的函数保持一致）
 async function autoInstallNpmDependencies(dependencies, options = {}) {
   const { silent = false, onProgress = null } = options;
@@ -23,12 +36,10 @@ async function autoInstallNpmDependencies(dependencies, options = {}) {
   };
 
   try {
-    // 获取已安装的 NPM 包列表
     const installedPkgs = await window.settingsAPI?.npmListInstalled?.();
     const installedList = (installedPkgs?.ok && Array.isArray(installedPkgs.packages)) ? installedPkgs.packages : [];
     const hasPkg = (name) => installedList.some(p => p.name === name && Array.isArray(p.versions) && p.versions.length);
 
-    // 筛选出缺失的依赖
     const missing = Object.keys(dependencies).filter(name => !hasPkg(name));
     
     if (!missing.length) {
@@ -42,14 +53,12 @@ async function autoInstallNpmDependencies(dependencies, options = {}) {
       onProgress && onProgress({ stage: 'npm', message: `开始自动安装 ${missing.length} 个 NPM 依赖...` });
     }
 
-    // 逐个安装缺失的依赖
     for (const name of missing) {
       try {
         if (!silent) {
           onProgress && onProgress({ stage: 'npm', message: `正在获取 ${name} 的版本信息...` });
         }
 
-        // 获取可用版本
         const verRes = await window.settingsAPI?.npmGetVersions?.(name);
         const versions = (verRes?.ok && Array.isArray(verRes.versions)) ? verRes.versions : [];
         
@@ -59,14 +68,12 @@ async function autoInstallNpmDependencies(dependencies, options = {}) {
           continue;
         }
 
-        // 选择最新版本
         const latestVersion = versions[versions.length - 1];
         
         if (!silent) {
           onProgress && onProgress({ stage: 'npm', message: `正在下载 ${name}@${latestVersion}...` });
         }
 
-        // 下载依赖
         const dl = await window.settingsAPI?.npmDownload?.(name, latestVersion);
         
         if (!dl?.ok) {
@@ -99,8 +106,6 @@ async function autoInstallNpmDependencies(dependencies, options = {}) {
   return results;
 }
 
-
-
 function renderStoreCard(item, installedList) {
   const el = document.createElement('div');
   el.className = 'store-card plugin-card';
@@ -118,7 +123,7 @@ function renderStoreCard(item, installedList) {
       <div style="display:flex;gap:12px;">
         <i class="${item.icon || 'ri-puzzle-line'}"></i>
         <div>
-          <div class="card-title">${item.name} ${versionText ? `<span class=\"pill small plugin-version\">${versionText}</span>` : ''}</div>
+          <div class="card-title">${item.name} ${versionText ? `<span class="pill small plugin-version">${versionText}</span>` : ''}</div>
           <div class="card-desc">${item.description || ''}</div>
           <div class="muted">作者：${authorText}</div>
         </div>
@@ -137,43 +142,49 @@ function renderStoreCard(item, installedList) {
   )) : null;
   const isInstalled = !!installed;
 
-  // 非插件类型：统一进入插件安装弹窗。若存在 npm 源，则文案显示“安装”以保持一致体验
   if (!isPluginType) {
     btnInstall.disabled = false;
     const hasNpmSource = !!item.npm;
     btnInstall.innerHTML = hasNpmSource ? '<i class="ri-download-2-line"></i> 安装' : '<i class="ri-eye-line"></i> 预览';
-    btnInstall.addEventListener('click', () => { try { showStorePluginModal(item); } catch {} });
+    btnInstall.addEventListener('click', () => { try { showStorePluginModal(item); } catch (e) {} });
   }
 
   const setInstallButton = async () => {
     try {
       if (!isPluginType) return;
-      // ZIP 安装或 NPM 安装的按钮状态
       if (!isInstalled) {
         btnInstall.disabled = false;
         btnInstall.innerHTML = '<i class="ri-download-2-line"></i> 安装';
         return;
       }
-      // 已安装：若无 npm 源，则仅显示“已安装”
-      if (!item.npm) {
-        btnInstall.disabled = true;
-        btnInstall.innerHTML = '<i class="ri-checkbox-circle-line"></i> 已安装';
+      
+      // 1. 优先检查市场版本更新
+      if (item.version && installed.version && compareVersions(item.version, installed.version) > 0) {
+        btnInstall.disabled = false;
+        btnInstall.innerHTML = `<i class="ri-refresh-line"></i> 更新到 v${item.version}`;
+        btnInstall.dataset.latest = item.version;
         return;
       }
-      const res = await window.settingsAPI?.npmGetVersions?.(item.npm);
-      const versions = (res?.ok && Array.isArray(res.versions)) ? res.versions : [];
-      const latest = versions.length ? versions[versions.length - 1] : null;
-      const installedVersion = installed?.version || null;
-      if (latest && installedVersion && latest !== installedVersion) {
-        btnInstall.disabled = false;
-        btnInstall.innerHTML = `<i class=\"ri-refresh-line\"></i> 更新到 v${latest}`;
-        btnInstall.dataset.latest = latest;
-      } else {
-        btnInstall.disabled = true;
-        btnInstall.innerHTML = '<i class="ri-checkbox-circle-line"></i> 已安装';
-        btnInstall.dataset.latest = '';
+
+      // 2. 检查 NPM 更新
+      if (item.npm) {
+        const res = await window.settingsAPI?.npmGetVersions?.(item.npm);
+        const versions = (res?.ok && Array.isArray(res.versions)) ? res.versions : [];
+        const latest = versions.length ? versions[versions.length - 1] : null;
+        const installedVersion = installed?.version || null;
+        if (latest && installedVersion && latest !== installedVersion) {
+          btnInstall.disabled = false;
+          btnInstall.innerHTML = `<i class="ri-refresh-line"></i> 更新到 v${latest}`;
+          btnInstall.dataset.latest = latest;
+          return;
+        }
       }
-    } catch {
+
+      // 3. 已安装且无更新
+      btnInstall.disabled = true;
+      btnInstall.innerHTML = '<i class="ri-checkbox-circle-line"></i> 已安装';
+      btnInstall.dataset.latest = '';
+    } catch (e) {
       btnInstall.disabled = isInstalled;
       btnInstall.innerHTML = isInstalled ? '<i class="ri-checkbox-circle-line"></i> 已安装' : '<i class="ri-download-2-line"></i> 安装';
     }
@@ -186,111 +197,73 @@ function renderStoreCard(item, installedList) {
         const latest = btnInstall.dataset.latest;
         btnInstall.disabled = true; btnInstall.innerHTML = '<i class="ri-loader-4-line"></i> 处理中...';
         if (latest) {
-          const dl = await window.settingsAPI?.npmDownload?.(item.npm, latest);
-          if (!dl?.ok) throw new Error(dl?.error || '下载失败');
-          const sw = await window.settingsAPI?.npmSwitch?.(item.id || item.name, item.npm, latest);
-          if (!sw?.ok) throw new Error(sw?.error || '切换版本失败');
-          await showAlert('已更新到最新版本');
+          // 若存在 ZIP 且版本匹配，优先 ZIP 更新
+          if (item.zip && compareVersions(item.version, latest) === 0) {
+             const base = await getMarketBase();
+             const url = new URL(item.zip, base).toString();
+             const res = await fetch(url);
+             if (!res.ok) throw new Error('ZIP 下载失败');
+             const buf = await res.arrayBuffer();
+             const name = item.name || item.id || 'plugin';
+             
+             let inspect = null;
+             try { inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf)); } catch (e) {}
+             
+             const enrichedItem = {
+                 ...item,
+                 id: inspect?.id || item.id || name,
+                 name: name,
+                 author: (typeof inspect?.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect?.author || item.author),
+                 dependencies: Array.isArray(inspect?.dependencies) ? inspect.dependencies : (Array.isArray(item?.dependencies) ? item.dependencies : []),
+                 npmDependencies: (inspect && typeof inspect.npmDependencies === 'object' && !Array.isArray(inspect.npmDependencies) && inspect.npmDependencies) ? inspect.npmDependencies : (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) ? item.npmDependencies : null)
+             };
+             const success = await window.unifiedPluginInstall({ kind: 'zipData', item: enrichedItem, zipName: name, zipData: new Uint8Array(buf) });
+             if (!success) { setInstallButton(); return; }
+          } else {
+             // NPM 更新
+             const dl = await window.settingsAPI?.npmDownload?.(item.npm, latest);
+             if (!dl?.ok) throw new Error(dl?.error || '下载失败');
+             const sw = await window.settingsAPI?.npmSwitch?.(item.id || item.name, item.npm, latest);
+             if (!sw?.ok) throw new Error(sw?.error || '切换版本失败');
+             await showAlert('已更新到最新版本');
+          }
         } else {
-          // 若存在 ZIP 字段，走 ZIP 安装
+          // 安装逻辑
+          let success = false;
           if (item.zip) {
-            try {
               const base = await getMarketBase();
               const url = new URL(item.zip, base).toString();
               const res = await fetch(url);
               if (!res.ok) throw new Error('ZIP 下载失败');
               const buf = await res.arrayBuffer();
-              // 名称不带 .zip 后缀：优先使用插件名称，其次回退到 id，最后回退默认名
               const name = item.name ? item.name : (item.id ? item.id : 'plugin');
-              // 安装前检查ZIP并弹出美化确认窗口
               let inspect = null;
-              try {
-                inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf));
-                if (inspect?.ok) {
-                  const installedList = await window.settingsAPI?.getPlugins?.();
-                  const installed = Array.isArray(installedList) ? installedList : [];
-                  const normalizeAuthor = (a) => {
-                    if (a === null || a === undefined) return null;
-                    if (typeof a === 'object') return a?.name || null;
-                    return String(a);
-                  };
-                  const authorVal = normalizeAuthor(inspect?.author) || normalizeAuthor(item?.author) || '未知作者';
-                  const pluginDepends = Array.isArray(inspect.dependencies) ? inspect.dependencies : (Array.isArray(item.dependencies) ? item.dependencies : []);
-                  const depsObjZip = (typeof inspect.npmDependencies === 'object' && inspect.npmDependencies) ? inspect.npmDependencies : null;
-                  const depNames = depsObjZip ? Object.keys(depsObjZip) : [];
-                  const parseVer = (v) => { const m = String(v||'0.0.0').split('.').map(x=>parseInt(x,10)||0); return { m:m[0]||0, n:m[1]||0, p:m[2]||0 }; };
-                  const cmp = (a,b)=>{ if(a.m!==b.m) return a.m-b.m; if(a.n!==b.n) return a.n-b.n; return a.p-b.p; };
-                  const satisfies = (ver, range) => {
-                    if (!range) return !!ver; const v=parseVer(ver); const r=String(range).trim(); const plain=r.replace(/^[~^]/,''); const base=parseVer(plain);
-                    if (r.startsWith('^')) return (v.m===base.m) && (cmp(v,base)>=0);
-                    if (r.startsWith('~')) return (v.m===base.m) && (v.n===base.n) && (cmp(v,base)>=0);
-                    if (r.startsWith('>=')) return cmp(v, parseVer(r.slice(2)))>=0;
-                    if (r.startsWith('>')) return cmp(v, parseVer(r.slice(1)))>0;
-                    if (r.startsWith('<=')) return cmp(v, parseVer(r.slice(2)))<=0;
-                    if (r.startsWith('<')) return cmp(v, parseVer(r.slice(1)))<0;
-                    const exact=parseVer(r); return cmp(v, exact)===0;
-                  };
-                  const depPills = pluginDepends.map(d => {
-                    const [depName, depRange] = String(d).split('@');
-                    const target = installed.find(pp => (pp.id === depName) || (pp.name === depName));
-                    const ok = !!target && satisfies(target?.version, depRange);
-                    const icon = ok ? 'ri-check-line' : 'ri-close-line';
-                    const cls = ok ? 'pill small ok' : 'pill small danger';
-                    return `<span class=\"${cls}\"><i class=\"${icon}\"></i> ${depName}${depRange ? '@'+depRange : ''}</span>`;
-                  }).join(' ');
-                  const hasUnsatisfied = pluginDepends.some(d => {
-                    const [depName, depRange] = String(d).split('@');
-                    const target = installed.find(pp => (pp.id === depName) || (pp.name === depName));
-                    return !(!!target && satisfies(target?.version, depRange));
-                  });
-                  const npmPills = depNames.map(k => `<span class=\"pill small\">${k}</span>`).join(' ');
-                  // 引导依赖安装弹窗：展示依赖（含上级依赖），可多选，默认市场可安装的依赖选中；已满足或未在市场找到的禁用
-                  const catalog = Array.isArray(window.__marketCatalog__) ? window.__marketCatalog__ : [];
-                  const findMarketItem = (name) => catalog.find((x) => (x.id === name) || (x.name === name));
-                  const resolveClosure = (deps) => {
-                    const seen = new Set(); const out = []; const queue = Array.isArray(deps) ? deps.slice() : [];
-                    while (queue.length) {
-                      const raw = queue.shift(); const [depName, depRange] = String(raw).split('@');
-                      const key = depName.trim(); if (!key || seen.has(key)) continue; seen.add(key);
-                      const mi = findMarketItem(key) || null; out.push({ name: key, range: depRange || '', market: mi });
-                      const next = Array.isArray(mi?.dependencies) ? mi.dependencies.slice() : []; queue.push(...next);
-                    }
-                    return out;
-                  };
-                  // 本地安装向导已移除，依赖引导与安装由统一入口处理
-                }
-              } catch {}
-              // 将 inspect 结果合并到 item，确保统一安装入口能识别 NPM 依赖
-              const depsObj = (inspect && typeof inspect.npmDependencies === 'object' && !Array.isArray(inspect.npmDependencies) && inspect.npmDependencies) ? inspect.npmDependencies : null;
+              try { inspect = await window.settingsAPI?.inspectPluginZipData?.(name, new Uint8Array(buf)); } catch (e) {}
               const enrichedItem = {
-                ...item,
-                id: inspect?.id || item.id || name,
-                name: name,
-                author: (typeof inspect?.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect?.author || item.author),
-                dependencies: Array.isArray(inspect?.dependencies) ? inspect.dependencies : (Array.isArray(item?.dependencies) ? item.dependencies : []),
-                npmDependencies: depsObj || (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) ? item.npmDependencies : null)
+                 ...item,
+                 id: inspect?.id || item.id || name,
+                 name: name,
+                 author: (typeof inspect?.author === 'object') ? (inspect.author?.name || JSON.stringify(inspect.author)) : (inspect?.author || item.author),
+                 dependencies: Array.isArray(inspect?.dependencies) ? inspect.dependencies : (Array.isArray(item?.dependencies) ? item.dependencies : []),
+                 npmDependencies: (inspect && typeof inspect.npmDependencies === 'object' && !Array.isArray(inspect.npmDependencies) && inspect.npmDependencies) ? inspect.npmDependencies : (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) ? item.npmDependencies : null)
               };
-              await window.unifiedPluginInstall({ kind: 'zipData', item: enrichedItem, zipName: name, zipData: new Uint8Array(buf) });
-            } catch (e) {
-              throw e;
-            }
+              success = await window.unifiedPluginInstall({ kind: 'zipData', item: enrichedItem, zipName: name, zipData: new Uint8Array(buf) });
           } else {
-            const pkg = item.npm || item.id || item.name;
-            // 本地向导移除，直接调用统一安装入口处理依赖与安装
-            try {} catch {}
-            await window.unifiedPluginInstall({ kind: 'npm', item, pkg });
+              success = await window.unifiedPluginInstall({ kind: 'npm', item, pkg: item.npm || item.id || item.name });
           }
+          if (!success) { setInstallButton(); return; }
         }
+        
+        // 刷新逻辑
         const active = Array.from(document.querySelectorAll('#page-market .store-tabs .sub-item')).find(b => b.classList.contains('active'));
         active?.click?.();
-        // 安装或更新成功后刷新插件管理页面（仅显示包含动作的插件）
         try {
           const container = document.getElementById('plugins');
           const list = await fetchPlugins();
           const filtered = list.filter((p) => Array.isArray(p.actions) && p.actions.length > 0);
           container.innerHTML = '';
           filtered.forEach((p) => container.appendChild(renderPlugin(p)));
-        } catch {}
+        } catch (e) {}
       } catch (err) {
         alert(err?.message || '操作失败');
         setInstallButton();
@@ -300,10 +273,70 @@ function renderStoreCard(item, installedList) {
 
   el.addEventListener('click', (evt) => {
     if (evt.target === btnInstall || btnInstall.contains(evt.target)) return;
-    try { showStorePluginModal(item); } catch {}
+    try { showStorePluginModal(item); } catch (e) {}
   });
   return el;
 }
+
+window.publishResource = async (type, item) => {
+  const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+  const box = document.createElement('div'); box.className = 'modal-box'; box.style.width = '400px';
+  const title = document.createElement('div'); title.className = 'modal-title'; title.textContent = '发布资源到市场';
+  const body = document.createElement('div'); body.className = 'modal-body';
+  body.innerHTML = `
+    <div style="margin-bottom:16px;">
+      <div class="muted" style="margin-bottom:8px;">资源：${item.name || item.id} (${type})</div>
+      <div class="muted" style="margin-bottom:8px;">ID：${item.id}</div>
+      <div class="muted" style="margin-bottom:16px;">版本：${item.version || '1.0.0'}</div>
+      <input type="password" id="pub-pass" placeholder="管理员密码" style="width:100%; padding:8px; border:1px solid var(--border); background:var(--bg); color:var(--fg); border-radius:4px; box-sizing:border-box;">
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button class="btn secondary" id="pub-cancel">取消</button>
+      <button class="btn primary" id="pub-confirm">发布</button>
+    </div>
+  `;
+  box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
+  return new Promise((resolve) => {
+    const close = () => { try { overlay.remove(); } catch (e) {} resolve(false); };
+    overlay.querySelector('#pub-cancel').onclick = close;
+    overlay.querySelector('#pub-confirm').onclick = async () => {
+      const pass = overlay.querySelector('#pub-pass').value;
+      const btn = overlay.querySelector('#pub-confirm');
+      btn.disabled = true; btn.textContent = '发布中...';
+      try {
+        let zipBuf = null;
+        let metadata = { ...item };
+        metadata.type = type;
+        if (!metadata.id) metadata.id = item.name;
+        if (!metadata.version) metadata.version = '1.0.0';
+        if (type === 'automation') {
+          const res = await window.settingsAPI?.packAutomation?.(item.id);
+          if (!res?.ok || !res.zipData) throw new Error(res?.error || '打包失败');
+          zipBuf = res.zipData;
+        } else {
+          const res = await window.settingsAPI?.packPlugin?.(item.id || item.name);
+          if (!res?.ok || !res.zipData) throw new Error(res?.error || '打包失败');
+          zipBuf = res.zipData;
+        }
+        const formData = new FormData();
+        const blob = new Blob([zipBuf], { type: 'application/zip' });
+        formData.append('file', blob, 'resource.zip');
+        formData.append('metadata', JSON.stringify(metadata));
+        formData.append('adminPassword', pass);
+        const base = await getMarketBase();
+        const url = new URL('/api/dev/publish', base).toString();
+        const res = await fetch(url, { method: 'POST', body: formData });
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error || '发布失败');
+        await showAlert('发布成功！');
+        close();
+      } catch (e) {
+        await showAlert('错误：' + e.message);
+        btn.disabled = false; btn.textContent = '发布';
+      }
+    };
+  });
+};
 
 function renderUpdateCard(p) {
   const el = document.createElement('div');
@@ -312,29 +345,50 @@ function renderUpdateCard(p) {
   const versionText = p.version ? `v${p.version}` : '';
   const latestText = p.latest ? `v${p.latest}` : '';
   el.innerHTML = `
-    <div class=\"card-header\" style=\"display:flex;justify-content:space-between;align-items:flex-start;gap:12px;\">
-      <div style=\"display:flex;gap:12px;\">
-        <i class=\"${p.icon || 'ri-refresh-line'}\"></i>
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div style="display:flex;gap:12px;">
+        <i class="${p.icon || 'ri-refresh-line'}"></i>
         <div>
-          <div class=\"card-title\">${p.name} <span class=\\\"pill small\\\">当前 ${versionText}</span> <span class=\\\"pill small primary\\\">最新 ${latestText}</span></div>
-          <div class=\"card-desc\">${p.description || ''}</div>
-          <div class=\"muted\">提示：该功能可更新</div>
+          <div class="card-title">${p.name} <span class="pill small">当前 ${versionText}</span> <span class="pill small primary">最新 ${latestText}</span></div>
+          <div class="card-desc">${p.description || ''}</div>
+          <div class="muted">提示：该功能可更新</div>
         </div>
       </div>
-      <div class=\"card-action\" style=\"flex-shrink:0;\">
-        <button class=\"btn primary\"><i class=\"ri-download-2-line\"></i> 更新到 ${latestText}</button>
+      <div class="card-action" style="flex-shrink:0;">
+        <button class="btn primary"><i class="ri-download-2-line"></i> 更新到 ${latestText}</button>
       </div>
     </div>
   `;
   const btn = el.querySelector('button.btn.primary');
   btn.addEventListener('click', async () => {
     try {
-      btn.disabled = true; btn.innerHTML = '<i class=\"ri-loader-4-line\"></i> 更新中...';
-      const dl = await window.settingsAPI?.npmDownload?.(p.npm, p.latest);
-      if (!dl?.ok) throw new Error(dl?.error || '下载失败');
-      const sw = await window.settingsAPI?.npmSwitch?.(p.id || p.name, p.npm, p.latest);
-      if (!sw?.ok) throw new Error(sw?.error || '切换版本失败');
-      await showAlert('已更新到最新版本');
+      btn.disabled = true; btn.innerHTML = '<i class="ri-loader-4-line"></i> 更新中...';
+      
+      // 优先使用 ZIP 更新（若存在）
+      if (p.zip) {
+        const base = await getMarketBase();
+        const url = new URL(p.zip, base).toString();
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('ZIP 下载失败');
+        const buf = await res.arrayBuffer();
+        const name = p.name || p.id;
+        // 复用统一安装逻辑
+        const success = await window.unifiedPluginInstall({ kind: 'zipData', item: p, zipName: name, zipData: new Uint8Array(buf) });
+        if (!success) {
+          btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 更新到 ${latestText}`;
+          return;
+        }
+      } else if (p.npm) {
+        // NPM 更新逻辑
+        const dl = await window.settingsAPI?.npmDownload?.(p.npm, p.latest);
+        if (!dl?.ok) throw new Error(dl?.error || '下载失败');
+        const sw = await window.settingsAPI?.npmSwitch?.(p.id || p.name, p.npm, p.latest);
+        if (!sw?.ok) throw new Error(sw?.error || '切换版本失败');
+        await showAlert('已更新到最新版本');
+      } else {
+        throw new Error('未找到更新源');
+      }
+
       const btnNav = Array.from(document.querySelectorAll('#page-market .store-tabs .sub-item')).find(b => b.dataset.storeTab === 'updates');
       btnNav?.click?.();
       // 更新成功后刷新插件管理页面
@@ -344,10 +398,10 @@ function renderUpdateCard(p) {
         const filtered = list.filter((pp) => Array.isArray(pp.actions) && pp.actions.length > 0);
         container.innerHTML = '';
         filtered.forEach((pp) => container.appendChild(renderPlugin(pp)));
-      } catch {}
+      } catch (e) {}
     } catch (e) {
       alert('更新失败：' + (e?.message || '未知错误'));
-      btn.disabled = false; btn.innerHTML = `<i class=\"ri-download-2-line\"></i> 更新到 ${latestText}`;
+      btn.disabled = false; btn.innerHTML = `<i class="ri-download-2-line"></i> 更新到 ${latestText}`;
     }
   });
   return el;

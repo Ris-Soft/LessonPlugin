@@ -249,7 +249,7 @@ async function initAutomationSettings() {
                   const weekIndex = Math.floor(diffDays / 7);
                   isEvenWeek = weekIndex % 2 === 0;
                   if (biweekOff) isEvenWeek = !isEvenWeek;
-                } catch { }
+                } catch (e) { }
               }
               let ok = true;
               switch (c.type) {
@@ -278,7 +278,7 @@ async function initAutomationSettings() {
                 statusDot.classList.toggle('ok', ok);
                 statusDot.classList.toggle('fail', !ok);
                 statusDot.title = ok ? '当前满足' : '当前不满足';
-              } catch { }
+              } catch (e) { }
             };
             const renderEditor = () => {
               editorWrap.innerHTML = '';
@@ -361,8 +361,8 @@ async function initAutomationSettings() {
         box.appendChild(condList);
         groupsWrap.appendChild(box);
       });
-      try { if (condStatusTimer) clearInterval(condStatusTimer); } catch { }
-      condStatusTimer = setInterval(() => { try { allCondUpdateFns.forEach(fn => fn && fn()); } catch { } }, 30 * 1000);
+      try { if (condStatusTimer) clearInterval(condStatusTimer); } catch (e) { }
+      condStatusTimer = setInterval(() => { try { allCondUpdateFns.forEach(fn => fn && fn()); } catch (e) { } }, 30 * 1000);
     };
     addGroupBtn.addEventListener('click', () => { it.conditions = it.conditions || { mode: 'and', groups: [] }; it.conditions.groups.push({ mode: 'and', items: [] }); renderGroups(); });
     secCond.appendChild(addGroupBtn);
@@ -570,7 +570,7 @@ async function initAutomationSettings() {
       return '—';
     })();
     let tz = 'Asia/Shanghai';
-    try { const v = await window.settingsAPI?.configGet?.('system', 'timeZone'); if (v) tz = String(v); } catch {}
+    try { const v = await window.settingsAPI?.configGet?.('system', 'timeZone'); if (v) tz = String(v); } catch (e) {}
     const formatDateTimeTZ = (d) => {
       try {
         const parts = new Intl.DateTimeFormat('zh-CN', {
@@ -591,7 +591,7 @@ async function initAutomationSettings() {
         const mm = get('minute');
         const ss = get('second');
         return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
-      } catch { return d.toLocaleString(); }
+      } catch (e) { return d.toLocaleString(); }
     };
     const lastText = it.lastSuccessAt ? formatDateTimeTZ(new Date(it.lastSuccessAt)) : '—';
     const metaId = document.createElement('div'); metaId.className = 'muted'; metaId.textContent = 'ID：' + (it.id || '—');
@@ -610,6 +610,17 @@ async function initAutomationSettings() {
     const btnSaveJson = document.createElement('button'); btnSaveJson.className = 'btn primary'; btnSaveJson.innerHTML = '<i class="ri-save-3-line"></i> 保存';
     const btnCopy = document.createElement('button'); btnCopy.className = 'btn secondary'; btnCopy.innerHTML = '<i class="ri-file-copy-2-line"></i> 复制';
     const btnPaste = document.createElement('button'); btnPaste.className = 'btn secondary'; btnPaste.innerHTML = '<i class="ri-clipboard-line"></i> 粘贴';
+    
+    // 开发模式：发布按钮
+    if (window.__isDev__) {
+      const btnPublish = document.createElement('button'); 
+      btnPublish.className = 'btn secondary'; 
+      btnPublish.innerHTML = '<i class="ri-upload-cloud-2-line"></i> 发布';
+      btnPublish.addEventListener('click', () => {
+        window.publishResource && window.publishResource('automation', it);
+      });
+      jsonActions.appendChild(btnPublish);
+    }
 
     const buildDisplay = () => {
       return {
@@ -620,7 +631,7 @@ async function initAutomationSettings() {
         confirm: { enabled: confirmEnabled.querySelector('input').checked, timeout: parseInt(timeoutInput.value || 60, 10) }
       };
     };
-    const refreshJson = () => { try { jsonArea.value = JSON.stringify(buildDisplay(), null, 2); } catch { } };
+    const refreshJson = () => { try { jsonArea.value = JSON.stringify(buildDisplay(), null, 2); } catch (e) { } };
     refreshJson();
 
     btnRefresh.addEventListener('click', () => refreshJson());

@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-function readJsonSafe(fp, fallback) { try { return JSON.parse(fs.readFileSync(fp, 'utf-8')); } catch { return fallback; } }
-function ensureDir(p) { try { fs.mkdirSync(p, { recursive: true }); } catch {} }
+function readJsonSafe(fp, fallback) { try { return JSON.parse(fs.readFileSync(fp, 'utf-8')); } catch (e) { return fallback; } }
+function ensureDir(p) { try { fs.mkdirSync(p, { recursive: true }); } catch (e) {} }
 function slugName(s) { return String(s||'').toLowerCase().replace(/\./g,'-').replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'') || 'plugin'; }
 
 function removeIfExists(p) {
@@ -12,7 +12,7 @@ function removeIfExists(p) {
       if (st.isDirectory() || st.isSymbolicLink()) fs.rmSync(p, { recursive: true, force: true });
       else fs.unlinkSync(p);
     }
-  } catch {}
+  } catch (e) {}
 }
 
 function resolvePluginId(pluginDir) {
@@ -32,7 +32,7 @@ function copyDir(src, dst) {
     const sp = path.join(src, it);
     const dp = path.join(dst, it);
     let st;
-    try { st = fs.lstatSync(sp); } catch { continue; }
+    try { st = fs.lstatSync(sp); } catch (e) { continue; }
     if (st.isDirectory()) {
       copyDir(sp, dp);
     } else if (st.isSymbolicLink()) {
@@ -52,7 +52,7 @@ function copyDir(src, dst) {
         console.warn(`[warn] Failed to resolve symlink ${sp}: ${e.message}`);
       }
     } else {
-      try { fs.copyFileSync(sp, dp); } catch {}
+      try { fs.copyFileSync(sp, dp); } catch (e) {}
     }
   }
 }
@@ -67,7 +67,7 @@ function cleanExtra(dst, src) {
     if (!fs.existsSync(sp)) removeIfExists(dp);
     else {
       let st;
-      try { st = fs.statSync(dp); } catch { continue; }
+      try { st = fs.statSync(dp); } catch (e) { continue; }
       if (st.isDirectory()) cleanExtra(dp, sp);
     }
   }
@@ -97,13 +97,13 @@ function fingerprintDir(root) {
     const rel = stack.pop();
     const dir = path.join(root, rel);
     let names = [];
-    try { names = fs.readdirSync(dir); } catch { continue; }
+    try { names = fs.readdirSync(dir); } catch (e) { continue; }
     for (const name of names) {
       if (name === '.git') continue;
       const subRel = rel ? path.join(rel, name) : name;
       const p = path.join(root, subRel);
       let st;
-      try { st = fs.statSync(p); } catch { continue; }
+      try { st = fs.statSync(p); } catch (e) { continue; }
       if (st.isDirectory()) { stack.push(subRel); }
       else { acc += `${subRel}|${st.size}|${st.mtimeMs};`; }
     }
@@ -116,8 +116,8 @@ function fingerprintDir(root) {
 function ensurePlaceholders(devRoot) {
   const cfgPath = path.join(devRoot, 'config.json');
   const manifestPath = path.join(devRoot, 'plugins.json');
-  try { if (!fs.existsSync(cfgPath)) fs.writeFileSync(cfgPath, JSON.stringify({ enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} }, null, 2), 'utf-8'); } catch {}
-  try { if (!fs.existsSync(manifestPath)) fs.writeFileSync(manifestPath, JSON.stringify({ plugins: [] }, null, 2), 'utf-8'); } catch {}
+  try { if (!fs.existsSync(cfgPath)) fs.writeFileSync(cfgPath, JSON.stringify({ enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} }, null, 2), 'utf-8'); } catch (e) {}
+  try { if (!fs.existsSync(manifestPath)) fs.writeFileSync(manifestPath, JSON.stringify({ plugins: [] }, null, 2), 'utf-8'); } catch (e) {}
 }
 
 function main() {
@@ -132,7 +132,7 @@ function main() {
     if (!fs.existsSync(cfgPath)) {
       fs.writeFileSync(cfgPath, JSON.stringify({ enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} }, null, 2), 'utf-8');
     }
-  } catch {}
+  } catch (e) {}
   const list = Array.isArray(cfg.paths) ? cfg.paths : [];
   const lastFinger = new Map();
   for (const rel of list) {
@@ -141,8 +141,8 @@ function main() {
     const id = resolvePluginId(abs);
     const target = path.join(devRoot, id);
     let fp = '';
-    try { fp = fingerprintDir(abs); } catch { fp = ''; }
-    try { syncPlugin(abs, target); } catch {}
+    try { fp = fingerprintDir(abs); } catch (e) { fp = ''; }
+    try { syncPlugin(abs, target); } catch (e) {}
     lastFinger.set(id, fp);
     try {
       const debounce = { t: 0 };
@@ -151,17 +151,17 @@ function main() {
         if (now - debounce.t < 600) return;
         debounce.t = now;
         let cur = '';
-        try { cur = fingerprintDir(abs); } catch { cur = ''; }
+        try { cur = fingerprintDir(abs); } catch (e) { cur = ''; }
         const prev = lastFinger.get(id) || '';
         if (cur === prev) return;
-        try { syncPlugin(abs, target); } catch {}
+        try { syncPlugin(abs, target); } catch (e) {}
         lastFinger.set(id, cur);
         const rel = filename ? String(filename) : '';
         console.log(`[${stamp()}] Synced ${id}${rel ? `:${rel}` : ''} → ${target}`);
       });
       w.on('error', () => {});
       console.log(`[${stamp()}] Watching ${id} → ${target}`);
-    } catch {}
+    } catch (e) {}
   }
   console.log(`[${stamp()}] Plugins root (src): ${devRoot}`);
   if (process.argv.includes('--once')) {

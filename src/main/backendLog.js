@@ -18,7 +18,7 @@ function init(options = {}) {
     fs.mkdirSync(logDir, { recursive: true });
     enabled = !!options.enabled;
     if (enabled) startCapture();
-  } catch {}
+  } catch (e) {}
 }
 
 function formatLine(level, args) {
@@ -26,10 +26,10 @@ function formatLine(level, args) {
   try {
     const msg = args.map(a => {
       if (typeof a === 'string') return a;
-      try { return JSON.stringify(a); } catch { return String(a); }
+      try { return JSON.stringify(a); } catch (e) { return String(a); }
     }).join(' ');
     return `${ts} [${level}] ${msg}`;
-  } catch { return `${ts} [${level}] ${args?.join(' ')}`; }
+  } catch (e) { return `${ts} [${level}] ${args?.join(' ')}`; }
 }
 
 function detectOrigin() {
@@ -54,7 +54,7 @@ function detectOrigin() {
       const name = base.replace(/\.(js|ts|mjs|cjs)$/i, '');
       return { sourceType: 'system', sourceId: name, module: name };
     }
-  } catch {}
+  } catch (e) {}
   return { sourceType: 'system', sourceId: 'unknown', module: 'unknown' };
 }
 
@@ -69,9 +69,9 @@ function append(level, args) {
       try {
         return args.map(a => {
           if (typeof a === 'string') return a;
-          try { return JSON.stringify(a); } catch { return String(a); }
+          try { return JSON.stringify(a); } catch (e) { return String(a); }
         }).join(' ');
-      } catch { return String(args?.join(' ') || ''); }
+      } catch (e) { return String(args?.join(' ') || ''); }
     })(),
     sourceType: origin.sourceType,
     sourceId: origin.sourceId,
@@ -79,10 +79,10 @@ function append(level, args) {
   };
   buffer.push(entry);
   if (buffer.length > maxBuffer) buffer = buffer.slice(buffer.length - maxBuffer);
-  try { fs.appendFileSync(logFile, line + '\n', 'utf-8'); } catch {}
+  try { fs.appendFileSync(logFile, line + '\n', 'utf-8'); } catch (e) {}
   for (const wc of Array.from(subscribers)) {
-    try { wc.send('backend:log', line); } catch {}
-    try { wc.send('backend:log:entry', entry); } catch {}
+    try { wc.send('backend:log', line); } catch (e) {}
+    try { wc.send('backend:log:entry', entry); } catch (e) {}
   }
 }
 
@@ -94,10 +94,10 @@ function startCapture() {
     warn: console.warn,
     error: console.error
   };
-  console.log = (...args) => { try { originalConsole.log(...args); } catch {}; append('log', args); };
-  console.info = (...args) => { try { originalConsole.info(...args); } catch {}; append('info', args); };
-  console.warn = (...args) => { try { originalConsole.warn(...args); } catch {}; append('warn', args); };
-  console.error = (...args) => { try { originalConsole.error(...args); } catch {}; append('error', args); };
+  console.log = (...args) => { try { originalConsole.log(...args); } catch (e) {}; append('log', args); };
+  console.info = (...args) => { try { originalConsole.info(...args); } catch (e) {}; append('info', args); };
+  console.warn = (...args) => { try { originalConsole.warn(...args); } catch (e) {}; append('warn', args); };
+  console.error = (...args) => { try { originalConsole.error(...args); } catch (e) {}; append('error', args); };
 }
 
 function stopCapture() {
@@ -122,14 +122,14 @@ function getLast(n = 20) {
       const lines = text.split(/\r?\n/).filter(Boolean);
       return lines.slice(Math.max(0, lines.length - n));
     }
-  } catch {}
+  } catch (e) {}
   return [];
 }
 
 function getLastEntries(n = 200) {
   try {
     if (buffer.length) return buffer.slice(Math.max(0, buffer.length - n));
-  } catch {}
+  } catch (e) {}
   return [];
 }
 
@@ -145,5 +145,5 @@ module.exports = {
   getLast,
   getLastEntries,
   subscribe,
-  write: (level, ...args) => { try { append(String(level || 'info'), args); } catch {} }
+  write: (level, ...args) => { try { append(String(level || 'info'), args); } catch (e) {} }
 };

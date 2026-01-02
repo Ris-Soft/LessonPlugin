@@ -34,6 +34,7 @@ async function initGeneralSettings() {
     splashBgStyle: 'default',
     splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具',
+    autoUpdateEnabled: true,
     autostartEnabled: false,
     autostartHigh: false,
     preciseTimeEnabled: false,
@@ -260,7 +261,7 @@ async function initGeneralSettings() {
 
       // 预览语句：根据当前来源设置请求并渲染（非阻塞）
       if (quoteEnabled) {
-        try { renderPreviewQuoteFromSource(doc, name); } catch {}
+        try { renderPreviewQuoteFromSource(doc, name); } catch (e) {}
       }
     } catch (e) {
       // 静默预览错误
@@ -278,7 +279,7 @@ async function initGeneralSettings() {
       if (ready === 'interactive' || ready === 'complete') {
         updateSplashPreview();
       }
-    } catch {}
+    } catch (e) {}
   }
 
   // 背景风格变更监听（单选按钮组）
@@ -359,7 +360,7 @@ async function initGeneralSettings() {
           } else {
             txt = String(data);
           }
-        } catch {
+        } catch (e) {
           txt = await resp.text();
         }
         quoteEl.textContent = txt || `「正在启动…」—— ${programName}`;
@@ -384,6 +385,7 @@ async function initGeneralSettings() {
 
   // 基础设置：自启动、精确时间与偏移
   const autostartEnabled = document.getElementById('autostart-enabled');
+  const autoUpdateEnabled = document.getElementById('auto-update-enabled');
   const autostartHigh = document.getElementById('autostart-high');
   const preciseTime = document.getElementById('precise-time');
   const semesterStart = document.getElementById('semester-start');
@@ -395,6 +397,7 @@ async function initGeneralSettings() {
   const currentSemesterSummary = document.getElementById('current-semester-summary');
 
   autostartEnabled.checked = !!cfg.autostartEnabled;
+  autoUpdateEnabled.checked = cfg.autoUpdateEnabled !== false;
   autostartHigh.checked = !!cfg.autostartHigh;
   preciseTime.checked = !!cfg.preciseTimeEnabled;
   semesterStart.value = String(cfg.semesterStart || cfg.offsetBaseDate || new Date().toISOString().slice(0, 10));
@@ -435,7 +438,7 @@ async function initGeneralSettings() {
       const mm = get('minute');
       const ss = get('second');
       return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
-    } catch {
+    } catch (e) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -459,7 +462,7 @@ async function initGeneralSettings() {
       if (currentTimeSummary) currentTimeSummary.textContent = formatDateTime(adj);
       if (currentOffsetSummary) currentOffsetSummary.textContent = `偏移 ${total >= 0 ? '+' : ''}${total}s`;
       if (currentSemesterSummary) currentSemesterSummary.textContent = `第 ${weekIndex} 周（${parity}），已开学 ${days} 天`;
-    } catch {
+    } catch (e) {
       const now = new Date();
       if (currentTimeSummary) currentTimeSummary.textContent = formatDateTime(now);
       if (currentOffsetSummary) currentOffsetSummary.textContent = '偏移 —';
@@ -467,7 +470,7 @@ async function initGeneralSettings() {
     }
   };
   // 初始化与定时刷新（避免重复定时器）
-  try { if (window.__timeSummaryTimer__) { clearInterval(window.__timeSummaryTimer__); } } catch {}
+  try { if (window.__timeSummaryTimer__) { clearInterval(window.__timeSummaryTimer__); } } catch (e) {}
   updateTimeSummaries();
   window.__timeSummaryTimer__ = setInterval(updateTimeSummaries, 1000);
 
@@ -504,7 +507,7 @@ async function initGeneralSettings() {
           + (Array.isArray(data.automation) ? data.automation.length : 0)
           + (Array.isArray(data.components) ? data.components.length : 0);
         marketApiSample.textContent = `连接成功，可用条目共 ${count} 个`;
-      } catch {
+      } catch (e) {
         marketApiSample.textContent = '连接失败，请检查地址或服务是否启动。';
       }
     });
@@ -519,7 +522,7 @@ async function initGeneralSettings() {
       if (!confirmed) return;
       const res = await window.settingsAPI?.cleanupUserData?.();
       if (res?.ok) {
-        try { await refreshUserDataSize(); } catch {}
+        try { await refreshUserDataSize(); } catch (e) {}
         alert('已清理用户数据。您现在可以从系统中卸载应用。');
       } else {
         alert('清理失败：' + (res?.error || '未知错误'));
@@ -530,6 +533,9 @@ async function initGeneralSettings() {
   autostartEnabled.addEventListener('change', async () => {
     await window.settingsAPI?.configSet('system', 'autostartEnabled', !!autostartEnabled.checked);
     await window.settingsAPI?.setAutostart?.(!!autostartEnabled.checked, !!autostartHigh.checked);
+  });
+  autoUpdateEnabled.addEventListener('change', async () => {
+    await window.settingsAPI?.configSet('system', 'autoUpdateEnabled', !!autoUpdateEnabled.checked);
   });
   autostartHigh.addEventListener('change', async () => {
     await window.settingsAPI?.configSet('system', 'autostartHigh', !!autostartHigh.checked);
@@ -578,26 +584,26 @@ async function initGeneralSettings() {
       const res = await window.settingsAPI?.getUserDataSize?.();
       const bytes = (res && typeof res === 'object') ? Number(res.bytes || 0) : Number(res || 0);
       userDataSizeEl.textContent = formatBytes(bytes);
-    } catch { userDataSizeEl.textContent = '—'; }
+    } catch (e) { userDataSizeEl.textContent = '—'; }
   };
   if (userDataPathEl && window.settingsAPI?.getUserDataPath) {
     try {
       const p = await window.settingsAPI.getUserDataPath();
       userDataPathEl.textContent = String(p || '');
-    } catch {}
+    } catch (e) {}
   }
   // 初始化数据目录大小（延后到空闲阶段，避免点击卡顿）
   try {
     if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(() => { try { refreshUserDataSize(); } catch {} }, { timeout: 1000 });
+      window.requestIdleCallback(() => { try { refreshUserDataSize(); } catch (e) {} }, { timeout: 1000 });
     } else {
-      setTimeout(() => { try { refreshUserDataSize(); } catch {} }, 0);
+      setTimeout(() => { try { refreshUserDataSize(); } catch (e) {} }, 0);
     }
-  } catch { refreshUserDataSize(); }
+  } catch (e) { refreshUserDataSize(); }
   if (openUserDataBtn && openUserDataBtn.dataset.bound !== '1') {
     openUserDataBtn.dataset.bound = '1';
     openUserDataBtn.addEventListener('click', async () => {
-      try { await window.settingsAPI?.openUserData?.(); } catch {}
+      try { await window.settingsAPI?.openUserData?.(); } catch (e) {}
     });
   }
   if (changeUserDataBtn && changeUserDataBtn.dataset.bound !== '1') {

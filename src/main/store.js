@@ -84,7 +84,7 @@ function deleteScope(scope) {
     const file = scopeFile(scope);
     if (fs.existsSync(file)) fs.unlinkSync(file);
     return true;
-  } catch { return false; }
+  } catch (e) { return false; }
 }
 
 function listPluginScopes() {
@@ -93,10 +93,10 @@ function listPluginScopes() {
     if (!fs.existsSync(pluginsDir)) return [];
     const names = fs.readdirSync(pluginsDir).filter((n) => {
       const fp = path.join(pluginsDir, n);
-      try { return fs.statSync(fp).isFile() && n.toLowerCase().endsWith('.json'); } catch { return false; }
+      try { return fs.statSync(fp).isFile() && n.toLowerCase().endsWith('.json'); } catch (e) { return false; }
     }).map((n) => n.replace(/\.json$/i, ''));
     return names;
-  } catch { return []; }
+  } catch (e) { return []; }
 }
 
 module.exports = { init, getAll, get, set, ensureDefaults, listPluginScopes, setAll, deleteScope };

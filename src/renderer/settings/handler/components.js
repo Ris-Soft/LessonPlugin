@@ -34,18 +34,18 @@ window.initComponentsPage = async function initComponentsPage() {
         const title = document.createElement('div'); title.className = 'modal-title';
         title.innerHTML = `<span><i class="ri-layout-3-line"></i> 预览组件 — ${c.name || c.id}</span>`;
         const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.innerHTML = '<i class="ri-close-line"></i>';
-        closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+        closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch (e) {} });
         title.appendChild(closeBtn);
-        try { title.style.justifyContent = 'space-between'; } catch {}
+        try { title.style.justifyContent = 'space-between'; } catch (e) {}
         const body = document.createElement('div'); body.className = 'modal-body';
         const frame = document.createElement('iframe'); frame.style.width = '100%'; frame.style.height = '480px'; frame.src = url; frame.title = '组件预览';
         body.appendChild(frame);
         box.appendChild(title); box.appendChild(body); overlay.appendChild(box); document.body.appendChild(overlay);
-      } catch {}
+      } catch (e) {}
     });
     const aboutBtn = el.querySelector('.about-btn');
     aboutBtn?.addEventListener('click', () => {
-      try { showComponentAboutModal(c); } catch {}
+      try { showComponentAboutModal(c); } catch (e) {}
     });
     const uninstallBtn = el.querySelector('.uninstall-btn');
     uninstallBtn?.addEventListener('click', async () => {
@@ -56,6 +56,16 @@ window.initComponentsPage = async function initComponentsPage() {
       showToast(`已卸载组件：${c.name || c.id}`, { type: 'success', duration: 2000 });
       await refresh();
     });
+    if (window.__isDev__) {
+      const publishBtn = document.createElement('button');
+      publishBtn.className = 'icon-btn publish-btn';
+      publishBtn.title = '发布到市场';
+      publishBtn.innerHTML = '<i class="ri-upload-cloud-2-line"></i>';
+      publishBtn.addEventListener('click', () => {
+        window.publishResource && window.publishResource('component', c);
+      });
+      el.querySelector('.actions-right').appendChild(publishBtn);
+    }
     return el;
   };
   const refresh = async () => {

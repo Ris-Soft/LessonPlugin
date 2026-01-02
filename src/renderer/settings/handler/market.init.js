@@ -5,7 +5,7 @@ async function getMarketBase() {
     if (typeof svc === 'string' && svc) return svc;
     const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase');
     return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/';
-  } catch {
+  } catch (e) {
     return 'http://localhost:3030/';
   }
 }
@@ -35,7 +35,7 @@ async function initMarketPage() {
     let currentTab = 'comprehensive';
     let currentSub = 'all';
     let pluginList = [];
-    try { pluginList = await fetchPlugins(); } catch { pluginList = []; }
+    try { pluginList = await fetchPlugins(); } catch (e) { pluginList = []; }
 
     const market = { categories: {}, catalog: { plugins: [], automation: [], components: [] } };
     const reloadMarket = async () => {
@@ -45,7 +45,7 @@ async function initMarketPage() {
         const catlog = await fetchMarket('/api/market/catalog');
         market.categories = cats || {};
         market.catalog = catlog || { plugins: [], automation: [], components: [] };
-      } catch {}
+      } catch (e) {}
       // 若接口不可用则显示空列表（不回退本地假数据）
       market.categories.plugins = Array.isArray(market?.categories?.plugins) ? market.categories.plugins : [];
       market.categories.automation = Array.isArray(market?.categories?.automation) ? market.categories.automation : [];
@@ -56,7 +56,7 @@ async function initMarketPage() {
       try {
         window.__marketCatalog__ = market.catalog.plugins.slice();
         window.__marketCatalogUpdatedAt__ = Date.now();
-      } catch {}
+      } catch (e) {}
     };
     // 首次加载数据
     await reloadMarket();
@@ -129,6 +129,18 @@ async function initMarketPage() {
     const renderGrid = async () => {
       const myToken = ++renderToken;
       gridEl.innerHTML = '';
+
+      // 功能更新页面改为满宽纵向排列
+      if (currentTab === 'updates') {
+        gridEl.style.display = 'flex';
+        gridEl.style.flexDirection = 'column';
+        gridEl.style.gap = '12px';
+      } else {
+        gridEl.style.display = '';
+        gridEl.style.flexDirection = '';
+        gridEl.style.gap = '';
+      }
+
       // 左侧分类容器在综合/功能更新隐藏，并让右侧占满
       const hideLeft = currentTab === 'comprehensive' || currentTab === 'updates';
       if (leftContainer) leftContainer.hidden = hideLeft;
@@ -136,7 +148,7 @@ async function initMarketPage() {
       subnavEl.hidden = hideLeft ? true : subnavEl.hidden;
 
       // 刷新本地插件列表，确保安装/更新后状态正确
-      try { pluginList = await fetchPlugins(); } catch { pluginList = []; }
+      try { pluginList = await fetchPlugins(); } catch (e) { pluginList = []; }
       if (renderToken !== myToken) return; // 若已有更新请求，取消旧渲染
 
       let items = [];
@@ -156,14 +168,34 @@ async function initMarketPage() {
         // 只显示可更新的（安装且有新版本）
         const updates = [];
         for (const p of pluginList.slice()) {
+          if (renderToken !== myToken) return; // 并发保护
+          let foundUpdate = false;
+          
+          // 1. 优先检查市场目录（支持 ZIP 与 NPM）
+          // 优先匹配 ID，其次 Name
+          const marketItem = market.catalog.plugins.find(m => m.id === p.id || m.name === p.name);
+          if (marketItem && marketItem.version && compareVersions(marketItem.version, p.version) > 0) {
+             updates.push({
+               ...p,
+               latest: marketItem.version,
+               zip: marketItem.zip,
+               npm: marketItem.npm, // 市场条目可能同时包含 npm
+               description: marketItem.description || p.description,
+               icon: marketItem.icon || p.icon
+             });
+             foundUpdate = true;
+          }
+          
+          if (foundUpdate) continue;
+
+          // 2. 检查 NPM（仅当本地插件声明 npm 且未在市场找到更新时）
           try {
             if (!p?.npm || !p?.version) continue;
             const res = await window.settingsAPI?.npmGetVersions?.(p.npm);
             const versions = (res?.ok && Array.isArray(res.versions)) ? res.versions : [];
             const latest = versions.length ? versions[versions.length - 1] : null;
             if (latest && latest !== p.version) updates.push({ ...p, latest });
-          } catch {}
-          if (renderToken !== myToken) return; // 并发保护
+          } catch (e) {}
         }
         items = updates;
       } else {
@@ -223,5 +255,5 @@ async function initMarketPage() {
         }
       });
     }
-  } catch {}
+  } catch (e) {}
 }

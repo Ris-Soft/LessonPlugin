@@ -102,7 +102,7 @@ async function main() {
           let data = '';
           res.on('data', c => data += c);
           res.on('end', () => {
-            try { resolve(JSON.parse(data)); } catch { resolve({}); }
+            try { resolve(JSON.parse(data)); } catch (e) { resolve({}); }
           });
         });
         req.on('error', () => resolve({}));
@@ -185,7 +185,7 @@ async function main() {
     try {
       console.log('[Publish] Committing to Git...');
       // 检查是否有 git
-      try { execSync('git --version', { stdio: 'ignore' }); } catch { throw new Error('Git not found'); }
+      try { execSync('git --version', { stdio: 'ignore' }); } catch (e) { throw new Error('Git not found'); }
       
       execSync('git add package.json', { cwd: path.resolve(__dirname, '..') });
       execSync(`git commit -m "chore(release): v${newVer}"`, { cwd: path.resolve(__dirname, '..') });
@@ -239,7 +239,7 @@ async function main() {
         if (fs.existsSync(passFile)) {
           adminPassword = fs.readFileSync(passFile, 'utf-8').trim();
         }
-      } catch {}
+      } catch (e) {}
       async function promptPassword() {
         return new Promise((resolve) => {
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -251,7 +251,7 @@ async function main() {
       }
       if (!adminPassword) {
         adminPassword = await promptPassword();
-        try { if (adminPassword) fs.writeFileSync(passFile, adminPassword, 'utf-8'); } catch {}
+        try { if (adminPassword) fs.writeFileSync(passFile, adminPassword, 'utf-8'); } catch (e) {}
       }
 
       // 准备上传文件
@@ -268,92 +268,61 @@ async function main() {
         console.log(`[Publish] Found ASAR: ${asarName}`);
       }
 
-      // 5. 直接上传（MARKET_DEBUG_AUTH=true 时允许匿名）
-      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
-      const crlf = '\r\n';
-      const options = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'multipart/form-data; boundary=' + boundary
-        }
-      };
-      const client = serverUrl.startsWith('https') ? https : http;
-      const doUpload = async () => {
-        return new Promise((resolve) => {
-          const reqUpload = client.request(serverUrl, options, (resUpload) => {
-            let data = '';
-            resUpload.on('data', (c) => data += c);
-            resUpload.on('end', () => {
-              let json = null;
-              try { json = JSON.parse(data); } catch {}
-              resolve({ status: resUpload.statusCode, body: data, json });
-            });
-          });
-          reqUpload.on('error', (e) => {
-            resolve({ status: 0, error: e });
-          });
-          // Fields
-          reqUpload.write(`--${boundary}${crlf}`);
-          reqUpload.write(`Content-Disposition: form-data; name="version"${crlf}${crlf}`);
-          reqUpload.write(`${newVer}${crlf}`);
-          reqUpload.write(`--${boundary}${crlf}`);
-          reqUpload.write(`Content-Disposition: form-data; name="asarSupported"${crlf}${crlf}`);
-          reqUpload.write(`true${crlf}`);
-          reqUpload.write(`--${boundary}${crlf}`);
-          reqUpload.write(`Content-Disposition: form-data; name="changelog"${crlf}${crlf}`);
-          reqUpload.write(`${changelog}${crlf}`);
-          reqUpload.write(`--${boundary}${crlf}`);
-          reqUpload.write(`Content-Disposition: form-data; name="adminPassword"${crlf}${crlf}`);
-          reqUpload.write(`${adminPassword}${crlf}`);
-          // Files (streaming)
-          const entries = Object.entries(uploadMap).filter(([_, p]) => p && fs.existsSync(p));
-          const writeNextFile = (idx) => {
-            if (idx >= entries.length) {
-              reqUpload.write(`--${boundary}--${crlf}`);
-              reqUpload.end();
-              return;
-            }
-            const [key, filePath] = entries[idx];
-            const filename = path.basename(filePath);
-            reqUpload.write(`--${boundary}${crlf}`);
-            reqUpload.write(`Content-Disposition: form-data; name="${key}"; filename="${filename}"${crlf}`);
-            reqUpload.write(`Content-Type: application/octet-stream${crlf}${crlf}`);
-            const stream = fs.createReadStream(filePath);
-            stream.on('error', () => {
-              // 跳过该文件继续下一个
-              reqUpload.write(crlf);
-              writeNextFile(idx + 1);
-            });
-            stream.on('end', () => {
-              reqUpload.write(crlf);
-              writeNextFile(idx + 1);
-            });
-            stream.on('data', (chunk) => {
-              reqUpload.write(chunk);
-            });
-          };
-          writeNextFile(0);
-        });
-      };
-      let result = await doUpload();
-      if (result.status === 401 && result.json && (result.json.error === 'admin_password_invalid' || result.json.error === 'admin_password_required' || result.json.error === 'admin_not_set')) {
-        console.error('[Publish] 管理员密码错误或未设置，将重新输入...');
-        try { fs.unlinkSync(passFile); } catch {}
-        adminPassword = await promptPassword();
-        try { if (adminPassword) fs.writeFileSync(passFile, adminPassword, 'utf-8'); } catch {}
-        result = await doUpload();
+      const pingUrl = (process.env.MARKET_URL ? process.env.MARKET_URL.replace(/\/api\/admin\/publish$/, '') : 'http://localhost:3030') + '/api/ping';
+      try { await fetch(pingUrl); } catch (e) {}
+      const fd = new FormData();
+      fd.append('version', newVer);
+      fd.append('asarSupported', 'true');
+      if (changelog) fd.append('changelog', changelog);
+      if (adminPassword) fd.append('adminPassword', adminPassword);
+      if (uploadMap.windows && fs.existsSync(uploadMap.windows)) {
+        const buf = fs.readFileSync(uploadMap.windows);
+        fd.append('windows', new Blob([buf]), path.basename(uploadMap.windows));
       }
-      if (result.status === 200) {
-        console.log('[Publish] Upload success!');
-        console.log(result.body);
-      } else {
-        if (result.status === 401) {
-          console.error('[Publish] Upload failed: unauthorized (401).');
-          console.error(result.body);
-        } else {
-          console.error(`[Publish] Upload failed: ${result.status}`);
-          console.error(result.body || (result.error && result.error.message) || result.error || 'unknown');
+      if (uploadMap.asar && fs.existsSync(uploadMap.asar)) {
+        const buf = fs.readFileSync(uploadMap.asar);
+        fd.append('asar', new Blob([buf]), path.basename(uploadMap.asar));
+      }
+      let resUpload;
+      try {
+        resUpload = await fetch(serverUrl, { method: 'POST', body: fd });
+      } catch (e) {
+        resUpload = { ok: false, status: 0, error: e && e.message };
+      }
+      if (!resUpload || !resUpload.ok) {
+        if (resUpload && resUpload.status === 401) {
+          try { fs.unlinkSync(passFile); } catch (e) {}
+          adminPassword = await promptPassword();
+          try { if (adminPassword) fs.writeFileSync(passFile, adminPassword, 'utf-8'); } catch (e) {}
+          const fd2 = new FormData();
+          fd2.append('version', newVer);
+          fd2.append('asarSupported', 'true');
+          if (changelog) fd2.append('changelog', changelog);
+          if (adminPassword) fd2.append('adminPassword', adminPassword);
+          if (uploadMap.windows && fs.existsSync(uploadMap.windows)) {
+            const buf = fs.readFileSync(uploadMap.windows);
+            fd2.append('windows', new Blob([buf]), path.basename(uploadMap.windows));
+          }
+          if (uploadMap.asar && fs.existsSync(uploadMap.asar)) {
+            const buf = fs.readFileSync(uploadMap.asar);
+            fd2.append('asar', new Blob([buf]), path.basename(uploadMap.asar));
+          }
+          try {
+            resUpload = await fetch(serverUrl, { method: 'POST', body: fd2 });
+          } catch (e) {
+            resUpload = { ok: false, status: 0, error: e && e.message };
+          }
         }
+      }
+      if (resUpload && resUpload.ok) {
+        const data = await resUpload.text();
+        console.log('[Publish] Upload success!');
+        console.log(data);
+      } else {
+        console.error('[Publish] Upload failed:', (resUpload && resUpload.status) || 0);
+        let err = '';
+        try { err = await (resUpload && resUpload.text ? resUpload.text() : ''); } catch (e) {}
+        console.error(err || (resUpload && resUpload.error) || 'read error');
       }
 
     } catch (e) {

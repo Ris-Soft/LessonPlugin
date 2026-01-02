@@ -20,7 +20,7 @@
       </div>
       <nav>
         <button class="nav-item active" data-page="plugins"><i class="ri-puzzle-line"></i> 插件管理</button>
-        <button class="nav-item" data-page="market" style="display: none;"><i class="ri-store-2-line"></i> 功能市场</button>
+        <button class="nav-item" data-page="market"><i class="ri-store-2-line"></i> 功能市场</button>
         <button class="nav-item" data-page="components"><i class="ri-layout-3-line"></i> 组件管理</button>
         <button class="nav-item" data-page="general"><i class="ri-settings-3-line"></i> 通用设置</button>
         <button class="nav-item" data-page="config"><i class="ri-settings-2-line"></i> 配置总览</button>
@@ -35,6 +35,10 @@
       <div class="titlebar">
         <div class="drag"></div>
         <div class="window-actions">
+          <div class="title-info" style="display:flex;align-items:center;gap:8px;margin-right:auto;padding-right:8px;">
+            <span class="pill small" id="title-version-pill" style="cursor:pointer;margin-top: 0;">版本 <span id="title-version">—</span></span>
+            <a id="title-alpha-pill" href="https://qm.qq.com/q/5JMVaQ0PZe" target="_blank" rel="noopener noreferrer" class="pill small" style="background:#f59e0b;color:#ffffff;cursor:pointer;text-decoration:none;margin-top:0;">Alpha</a>
+          </div>
           <button class="win-btn" data-act="menu" title="更多"><i style="font-size: 18px;" class="ri-more-2-fill"></i></button>
           <button class="win-btn" data-act="minimize" title="最小化"><i style="font-size: 18px;"
               class="ri-subtract-line"></i></button>
@@ -246,6 +250,20 @@
           <!-- 基础设置子页（仅保留启动相关） -->
           <div id="general-basic" class="panel">
             <div class="form">
+              <!-- 自动更新开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-refresh-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">自动更新</div>
+                  <div class="setting-desc">允许在启动时自动检查并应用 ASAR 更新或安装包更新。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="auto-update-enabled" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
               <!-- 自启动开关 -->
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-play-line"></i></div>
@@ -689,17 +707,17 @@
               <div class="section-title"><i class="ri-team-line"></i> 贡献者</div>
               <ul class="contributors-list horizontal">
                 <li>
-                  <div class="avatar"><i style="color: white;" class="ri-code-line"></i></div>
+                  <div class="avatar"><img src="./avatars/PYLXU.jpg" alt="PYLXU" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"></div>
                   <div class="name">PYLXU</div>
                   <div class="role">主程序开发</div>
                 </li>
                 <li>
-                  <div class="avatar"><i style="color: white;" class="ri-code-line"></i></div>
+                  <div class="avatar"><img src="./avatars/FYCG.jpg" alt="风吟残歌" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"></div>
                   <div class="name">风吟残歌</div>
                   <div class="role">主程序开发</div>
                 </li>
                 <li>
-                  <div class="avatar"><i style="color: white;" class="ri-palette-line"></i></div>
+                  <div class="avatar"><img src="./avatars/XZEE.jpg" alt="小震" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"></div>
                   <div class="name">小震</div>
                   <div class="role">LOGO设计</div>
                 </li>

@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   // 新增：安装前ZIP检查
   inspectPluginZip: (zipPath) => ipcRenderer.invoke('plugin:inspectZip', zipPath),
   inspectPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:inspectZipData', fileName, data),
+  // 新增：打包插件/自动化为 zip (返回 Uint8Array buffer)
+  packPlugin: (pluginId) => ipcRenderer.invoke('plugin:pack', pluginId),
+  packAutomation: (id) => ipcRenderer.invoke('automation:pack', id),
   uninstallPlugin: (name) => ipcRenderer.invoke('plugin:uninstall', name),
   // 新增：重载本地插件（仅开发环境）
   reloadPlugin: (name) => ipcRenderer.invoke('plugin:reload', name),
@@ -35,6 +38,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   configGetAll: (scope) => ipcRenderer.invoke('config:getAll', scope),
   configGet: (scope, key) => ipcRenderer.invoke('config:get', scope, key),
   configSet: (scope, key, value) => ipcRenderer.invoke('config:set', scope, key, value),
+  configDeleteScope: (scope) => ipcRenderer.invoke('config:deleteScope', scope),
   configEnsureDefaults: (scope, defaults) => ipcRenderer.invoke('config:ensureDefaults', scope, defaults),
   configListScopes: () => ipcRenderer.invoke('config:listScopes'),
   configPluginGetAll: (pluginKey) => ipcRenderer.invoke('config:plugin:getAll', pluginKey),
@@ -89,7 +93,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
           __progressListeners.delete(handler);
         }
       };
-    } catch {}
+    } catch (e) {}
   },
   // 取消进度事件订阅（用于安装完成后解绑）
   offProgress: (handler) => {
@@ -99,7 +103,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
         ipcRenderer.removeListener('plugin-progress', listener);
         __progressListeners.delete(handler);
       }
-    } catch {}
+    } catch (e) {}
   },
   // 打开插件信息模态框事件订阅
   onOpenPluginInfo: (handler) => {
@@ -151,7 +155,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   onBackendLog: (handler) => {
     const listener = (_e, line) => handler && handler(line);
     ipcRenderer.on('backend:log', listener);
-    try { ipcRenderer.send('debug:logs:subscribe'); } catch {}
+    try { ipcRenderer.send('debug:logs:subscribe'); } catch (e) {}
     return () => {
       ipcRenderer.removeListener('backend:log', listener);
     };

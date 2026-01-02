@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('consoleAPI', {
   onBackendLogEntry: (handler) => {
     const listener = (_e, entry) => handler && handler(entry);
     ipcRenderer.on('backend:log:entry', listener);
-    try { ipcRenderer.send('debug:logs:subscribe'); } catch {}
+    try { ipcRenderer.send('debug:logs:subscribe'); } catch (e) {}
     return () => { ipcRenderer.removeListener('backend:log:entry', listener); };
   }
   ,

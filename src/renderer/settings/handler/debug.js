@@ -31,7 +31,7 @@ async function initDebugSettings() {
                   });
                   logList.scrollTop = logList.scrollHeight;
                 }
-              } catch {}
+              } catch (e) {}
             })();
             try {
               window.settingsAPI?.onBackendLog?.((line) => {
@@ -41,9 +41,9 @@ async function initDebugSettings() {
                   logList.appendChild(row);
                   // 自动滚动到底部
                   logList.scrollTop = logList.scrollHeight;
-                } catch {}
+                } catch (e) {}
               });
-            } catch {}
+            } catch (e) {}
           }
         }
       });
@@ -58,7 +58,7 @@ async function initDebugSettings() {
         document.getElementById('debug-node').textContent = info?.nodeVersion || (process?.versions?.node || '—');
         document.getElementById('debug-chrome').textContent = info?.chromeVersion || (process?.versions?.chrome || '—');
         document.getElementById('debug-platform').textContent = info?.platform || (process?.platform || navigator?.platform || '—');
-      } catch {}
+      } catch (e) {}
     })();
     const restartBtn = document.getElementById('debug-restart');
     restartBtn?.addEventListener('click', async () => {
@@ -87,7 +87,7 @@ async function initDebugSettings() {
     let iconsDir = '';
     try {
       iconsDir = await window.settingsAPI?.getIconsDir?.();
-    } catch {}
+    } catch (e) {}
     if (pathEl) pathEl.textContent = String(iconsDir || '—');
 
     const currentIconClass = () => (iconClassInput?.value?.trim() || 'ri-settings-3-line');
@@ -111,7 +111,7 @@ async function initDebugSettings() {
             lastDefaultName = def;
           }
         }
-      } catch {}
+      } catch (e) {}
     }
 
     iconClassInput?.addEventListener('input', renderPreview);
@@ -155,9 +155,9 @@ async function initDebugSettings() {
     openDirBtn?.addEventListener('click', async () => {
       try {
         await window.settingsAPI?.openIconsDir?.();
-      } catch {}
+      } catch (e) {}
     });
 
     await renderPreview();
-  } catch {}
+  } catch (e) {}
 }

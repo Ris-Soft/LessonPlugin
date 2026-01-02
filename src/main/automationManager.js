@@ -20,7 +20,7 @@ class AutomationManager {
     // 新增：插件“分钟触发器”注册表（仅 HH:MM + 回调）
     this.pluginMinuteTriggers = new Map();
     // 轻日志：按系统配置或环境变量启用
-    this.log = (...a) => { try { if (this.store.get('system','debugLog') || process.env.LP_DEBUG) console.log('[Automation]', ...a); } catch {} };
+    this.log = (...a) => { try { if (this.store.get('system','debugLog') || process.env.LP_DEBUG) console.log('[Automation]', ...a); } catch (e) {} };
   }
 
   init() {
@@ -30,9 +30,9 @@ class AutomationManager {
     this.items = Array.isArray(latest) ? latest : [];
 
     // 根据规范对齐分钟触发：插件 init 完成后按当前秒数决定补触发与定时器创建
-    try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+    try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch (e) {}
     const align = () => {
-      try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+      try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch (e) {}
       const d = nowDate();
       const sec = d.getSeconds();
       const hh = String(d.getHours()).padStart(2, '0');
@@ -42,14 +42,14 @@ class AutomationManager {
       this.log('align:start', { cur, sec, msToNextMinute });
     
       const startAlignedInterval = () => {
-        try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+        try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch (e) {}
         // 在 00 秒边界执行一次，然后进入每 60s 的对齐循环
-        try { this.checkTimeTriggers(); this.log('aligned:boundary_tick'); } catch {}
-        this.timer = setInterval(() => { this.log('tick:minute'); try { this.checkTimeTriggers(); } catch {} }, 60000);
+        try { this.checkTimeTriggers(); this.log('aligned:boundary_tick'); } catch (e) {}
+        this.timer = setInterval(() => { this.log('tick:minute'); try { this.checkTimeTriggers(); } catch (e) {} }, 60000);
       };
     
       // 启动时立即检查一次当前分钟（补触发），随后在下一分钟 00 秒对齐并进入每 60s 检查
-      try { this.checkTimeTriggers(); this.log('startup:immediate_check', cur); } catch {}
+      try { this.checkTimeTriggers(); this.log('startup:immediate_check', cur); } catch (e) {}
       this.log('align:schedule_next_minute', msToNextMinute);
       this.timer = setTimeout(startAlignedInterval, msToNextMinute);
     };
@@ -60,16 +60,16 @@ class AutomationManager {
       const { powerMonitor } = require('electron');
       this._onResume = () => { align(); };
       powerMonitor.on('resume', this._onResume);
-    } catch {}
+    } catch (e) {}
   }
 
   dispose() {
-    try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch {}
+    try { if (this.timer) { clearInterval(this.timer); clearTimeout(this.timer); } } catch (e) {}
     try {
       const { powerMonitor } = require('electron');
       if (this._onResume) powerMonitor.removeListener('resume', this._onResume);
       this._onResume = null;
-    } catch {}
+    } catch (e) {}
   }
 
   list() { return this.items; }
@@ -194,7 +194,7 @@ class AutomationManager {
 
       // 2) 生成 ICO 图标（深色圆角边框背景 + 白色 Remixicon 图标）
       const iconsDir = path.join(this.app.getPath('userData'), 'icons');
-      try { if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true }); } catch {}
+      try { if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true }); } catch (e) {}
       const icoPath = path.join(iconsDir, `${item.id}.ico`);
       const pngPath = path.join(iconsDir, `${item.id}.png`);
       let icoOk = false;
@@ -211,7 +211,7 @@ class AutomationManager {
             icoOk = true;
           }
         }
-      } catch {}
+      } catch (e) {}
       if (!icoOk) {
         // 回退到主进程生成（离屏渲染 + 字体）
         icoOk = await this._generateRemixIconIco(iconName, icoPath, bgColor, fgColor);
@@ -244,7 +244,7 @@ class AutomationManager {
             p.on('exit', (code) => { if (code === 0 && fs.existsSync(shortcutPath)) resolve(); else reject(new Error('powershell_failed')); });
           });
           created = true;
-        } catch {}
+        } catch (e) {}
         if (!created) {
           const fallbackFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.url';
           shortcutPath = path.join(desktop, fallbackFile);
@@ -258,7 +258,7 @@ class AutomationManager {
         shortcutPath = path.join(desktop, safeFile);
         const content = `#!/bin/bash\nopen \"OrbiBoard://task/${encodeURIComponent(protoText)}\"\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-        try { fs.chmodSync(shortcutPath, 0o755); } catch {}
+        try { fs.chmodSync(shortcutPath, 0o755); } catch (e) {}
       } else {
         const safeFile = (name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || item.id) + '.desktop';
         shortcutPath = path.join(desktop, safeFile);
@@ -268,7 +268,7 @@ class AutomationManager {
         const iconLine = pngOk ? `Icon=${pngPath}` : '';
         const content = `[Desktop Entry]\nType=Application\nName=${name}\n${execLine}\n${tryExecLine}\n${iconLine}\nTerminal=false\nCategories=Utility;\n`;
         try { fs.writeFileSync(shortcutPath, content, 'utf8'); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-        try { fs.chmodSync(shortcutPath, 0o755); } catch {}
+        try { fs.chmodSync(shortcutPath, 0o755); } catch (e) {}
       }
 
       return { ok: true, shortcutPath, iconPath: (process.platform === 'win32' ? (icoOk ? icoPath : null) : (pngOk ? pngPath : null)), itemId: item.id, protocolText: protoText };
@@ -283,7 +283,7 @@ class AutomationManager {
       const rendererDir = path.join(__dirname, '..', 'renderer');
       const remixCssPath = path.join(rendererDir, 'remixicon-local.css');
       let remixCss = '';
-      try { remixCss = fs.readFileSync(remixCssPath, 'utf8'); } catch {}
+      try { remixCss = fs.readFileSync(remixCssPath, 'utf8'); } catch (e) {}
       const woffUrl = `file://${rendererDir.replace(/\\/g, '/')}/remixicon.woff2`;
       if (remixCss) {
         // 重写字体文件为绝对 file://，避免 data: 环境相对路径失效
@@ -309,7 +309,7 @@ class AutomationManager {
         i.style.fontStyle = 'normal';
         i.style.fontWeight = 'normal';
         document.body.appendChild(i);
-        try { await document.fonts.ready; } catch {}
+        try { await document.fonts.ready; } catch (e) {}
         function getCharFromComputed(el) {
           const content = getComputedStyle(el, '::before').content || '';
           const raw = String(content).replace(/^\s*[\"\']|[\"\']\s*$/g, '');
@@ -346,13 +346,13 @@ class AutomationManager {
         resolve(data);
       }))()`;
       const dataUrl = await win.webContents.executeJavaScript(js, true);
-      try { if (!win.isDestroyed()) win.destroy(); } catch {}
+      try { if (!win.isDestroyed()) win.destroy(); } catch (e) {}
       const pngBuf = Buffer.from(String(dataUrl || '').replace(/^data:image\/png;base64,/, ''), 'base64');
       if (!pngBuf?.length) return false;
       const icoBuf = this._pngToIco(pngBuf, size);
       fs.writeFileSync(icoPath, icoBuf);
       return true;
-    } catch {
+    } catch (e) {
       return false;
     }
   }
@@ -363,7 +363,7 @@ class AutomationManager {
       const rendererDir = path.join(__dirname, '..', 'renderer');
       const remixCssPath = path.join(rendererDir, 'remixicon-local.css');
       let remixCss = '';
-      try { remixCss = fs.readFileSync(remixCssPath, 'utf8'); } catch {}
+      try { remixCss = fs.readFileSync(remixCssPath, 'utf8'); } catch (e) {}
       const woffUrl = `file://${rendererDir.replace(/\\/g, '/')}/remixicon.woff2`;
       if (remixCss) {
         remixCss = remixCss.replace(/url\(\s*['"]?remixicon\.woff2['"]?\s*\)/g, `url('${woffUrl}')`);
@@ -385,7 +385,7 @@ class AutomationManager {
         i.style.fontStyle = 'normal';
         i.style.fontWeight = 'normal';
         document.body.appendChild(i);
-        try { await document.fonts.ready; } catch {}
+        try { await document.fonts.ready; } catch (e) {}
         function getCharFromComputed(el) {
           const content = getComputedStyle(el, '::before').content || '';
           const raw = String(content).replace(/^\s*[^\w\\]*|[^\w\\]*\s*$/g, '');
@@ -419,12 +419,12 @@ class AutomationManager {
         resolve(data);
       }))()`;
       const dataUrl = await win.webContents.executeJavaScript(js, true);
-      try { if (!win.isDestroyed()) win.destroy(); } catch {}
+      try { if (!win.isDestroyed()) win.destroy(); } catch (e) {}
       const pngBuf = Buffer.from(String(dataUrl || '').replace(/^data:image\/png;base64,/, ''), 'base64');
       if (!pngBuf?.length) return false;
       fs.writeFileSync(pngPath, pngBuf);
       return true;
-    } catch {
+    } catch (e) {
       return false;
     }
   }
@@ -461,7 +461,7 @@ class AutomationManager {
         const weekIndex = Math.floor(diffDays / 7);
         isEvenWeek = weekIndex % 2 === 0;
         if (biweekOff) isEvenWeek = !isEvenWeek;
-      } catch {}
+      } catch (e) {}
     }
 
     const matchBiweek = (rule) => {
@@ -484,7 +484,7 @@ class AutomationManager {
             try {
               const acts = Array.isArray(p.actionsStart) ? p.actionsStart : [];
               if (acts.length) this.executeActions(acts, { reason: 'pluginTimer:start', pluginId: pid, now: d, period: p });
-            } catch {}
+            } catch (e) {}
           }
         }
         // 触发结束：执行插件注册的 actionsEnd（若为空则忽略）
@@ -495,18 +495,18 @@ class AutomationManager {
             try {
               const acts = Array.isArray(p.actionsEnd) ? p.actionsEnd : [];
               if (acts.length) this.executeActions(acts, { reason: 'pluginTimer:end', pluginId: pid, now: d, period: p });
-            } catch {}
+            } catch (e) {}
           }
         }
       }
     }
   }
 
-  async invokeProtocol(text) {
+  async invokeProtocol(text, params = {}) {
     for (const item of this.items) {
       if (!item.enabled) continue;
       const hit = (item.triggers || []).some((t) => t?.type === 'protocol' && String(t?.text || '').trim() === String(text || '').trim());
-      if (hit) await this.tryExecute(item, { reason: 'protocol', text });
+      if (hit) await this.tryExecute(item, { reason: 'protocol', text, params });
     }
     return { ok: true };
   }
@@ -529,7 +529,7 @@ class AutomationManager {
         const weekIndex = Math.floor(diffDays / 7);
         isEvenWeek = weekIndex % 2 === 0;
         if (biweekOff) isEvenWeek = !isEvenWeek;
-      } catch {}
+      } catch (e) {}
     }
 
     const evalItem = (c) => {
@@ -582,7 +582,7 @@ class AutomationManager {
     if (item?.confirm?.enabled) {
       await this.showConfirmOverlay(item, { ...ctx, itemId: item.id });
     } else {
-      try { console.info('automation:execute', { id: item.id, name: item.name, reason: ctx?.reason || '' }); } catch {}
+      try { console.info('automation:execute', { id: item.id, name: item.name, reason: ctx?.reason || '' }); } catch (e) {}
       await this.executeActions(item.actions || [], { ...ctx, itemId: item.id });
     }
   }
@@ -594,18 +594,18 @@ class AutomationManager {
         skipTaskbar: true, focusable: false, hasShadow: false, acceptFirstMouse: true,
         webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js'), backgroundThrottling: false } // 复用API能力
       });
-      try { win.setAlwaysOnTop(true, 'screen-saver'); } catch {}
+      try { win.setAlwaysOnTop(true, 'screen-saver'); } catch (e) {}
       win.loadFile(path.join(__dirname, '..', 'renderer', 'automation-confirm.html'));
       const timeout = Math.max(5, parseInt(item?.confirm?.timeout || 60, 10));
       // 将自动化条目基本信息传递给渲染页
       try {
         win.webContents.once('did-finish-load', () => {
-          try { win.webContents.send('automation:confirm:init', { id: item.id, name: item.name, timeout }); } catch {}
+          try { win.webContents.send('automation:confirm:init', { id: item.id, name: item.name, timeout }); } catch (e) {}
         });
-      } catch {}
+      } catch (e) {}
       let done = false;
       const finish = async (ok) => {
-        if (done) return; done = true; try { if (!win.isDestroyed()) win.destroy(); } catch {}
+        if (done) return; done = true; try { if (!win.isDestroyed()) win.destroy(); } catch (e) {}
         if (ok) await this.executeActions(item.actions || [], { ...ctx, itemId: item.id });
         resolve(ok);
       };
@@ -614,11 +614,11 @@ class AutomationManager {
         const { ipcMain } = require('electron');
         const onConfirm = (_e, id, approved) => {
           if (id !== item.id) return;
-          try { ipcMain.removeListener('automation:confirm:result', onConfirm); } catch {}
+          try { ipcMain.removeListener('automation:confirm:result', onConfirm); } catch (e) {}
           finish(approved);
         };
         ipcMain.on('automation:confirm:result', onConfirm);
-      } catch {}
+      } catch (e) {}
       // 超时自动执行
       setTimeout(() => finish(true), timeout * 1000);
     });
@@ -642,14 +642,19 @@ class AutomationManager {
           const pluginKey = String(parts[0] || '').trim();
           const varName = String(parts.slice(1).join(':') || '').trim();
           if (!pluginKey || !varName) continue;
+          if (pluginKey === 'protocol') {
+            const val = ctx && ctx.params ? ctx.params[varName] : '';
+            out = out.replace(m[0], String(val ?? ''));
+            continue;
+          }
           try {
             const res = await this.pluginManager.getVariable(pluginKey, varName);
             const val = (res && res.ok) ? (res.result ?? '') : '';
             out = out.replace(m[0], String(val ?? ''));
-          } catch {}
+          } catch (e) {}
         }
         return out;
-      } catch { return String(s ?? ''); }
+      } catch (e) { return String(s ?? ''); }
     };
     const expandValue = async (v) => {
       try {
@@ -665,7 +670,7 @@ class AutomationManager {
           return obj;
         }
         return v;
-      } catch { return v; }
+      } catch (e) { return v; }
     };
     for (const act of actions) {
       try {
@@ -674,7 +679,7 @@ class AutomationManager {
         // if ((act && (act.type === 'pluginEvent' || act.type === 'pluginAction')) && !manual) {
         //   continue;
         // }
-        try { console.info('automation:action:start', { type: act.type, pluginId: act.pluginId || '', target: act.event || act.target || act.action || '' }); } catch {}
+        try { console.info('automation:action:start', { type: act.type, pluginId: act.pluginId || '', target: act.event || act.target || act.action || '' }); } catch (e) {}
         this.log('executeAction:start', act.type, act.pluginId || '', act.event || act.target || act.action || '');
         if (act.type === 'pluginEvent') {
           const params = Array.isArray(act.params) ? await Promise.all(act.params.map((x) => expandValue(x))) : [];
@@ -699,10 +704,10 @@ class AutomationManager {
             const action = (act.op === 'restart') ? 'restart' : (act.op === 'logoff') ? 'log out' : 'shut down';
             try {
               spawn('osascript', ['-e', `tell application "System Events" to ${action}`], { windowsHide: true });
-            } catch {}
+            } catch (e) {}
           } else {
             // Linux: 优先使用 systemctl，其次回退到 shutdown
-            const trySpawn = (cmd, args) => { try { spawn(cmd, args, { windowsHide: true }); return true; } catch { return false; } };
+            const trySpawn = (cmd, args) => { try { spawn(cmd, args, { windowsHide: true }); return true; } catch (e) { return false; } };
             if (act.op === 'restart') {
               if (!trySpawn('systemctl', ['reboot'])) {
                 trySpawn('shutdown', ['-r', 'now']);
@@ -724,13 +729,13 @@ class AutomationManager {
           }
         } else if (act.type === 'openApp') {
           if (act.path) {
-            try { const p = await expandString(act.path); shell.openPath(p); } catch { shell.openPath(act.path); }
+            try { const p = await expandString(act.path); shell.openPath(p); } catch (e) { shell.openPath(act.path); }
           }
         } else if (act.type === 'cmd') {
           const cmdStr = String(act.command || '').trim();
           if (cmdStr) {
             let expanded = cmdStr;
-            try { expanded = await expandString(cmdStr); } catch {}
+            try { expanded = await expandString(cmdStr); } catch (e) {}
             const platform = process.platform;
             if (platform === 'win32') {
               // Windows: 使用 cmd.exe /d /s /c
@@ -738,7 +743,7 @@ class AutomationManager {
               try {
                 spawn(comspec, ['/d', '/s', '/c', expanded], { windowsHide: true });
               } catch (e) {
-                try { spawn(expanded, { shell: true, windowsHide: true }); } catch {}
+                try { spawn(expanded, { shell: true, windowsHide: true }); } catch (e) {}
               }
             } else {
               // macOS/Linux: 使用登录 Shell 执行命令，支持别名与 PATH
@@ -746,7 +751,7 @@ class AutomationManager {
               try {
                 spawn(shellPath, ['-lc', expanded], { windowsHide: true });
               } catch (e) {
-                try { spawn(expanded, { shell: true, windowsHide: true }); } catch {}
+                try { spawn(expanded, { shell: true, windowsHide: true }); } catch (e) {}
               }
             }
           }
@@ -758,10 +763,10 @@ class AutomationManager {
           const sec = Math.max(0, isNaN(secVal) ? 0 : secVal);
           await new Promise((resolve) => setTimeout(resolve, Math.round(sec * 1000)));
         }
-        try { console.info('automation:action:success', { type: act.type }); } catch {}
+        try { console.info('automation:action:success', { type: act.type }); } catch (e) {}
         this.log('executeAction:success', act.type);
       } catch (e) {
-        try { console.info('automation:action:error', { type: act.type, error: e?.message || String(e) }); } catch {}
+        try { console.info('automation:action:error', { type: act.type, error: e?.message || String(e) }); } catch (e) {}
         this.log('executeAction:error', act.type, e?.message || String(e));
       }
     }
@@ -775,7 +780,7 @@ class AutomationManager {
           this.store.set('automation', 'list', this.items);
         }
       }
-    } catch {}
+    } catch (e) {}
   }
 
   // 新增：插件分钟触发器接口（仅 HH:MM 列表与回调）
@@ -809,7 +814,7 @@ class AutomationManager {
         if (entry._lastMinute === curHHMM) continue;
         entry._lastMinute = curHHMM;
         this.log('pluginMinute:fire', pid, curHHMM);
-        try { cb(curHHMM, d); } catch {}
+        try { cb(curHHMM, d); } catch (e) {}
       }
     }
   }

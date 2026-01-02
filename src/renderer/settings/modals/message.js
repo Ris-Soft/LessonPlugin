@@ -6,7 +6,7 @@ function showModal({ title = '提示', message = '', confirmText = '确定', can
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
     const box = document.createElement('div'); box.className = 'modal-box';
     if (boxClass) {
-      try { box.classList.add(boxClass); } catch {}
+      try { box.classList.add(boxClass); } catch (e) {}
     }
     const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
     const msg = document.createElement('div'); msg.className = 'modal-message';
@@ -16,7 +16,7 @@ function showModal({ title = '提示', message = '', confirmText = '确定', can
         if (message.classList && (message.classList.contains('config-editor') || message.classList.contains('modal-body'))) {
           msg.classList.add('compact');
         }
-      } catch {}
+      } catch (e) {}
     } else {
       msg.textContent = String(message || '');
     }
@@ -60,7 +60,7 @@ async function showLogModal(title = '日志', lines = []) {
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     // 自动关闭
-    setTimeout(() => { try { overlay.remove(); } catch { } resolve(true); }, 1500);
+    setTimeout(() => { try { overlay.remove(); } catch (e) { } resolve(true); }, 1500);
   });
 }
 
@@ -150,10 +150,10 @@ function showToast(message = '', { type = 'info', duration = 2000 } = {}) {
       toast.classList.add('show');
     });
     setTimeout(() => {
-      try { toast.classList.remove('show'); } catch { }
-      setTimeout(() => { try { toast.remove(); } catch { } }, 300);
+      try { toast.classList.remove('show'); } catch (e) { }
+      setTimeout(() => { try { toast.remove(); } catch (e) { } }, 300);
     }, Math.max(1000, duration));
-  } catch { }
+  } catch (e) { }
 }
 
 async function showLinuxTarGuide(errorText = '') {
@@ -178,7 +178,7 @@ async function showLinuxTarGuide(errorText = '') {
       code.textContent = cmd;
       const copy = document.createElement('button'); copy.className = 'btn secondary'; copy.innerHTML = '<i class="ri-file-copy-line"></i> 复制';
       copy.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(cmd); } catch {}
+        try { await navigator.clipboard.writeText(cmd); } catch (e) {}
       });
       row.appendChild(code); row.appendChild(copy);
       wrap.appendChild(ttl); wrap.appendChild(row);
@@ -215,7 +215,7 @@ async function showUninstallConfirm(item) {
   try {
     const key = item.id || item.name || item.npm;
     let dep = null;
-    try { dep = await window.settingsAPI?.pluginDependents?.(key); } catch { }
+    try { dep = await window.settingsAPI?.pluginDependents?.(key); } catch (e) { }
     const pluginNames = Array.isArray(dep?.plugins) ? dep.plugins.map(p => p.name).join('，') : '';
     const autoNames = Array.isArray(dep?.automations) ? dep.automations.map(a => `${a.name}${a.enabled ? '(已启用)' : ''}`).join('，') : '';
     const extra = [
@@ -276,13 +276,13 @@ async function showUninstallConfirm(item) {
 
     const confirmed = await showModal({ title: '卸载插件', message: content, confirmText: '卸载', cancelText: '取消' });
     return { confirmed, dep: dep || {} };
-  } catch { return { confirmed: false, dep: {} }; }
+  } catch (e) { return { confirmed: false, dep: {} }; }
 }
 
 // 进度模态框：用于展示下载/安装过程进度，返回控制器 { update, close }
 function showProgressModal(title = '下载/安装进度', initialMessage = '准备中...') {
   const old = document.querySelector('.modal-overlay');
-  if (old) try { old.remove(); } catch {}
+  if (old) try { old.remove(); } catch (e) {}
   const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
   const box = document.createElement('div'); box.className = 'modal-box';
   const t = document.createElement('div'); t.className = 'modal-title'; t.textContent = title;
@@ -301,7 +301,7 @@ function showProgressModal(title = '下载/安装进度', initialMessage = '准�
   const actions = document.createElement('div'); actions.className = 'modal-actions';
   // 执行中不提供取消，仅在外部调用 close() 时关闭
   const closeBtn = document.createElement('button'); closeBtn.className = 'btn secondary'; closeBtn.textContent = '隐藏';
-  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch {} });
+  closeBtn.addEventListener('click', () => { try { overlay.remove(); } catch (e) {} });
   actions.appendChild(closeBtn);
   msg.appendChild(statusLine);
   msg.appendChild(progress);
@@ -338,16 +338,16 @@ function showProgressModal(title = '下载/安装进度', initialMessage = '准�
         }
         // 完成或错误阶段时自动关闭动画，并将进度置为 100%
         if (String(stage).toLowerCase() === 'done' || String(stage).toLowerCase() === 'error' || /完成/.test(message)) {
-          if (bar._animTimer) { try { clearInterval(bar._animTimer); } catch {} bar._animTimer = null; }
+          if (bar._animTimer) { try { clearInterval(bar._animTimer); } catch (e) {} bar._animTimer = null; }
           bar.style.width = '100%';
         }
-      } catch {}
+      } catch (e) {}
     },
     close: () => {
       try {
         if (bar._animTimer) { clearInterval(bar._animTimer); bar._animTimer = null; }
         overlay.remove();
-      } catch {}
+      } catch (e) {}
     }
   };
   return controller;

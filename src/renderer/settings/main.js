@@ -6,7 +6,7 @@ async function main() {
   try {
     const info = await window.settingsAPI?.getAppInfo?.();
     isDev = !!info?.isDev;
-  } catch {}
+  } catch (e) {}
   window.__isDev__ = isDev;
 
   // 左侧导航切换
@@ -34,7 +34,7 @@ async function main() {
         debugBtn.click();
       }
     }
-  } catch {}
+  } catch (e) {}
   navItems.forEach((btn) => {
     btn.addEventListener('click', async () => {
       navItems.forEach((b) => b.classList.remove('active'));
@@ -48,7 +48,7 @@ async function main() {
       } else if (page === 'general') {
         initGeneralSettings();
       } else if (page === 'config') {
-        try { initConfigOverview(); } catch {}
+        try { initConfigOverview(); } catch (e) {}
       } else if (page === 'automation') {
         initAutomationSettings();
       } else if (page === 'debug') {
@@ -56,11 +56,11 @@ async function main() {
       } else if (page === 'market') {
         initMarketPage();
       } else if (page === 'plugins') {
-        try { await window.initPluginsPage?.(); } catch {}
+        try { await window.initPluginsPage?.(); } catch (e) {}
       } else if (page === 'components') {
-        try { window.initComponentsPage?.(); } catch {}
+        try { window.initComponentsPage?.(); } catch (e) {}
       } else if (page === 'defaults') {
-        try { window.initDefaultsPage?.(); } catch {}
+        try { window.initDefaultsPage?.(); } catch (e) {}
       } else if (page === 'about') {
         initAboutPage();
       }
@@ -82,7 +82,7 @@ async function main() {
   } else if (page === 'general') {
     initGeneralSettings();
   } else if (page === 'config') {
-    try { initConfigOverview(); } catch {}
+    try { initConfigOverview(); } catch (e) {}
   } else if (page === 'automation') {
     initAutomationSettings();
   } else if (page === 'debug') {
@@ -90,17 +90,17 @@ async function main() {
   } else if (page === 'market') {
       initMarketPage();
     } else if (page === 'plugins') {
-      try { await window.initPluginsPage?.(); } catch {}
+      try { await window.initPluginsPage?.(); } catch (e) {}
     } else if (page === 'components') {
-      try { window.initComponentsPage?.(); } catch {}
+      try { window.initComponentsPage?.(); } catch (e) {}
     } else if (page === 'defaults') {
-      try { window.initDefaultsPage?.(); } catch {}
+      try { window.initDefaultsPage?.(); } catch (e) {}
     } else if (page === 'about') {
       initAboutPage();
     }
-    } catch {}
+    } catch (e) {}
   };
-  window.settingsAPI?.onNavigate?.((page) => { try { navigateToPage(page); } catch {} });
+  window.settingsAPI?.onNavigate?.((page) => { try { navigateToPage(page); } catch (e) {} });
   window.settingsAPI?.onOpenPluginInfo?.(async (pluginKey) => {
     try {
       await navigateToPage('plugins');
@@ -112,7 +112,7 @@ async function main() {
       } else {
         await showAlert(`未找到插件：${pluginKey}`);
       }
-    } catch {}
+    } catch (e) {}
   });
 
   window.settingsAPI?.onOpenStoreItem?.(async (payload) => {
@@ -129,7 +129,7 @@ async function main() {
       } else {
         await showAlert(`未找到：${id}`);
       }
-    } catch {}
+    } catch (e) {}
   });
 
   window.settingsAPI?.onMarketInstall?.(async (payload) => {
@@ -142,12 +142,12 @@ async function main() {
       const item = arr.find((x) => String(x.id || x.name) === id);
       if (!item) { await showAlert(`未找到：${id}`); return; }
       showStorePluginModal(item);
-    } catch {}
+    } catch (e) {}
   });
 
   // 渲染插件列表
   const container = document.getElementById('plugins');
-  try { await window.initPluginsPage?.(); } catch {}
+  try { await window.initPluginsPage?.(); } catch (e) {}
 
   // 打开设置页时检查缺失依赖并提示安装（避免占用启动时间）
   let depsPrompted = false;
@@ -171,13 +171,13 @@ async function main() {
               if (payload && String(payload.stage).toLowerCase() === 'npm') {
                 progressModal.update(payload);
               }
-            } catch {}
+            } catch (e) {}
           };
           let unsubscribe = null;
-          try { unsubscribe = window.settingsAPI?.onProgress?.(handler); } catch {}
+          try { unsubscribe = window.settingsAPI?.onProgress?.(handler); } catch (e) {}
           const ensure = await window.settingsAPI?.pluginEnsureDeps?.(p.id || p.name);
-          try { unsubscribe && unsubscribe(); } catch {}
-          try { progressModal?.close?.(); } catch {}
+          try { unsubscribe && unsubscribe(); } catch (e) {}
+          try { progressModal?.close?.(); } catch (e) {}
           if (ensure?.ok) {
             await showToast(`已安装 ${p.name} 依赖`);
           } else {
@@ -185,7 +185,7 @@ async function main() {
           }
         }
       }
-    } catch {}
+    } catch (e) {}
   }
   // 触发一次检查
   checkMissingDepsPrompt();
@@ -198,7 +198,7 @@ async function main() {
         try {
           const r = b.getBoundingClientRect();
           window.showAppMenu({ x: r.right - 180, y: r.bottom + 6 });
-        } catch {}
+        } catch (e) {}
       } else {
         window.settingsAPI?.windowControl(act);
       }
@@ -211,7 +211,32 @@ async function main() {
       e.preventDefault();
       window.showAppMenu({ x: e.clientX, y: e.clientY });
     });
-  } catch {}
+  } catch (e) {}
+
+  // 标题栏版本显示与跳转关于
+  try {
+    const info = await window.settingsAPI?.getAppInfo?.();
+    const v = info?.appVersion || '';
+    const vEl = document.getElementById('title-version');
+    if (vEl) vEl.textContent = v || '—';
+    const pill = document.getElementById('title-version-pill');
+    pill?.addEventListener('click', () => {
+      const btn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.dataset.page === 'about');
+      if (btn) btn.click();
+    });
+    // 启动时检查是否有更新，若有则在版本 pill 显示“旧版本→新版本”，并高亮为绿色白字
+    try {
+      const res = await window.settingsAPI?.checkUpdate?.(true);
+      if (res?.ok && res.hasUpdate) {
+        if (vEl) vEl.textContent = `${res.currentVersion} → ${res.remoteVersion}`;
+        if (pill) {
+          pill.classList.add('primary');
+          pill.style.background = 'var(--accent)';
+          pill.style.color = '#ffffff';
+        }
+      }
+    } catch (e) {}
+  } catch (e) {}
 
   // NPM 管理逻辑（仅展示已安装列表）
   const installedEl = document.getElementById('npm-installed');
@@ -339,13 +364,13 @@ async function main() {
                   progressModal.update(payload);
                 }
               }
-            } catch {}
+            } catch (e) {}
           };
           const unsubscribe = window.settingsAPI?.onProgress?.(handler);
           const dl = await window.settingsAPI?.npmDownload?.(name, v);
           // 解绑进度并关闭模态框
-          try { unsubscribe && unsubscribe(); } catch {}
-          try { progressModal?.close?.(); } catch {}
+          try { unsubscribe && unsubscribe(); } catch (e) {}
+          try { progressModal?.close?.(); } catch (e) {}
           if (!dl?.ok) {
             await showAlert(`下载失败：${dl?.error || '未知错误'}`);
             return;
@@ -456,7 +481,7 @@ NPM依赖：${depNames.length ? depNames.join('，') : '无'}
 `;
         // 风险确认与依赖选择将由统一安装入口统一处理
       }
-    } catch {}
+    } catch (e) {}
     // 直接调用统一安装入口，交由其处理确认与依赖引导
     try {
       if (pendingZipPath) {

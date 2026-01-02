@@ -115,12 +115,12 @@
                   progressModal.update(payload);
                 }
               }
-            } catch {}
+            } catch (e) {}
           };
           const unsubscribe = window.settingsAPI?.onProgress?.(handler);
           const dl = await window.settingsAPI?.npmDownload?.(name, v);
-          try { unsubscribe && unsubscribe(); } catch {}
-          try { progressModal?.close?.(); } catch {}
+          try { unsubscribe && unsubscribe(); } catch (e) {}
+          try { progressModal?.close?.(); } catch (e) {}
           if (!dl?.ok) {
             await showAlert(`下载失败：${dl?.error || '未知错误'}`);
             return;

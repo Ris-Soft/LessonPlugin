@@ -28,11 +28,11 @@ let storeRoot = '';
 let progressReporter = null; // 供插件在初始化期间更新启动页文本
 // 引入自动化管理器引用，供插件入口 API 使用
 let automationManagerRef = null;
-try { tar = require('tar'); } catch {}
+try { tar = require('tar'); } catch (e) {}
 
 function ensureTar() {
   if (!tar) {
-    try { tar = require('tar'); } catch {}
+    try { tar = require('tar'); } catch (e) {}
   }
   return !!tar;
 }
@@ -81,9 +81,9 @@ function extractTgzPureJS(file, cwd) {
         const outPath = path.join(cwd, safe);
         if (!outPath.startsWith(path.resolve(cwd))) continue;
         if (typeflag === 53) {
-          try { fs.mkdirSync(outPath, { recursive: true }); } catch {}
+          try { fs.mkdirSync(outPath, { recursive: true }); } catch (e) {}
         } else {
-          try { fs.mkdirSync(path.dirname(outPath), { recursive: true }); } catch {}
+          try { fs.mkdirSync(path.dirname(outPath), { recursive: true }); } catch (e) {}
           fs.writeFileSync(outPath, data);
         }
       }
@@ -113,25 +113,25 @@ function addNodeModulesToGlobalPaths(baseDir) {
     const names = fs.readdirSync(baseDir);
     for (const name of names) {
       const nameDir = path.join(baseDir, name);
-      try { if (!fs.statSync(nameDir).isDirectory()) continue; } catch { continue; }
+      try { if (!fs.statSync(nameDir).isDirectory()) continue; } catch (e) { continue; }
       // 支持 scope 目录：@scope 下的多个包
       const packageDirs = name.startsWith('@')
-        ? fs.readdirSync(nameDir).map((pkg) => path.join(nameDir, pkg)).filter((p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } })
+        ? fs.readdirSync(nameDir).map((pkg) => path.join(nameDir, pkg)).filter((p) => { try { return fs.statSync(p).isDirectory(); } catch (e) { return false; } })
         : [nameDir];
       for (const pkgDir of packageDirs) {
         let versions = [];
-        try { versions = fs.readdirSync(pkgDir); } catch { versions = []; }
+        try { versions = fs.readdirSync(pkgDir); } catch (e) { versions = []; }
         for (const v of versions) {
           const nm = path.join(pkgDir, v, 'node_modules');
           try {
             if (fs.existsSync(nm) && fs.statSync(nm).isDirectory()) {
               if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm);
             }
-          } catch {}
+          } catch (e) {}
         }
       }
     }
-  } catch {}
+  } catch (e) {}
 }
 
 function refreshGlobalModulePaths() {
@@ -146,8 +146,8 @@ function refreshGlobalModulePaths() {
       if (fs.existsSync(appNodeModules) && fs.statSync(appNodeModules).isDirectory()) {
         if (!Module.globalPaths.includes(appNodeModules)) Module.globalPaths.push(appNodeModules);
       }
-    } catch {}
-  } catch {}
+    } catch (e) {}
+  } catch (e) {}
 }
 
 // 由主进程注入自动化管理器实例，使插件可通过统一 API 访问计时器能力
@@ -185,7 +185,7 @@ module.exports.init = function init(paths) {
       // 已统一在下方读取 package.json 并解析版本与其它元信息
       const pkgPath = path.join(full, 'package.json');
       let pkg = null;
-      if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+      if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch (e) {} }
       let detectedVersion = meta.version || (pkg?.version || null);
       // 计算相对路径（用于 local 字段）
       const rel = path.relative(pluginsRoot, full).replace(/\\/g, '/');
@@ -195,7 +195,7 @@ module.exports.init = function init(paths) {
         try {
           const mod = require(indexPath);
           if (mod?.name) name = mod.name;
-        } catch {}
+        } catch (e) {}
       }
       if (!name) name = entry; // 回退到目录名
 
@@ -242,7 +242,7 @@ module.exports.init = function init(paths) {
           try {
             if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
             if (meta && typeof meta.variables === 'object' && meta.variables) return meta.variables;
-          } catch {}
+          } catch (e) {}
           return undefined;
         })(),
         configSchema: (() => {
@@ -251,7 +251,7 @@ module.exports.init = function init(paths) {
             if (meta && typeof meta.configSchema === 'object' && meta.configSchema) return meta.configSchema;
             if (Array.isArray(meta.config)) return meta.config;
             if (meta && typeof meta.config === 'object' && meta.config) return meta.config;
-          } catch {}
+          } catch (e) {}
           return undefined;
         })()
       });
@@ -262,9 +262,9 @@ module.exports.init = function init(paths) {
         if (cleanId) nameToId.set(String(cleanId), id);
         if (slugFromName) nameToId.set(String(slugFromName), id);
         nameToId.set(String(id), id);
-      } catch {}
+      } catch (e) {}
     }
-  } catch {}
+  } catch (e) {}
   // 组件目录：%USER_DATA%/LessonPlugin/components
   try {
     const componentsRoot = path.resolve(pluginsRoot, '..', 'components');
@@ -280,7 +280,7 @@ module.exports.init = function init(paths) {
       if (!fs.existsSync(entryPath)) continue;
       const pkgPath = path.join(full, 'package.json');
       let pkg = null;
-      if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+      if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch (e) {} }
       let detectedVersion = meta.version || (pkg?.version || null);
       const rel = path.relative(pluginsRoot, full).replace(/\\/g, '/');
       let name = meta.name || entry;
@@ -321,9 +321,9 @@ module.exports.init = function init(paths) {
         if (cleanId) nameToId.set(String(cleanId), id);
         if (slugFromName) nameToId.set(String(slugFromName), id);
         nameToId.set(String(id), id);
-      } catch {}
+      } catch (e) {}
     }
-  } catch {}
+  } catch (e) {}
   config = readJsonSafe(configPath, { enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} });
   // 确保 config 对象包含所有必要的属性
   if (!config.enabled) config.enabled = {};
@@ -422,11 +422,19 @@ module.exports.getVariable = async function getVariable(idOrName, varName) {
   }
 };
 
+module.exports.findPluginByIdOrName = findPluginByIdOrName;
+
 function findPluginByIdOrName(key) {
   const canon = canonicalizePluginId(key);
   // 直接按规范ID匹配；同时兼容名称精确匹配
   return manifest.plugins.find((p) => p.id === canon || p.name === key || p.name === canon);
 }
+
+module.exports.getPluginDir = function getPluginDir(idOrName) {
+  const p = findPluginByIdOrName(idOrName);
+  if (!p || !p.local) return null;
+  return path.resolve(pluginsRoot, p.local);
+};
 
 // 新增：读取插件 README 文本（优先本地插件目录）
 module.exports.getPluginReadme = function getPluginReadme(idOrName) {
@@ -441,12 +449,12 @@ module.exports.getPluginReadme = function getPluginReadme(idOrName) {
       for (const name of candidates) {
         const f = path.join(fullDir, name);
         if (fs.existsSync(f) && fs.statSync(f).isFile()) {
-          try { return fs.readFileSync(f, 'utf-8'); } catch {}
+          try { return fs.readFileSync(f, 'utf-8'); } catch (e) {}
         }
       }
     }
     return null;
-  } catch { return null; }
+  } catch (e) { return null; }
 };
 
 module.exports.toggle = async function toggle(idOrName, enabled) {
@@ -462,7 +470,7 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
 
   try {
     if (!enabled) {
-      try { console.info('plugin:toggle', { id: p.id, name: p.name, enabled: false }); } catch {}
+      try { console.info('plugin:toggle', { id: p.id, name: p.name, enabled: false }); } catch (e) {}
       logs.push(`[disable] 开始禁用插件 ${p.name}`);
       // 调用插件导出的生命周期函数进行清理
       try {
@@ -476,7 +484,7 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
         logs.push(`[disable] 调用禁用生命周期失败: ${e?.message || e}`);
       }
       // 触发插件禁用事件，便于插件自行清理资源（保持兼容事件名）
-      try { module.exports.emitEvent('__plugin_disabled__', { pluginId: canonId, name: p.name, version: p.version }); } catch {}
+      try { module.exports.emitEvent('__plugin_disabled__', { pluginId: canonId, name: p.name, version: p.version }); } catch (e) {}
       // 清理事件订阅
       try {
         const winById = pluginWindows.get(p.id);
@@ -485,50 +493,50 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
         if (winById?.webContents?.id) pluginWebContentsIds.push(winById.webContents.id);
         if (winByName?.webContents?.id && winByName !== winById) pluginWebContentsIds.push(winByName.webContents.id);
         for (const [eventName, subscriberSet] of eventSubscribers.entries()) {
-          try { pluginWebContentsIds.forEach(id => subscriberSet.delete(id)); } catch {}
-          if (subscriberSet.size === 0) { try { eventSubscribers.delete(eventName); } catch {} }
+          try { pluginWebContentsIds.forEach(id => subscriberSet.delete(id)); } catch (e) {}
+          if (subscriberSet.size === 0) { try { eventSubscribers.delete(eventName); } catch (e) {} }
         }
-      } catch {}
-      try { apiRegistry.delete(canonId); logs.push('[disable] 已清理已注册 API'); } catch {}
-      try { functionRegistry.delete(canonId); logs.push('[disable] 已清理已注册函数'); } catch {}
-      try { automationEventRegistry.delete(canonId); logs.push('[disable] 已清理自动化事件'); } catch {}
+      } catch (e) {}
+      try { apiRegistry.delete(canonId); logs.push('[disable] 已清理已注册 API'); } catch (e) {}
+      try { functionRegistry.delete(canonId); logs.push('[disable] 已清理已注册函数'); } catch (e) {}
+      try { automationEventRegistry.delete(canonId); logs.push('[disable] 已清理自动化事件'); } catch (e) {}
       // 关闭窗口
       try {
         const winById = pluginWindows.get(p.id);
         const winByName = pluginWindows.get(p.name);
         if (winById) {
-          try { if (winById.webContents && !winById.webContents.isDestroyed()) winById.webContents.destroy(); } catch {}
-          try { if (winById.destroy && !winById.isDestroyed()) winById.destroy(); } catch {}
+          try { if (winById.webContents && !winById.webContents.isDestroyed()) winById.webContents.destroy(); } catch (e) {}
+          try { if (winById.destroy && !winById.isDestroyed()) winById.destroy(); } catch (e) {}
         }
         if (winByName && winByName !== winById) {
-          try { if (winByName.webContents && !winByName.webContents.isDestroyed()) winByName.webContents.destroy(); } catch {}
-          try { if (winByName.destroy && !winByName.isDestroyed()) winByName.destroy(); } catch {}
+          try { if (winByName.webContents && !winByName.webContents.isDestroyed()) winByName.webContents.destroy(); } catch (e) {}
+          try { if (winByName.destroy && !winByName.isDestroyed()) winByName.destroy(); } catch (e) {}
         }
         pluginWindows.delete(p.id);
         pluginWindows.delete(p.name);
         logs.push('[disable] 已关闭相关窗口');
-      } catch {}
+      } catch (e) {}
       // 清理自动化触发器
       try {
         if (automationManagerRef) {
-          try { automationManagerRef.clearPluginMinuteTriggers(canonId); logs.push('[disable] 已清理分钟触发器'); } catch {}
-          try { if (typeof automationManagerRef.clearPluginTimers === 'function') automationManagerRef.clearPluginTimers(canonId); } catch {}
+          try { automationManagerRef.clearPluginMinuteTriggers(canonId); logs.push('[disable] 已清理分钟触发器'); } catch (e) {}
+          try { if (typeof automationManagerRef.clearPluginTimers === 'function') automationManagerRef.clearPluginTimers(canonId); } catch (e) {}
         }
-      } catch {}
+      } catch (e) {}
       logs.push(`[disable] 插件 ${p.name} 已禁用`);
     } else {
-      try { console.info('plugin:toggle', { id: p.id, name: p.name, enabled: true }); } catch {}
+      try { console.info('plugin:toggle', { id: p.id, name: p.name, enabled: true }); } catch (e) {}
       logs.push(`[enable] 开始启用插件 ${p.name}`);
       const baseDir = p.local ? path.join(path.dirname(manifestPath), p.local) : null;
       const modPath = baseDir ? path.resolve(baseDir, 'index.js') : null;
-      try { if (modPath) { delete require.cache[require.resolve(modPath)]; } } catch {}
+      try { if (modPath) { delete require.cache[require.resolve(modPath)]; } } catch (e) {}
       if (modPath && fs.existsSync(modPath)) {
         try {
           // 启用前确保依赖注入到插件目录
           try {
             const depsRes = await module.exports.ensureDeps(p.id);
-            try { console.info('plugin:deps', { id: p.id, name: p.name, ok: !!depsRes?.ok }); } catch {}
-          } catch {}
+            try { console.info('plugin:deps', { id: p.id, name: p.name, ok: !!depsRes?.ok }); } catch (e) {}
+          } catch (e) {}
           const mod = require(modPath);
           // 注册函数
           const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -552,21 +560,21 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
             try {
               await Promise.resolve(mod.init(createPluginApi(p.id)));
               logs.push(`[enable] 插件 ${p.name} 初始化完成`);
-              try { console.info('plugin:init_done', { id: p.id, name: p.name }); } catch {}
+              try { console.info('plugin:init_done', { id: p.id, name: p.name }); } catch (e) {}
             } catch (e) {
               logs.push(`[enable] 插件 ${p.name} 初始化失败：${e?.message || e}`);
-              try { console.info('plugin:init_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch {}
+              try { console.info('plugin:init_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch (e) {}
             }
           }
         } catch (e) {
           logs.push(`[enable] 启用失败：${e?.message || String(e)}`);
-          try { console.info('plugin:enable_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch {}
+          try { console.info('plugin:enable_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch (e) {}
         }
       } else {
         logs.push('[enable] 未找到本地入口 index.js，跳过注册/初始化');
       }
     }
-  } catch {}
+  } catch (e) {}
 
   return { ok: true, id: p.id, name: p.name, enabled: !!enabled, logs };
 };
@@ -590,7 +598,7 @@ function pickInstalledLatest(name) {
       return 0;
     });
     return versions[versions.length - 1] || null;
-  } catch { return null; }
+  } catch (e) { return null; }
 }
 
 function linkDepToPlugin(pluginDir, pkgName, version) {
@@ -600,7 +608,7 @@ function linkDepToPlugin(pluginDir, pkgName, version) {
     const target = path.join(pluginNm, ...segs);
     const storePkg = path.join(storeRoot, ...segs, version, 'node_modules', ...segs);
     if (!fs.existsSync(storePkg)) return { ok: false, error: 'store_package_missing' };
-    try { if (!fs.existsSync(pluginNm)) fs.mkdirSync(pluginNm, { recursive: true }); } catch {}
+    try { if (!fs.existsSync(pluginNm)) fs.mkdirSync(pluginNm, { recursive: true }); } catch (e) {}
     try {
       if (fs.existsSync(target)) {
         const stat = fs.lstatSync(target);
@@ -610,9 +618,9 @@ function linkDepToPlugin(pluginDir, pkgName, version) {
           fs.unlinkSync(target);
         }
       }
-    } catch {}
+    } catch (e) {}
     // 确保父目录存在（处理 scope 嵌套）
-    try { fs.mkdirSync(path.dirname(target), { recursive: true }); } catch {}
+    try { fs.mkdirSync(path.dirname(target), { recursive: true }); } catch (e) {}
     const type = process.platform === 'win32' ? 'junction' : 'dir';
     try {
       fs.symlinkSync(storePkg, target, type);
@@ -662,7 +670,7 @@ function collectPluginDeps(p) {
         }
       }
     }
-  } catch {}
+  } catch (e) {}
   return deps;
 }
 
@@ -702,7 +710,7 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
         }
         if (pick) {
           const dl = await module.exports.downloadPackageVersion(name, pick, (status) => {
-            try { if (progressReporter) progressReporter(status); } catch {}
+            try { if (progressReporter) progressReporter(status); } catch (e) {}
           });
           if (dl.ok) {
             version = pick;
@@ -718,17 +726,17 @@ module.exports.ensureDeps = async function ensureDeps(idOrName, options) {
           continue;
         }
       }
-      try { if (progressReporter) progressReporter({ stage: 'npm', message: `链接 ${name}@${version} 到插件...` }); } catch {}
+      try { if (progressReporter) progressReporter({ stage: 'npm', message: `链接 ${name}@${version} 到插件...` }); } catch (e) {}
       const link = linkDepToPlugin(baseDir, name, version);
       if (!link.ok) {
         logs.push(`[deps] 链接 ${name}@${version} 到插件失败：${link.error}`);
-        try { console.error('deps:link:failed', name, version, link.error); } catch {}
+        try { console.error('deps:link:failed', name, version, link.error); } catch (e) {}
         hadError = true;
       } else {
         const method = link.method === 'copy' ? '复制' : '链接';
         logs.push(`[deps] 已${method} ${name}@${version} 到插件`);
-        try { console.log('deps:link:success', name, version, method); } catch {}
-        try { if (progressReporter) progressReporter({ stage: 'npm', message: `已${method} ${name}@${version}` }); } catch {}
+        try { console.log('deps:link:success', name, version, method); } catch (e) {}
+        try { if (progressReporter) progressReporter({ stage: 'npm', message: `已${method} ${name}@${version}` }); } catch (e) {}
       }
     }
     return { ok: !hadError, logs };
@@ -757,7 +765,7 @@ module.exports.getPluginDependencyStatus = function getPluginDependencyStatus(id
           });
           installed.push(...versions);
         }
-      } catch {}
+      } catch (e) {}
       const linked = baseDir ? fs.existsSync(path.join(baseDir, 'node_modules', ...segs)) : false;
       status.push({ name, installed, linked });
     }
@@ -803,7 +811,7 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
           const modPath = path.resolve(localPath, 'index.js');
           if (fs.existsSync(modPath)) {
             // 启动阶段仅链接已有依赖，不触发下载以加速启动
-            try { await module.exports.ensureDeps(p.id, { downloadIfMissing: false }); } catch {}
+            try { await module.exports.ensureDeps(p.id, { downloadIfMissing: false }); } catch (e) {}
             const mod = require(modPath);
             // 仅从 functions 中注册函数，排除 actions
             const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -832,7 +840,7 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
               }
             }
           }
-        } catch {}
+        } catch (e) {}
       } else {
         status.stage = 'missing';
         status.message = '本地插件路径不存在';
@@ -884,7 +892,7 @@ module.exports.installNpm = async function installNpm(idOrName, onProgress) {
       writeJsonSafe(configPath, config);
     }
   }
-  try { await module.exports.ensureDeps(p.id, { downloadIfMissing: false }); } catch {}
+  try { await module.exports.ensureDeps(p.id, { downloadIfMissing: false }); } catch (e) {}
   return { ok: results.every((r) => r.ok), results };
 };
 
@@ -892,19 +900,19 @@ module.exports.closeAllWindows = function closeAllWindows() {
   for (const w of windows) {
     try {
       if (!w.isDestroyed()) w.destroy();
-    } catch {}
+    } catch (e) {}
   }
   windows = [];
   // 同步清理插件窗口与事件订阅
   try {
     for (const [key, w] of pluginWindows.entries()) {
       const wc = (w && w.webContents) ? w.webContents : null;
-      try { if (wc && !wc.isDestroyed()) wc.destroy(); } catch {}
-      try { if (w && typeof w.destroy === 'function' && !w.isDestroyed()) w.destroy(); } catch {}
+      try { if (wc && !wc.isDestroyed()) wc.destroy(); } catch (e) {}
+      try { if (w && typeof w.destroy === 'function' && !w.isDestroyed()) w.destroy(); } catch (e) {}
     }
     pluginWindows.clear();
-  } catch {}
-  try { eventSubscribers.clear(); } catch {}
+  } catch (e) {}
+  try { eventSubscribers.clear(); } catch (e) {}
 };
 
 // --------- Registry 访问与下载 ---------
@@ -958,7 +966,7 @@ module.exports.getPackageVersions = async function getPackageVersions(name) {
     try {
       const cmp = require('semver-compare');
       versions.sort(cmp);
-    } catch {}
+    } catch (e) {}
     return { ok: true, versions };
   } catch (e) {
     return { ok: false, error: e?.message || '解析版本失败' };
@@ -970,7 +978,7 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   const dest = path.join(storeRoot, ...segs, version);
   if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
   const nm = path.join(dest, 'node_modules');
-  if (!fs.existsSync(nm)) { try { fs.mkdirSync(nm, { recursive: true }); } catch {} }
+  if (!fs.existsSync(nm)) { try { fs.mkdirSync(nm, { recursive: true }); } catch (e) {} }
   const directPath = path.join(nm, ...segs);
   if (fs.existsSync(directPath)) return { ok: true, path: directPath };
   onProgress && onProgress({ stage: 'npm', message: `下载 ${name}@${version} ...` });
@@ -983,7 +991,7 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   const tgz = await httpGet(tarball);
   if (!tgz.ok) return { ok: false, error: tgz.error || '下载失败' };
   const tmpDir = path.join(dest, '__tmp__');
-  try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
+  try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
   const tmpTgz = path.join(tmpDir, `${segs[segs.length - 1]}-${version}.tgz`);
   try { fs.writeFileSync(tmpTgz, tgz.buffer); } catch (e) { return { ok: false, error: e?.message || '写入临时文件失败' }; }
   {
@@ -1024,9 +1032,9 @@ module.exports.downloadPackageVersion = async function downloadPackageVersion(na
   } catch (e) {
     return { ok: false, error: e?.message || '复制解压内容失败' };
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}
   }
-  try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch {}
+  try { if (!Module.globalPaths.includes(nm)) Module.globalPaths.push(nm); } catch (e) {}
   onProgress && onProgress({ stage: 'npm', message: `完成 ${name}@${version}` });
   return { ok: fs.existsSync(directPath), path: directPath };
 };
@@ -1049,7 +1057,7 @@ module.exports.listInstalledPackages = async function listInstalledPackages() {
         // 处理 scope 下的包
         const pkgs = fs.readdirSync(nameDir).filter((p) => {
           const pDir = path.join(nameDir, p);
-          try { return fs.statSync(pDir).isDirectory(); } catch { return false; }
+          try { return fs.statSync(pDir).isDirectory(); } catch (e) { return false; }
         });
         for (const p of pkgs) {
           const pkgDir = path.join(nameDir, p);
@@ -1067,10 +1075,10 @@ module.exports.listInstalledPackages = async function listInstalledPackages() {
               if (!entries.length) fs.rmSync(pkgDir, { recursive: true, force: true });
               // 若 scope 目录已空，也尝试清理
               const remain = fs.readdirSync(nameDir).filter((n) => {
-                try { return fs.statSync(path.join(nameDir, n)).isDirectory(); } catch { return false; }
+                try { return fs.statSync(path.join(nameDir, n)).isDirectory(); } catch (e) { return false; }
               });
               if (!remain.length) fs.rmSync(nameDir, { recursive: true, force: true });
-            } catch {}
+            } catch (e) {}
           }
         }
       } else {
@@ -1086,7 +1094,7 @@ module.exports.listInstalledPackages = async function listInstalledPackages() {
           try {
             const entries = fs.readdirSync(nameDir);
             if (!entries.length) fs.rmSync(nameDir, { recursive: true, force: true });
-          } catch {}
+          } catch (e) {}
         }
       }
     }
@@ -1120,7 +1128,7 @@ module.exports.listPackageUsers = function listPackageUsers(pkgName) {
           } else {
             version = parts[1] || null;
           }
-        } catch {}
+        } catch (e) {}
         users.push({ pluginId: p.id, pluginName: p.name, version: version || null });
       }
     }
@@ -1174,22 +1182,22 @@ module.exports.removePackageVersions = function removePackageVersions(pkgName, v
         });
         if (verNames.length === 0) {
           // 没有有效版本，删除包目录
-          try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch {}
+          try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch (e) {}
           // 若为 scoped 包，scope 目录为空则删除
           if (isScoped) {
             const scopeDir = path.join(storeRoot, segs[0]);
             try {
               const remain = fs.readdirSync(scopeDir).filter((n) => {
-                try { return fs.statSync(path.join(scopeDir, n)).isDirectory(); } catch { return false; }
+                try { return fs.statSync(path.join(scopeDir, n)).isDirectory(); } catch (e) { return false; }
               });
               if (remain.length === 0) fs.rmSync(scopeDir, { recursive: true, force: true });
-            } catch {}
+            } catch (e) {}
           }
         }
       }
-    } catch {}
+    } catch (e) {}
     // 删除后刷新全局模块路径（避免残留）
-    try { refreshGlobalModulePaths(); } catch {}
+    try { refreshGlobalModulePaths(); } catch (e) {}
     const ok = errors.length === 0;
     return { ok, removed, blocked, errors, uses };
   } catch (e) {
@@ -1225,7 +1233,7 @@ module.exports.uninstall = function uninstall(idOrName) {
     const idx = manifest.plugins.findIndex((p) => p.id === idOrName || p.name === idOrName);
     if (idx < 0) return { ok: false, error: 'not_found' };
     const p = manifest.plugins[idx];
-    try { console.info('plugin:uninstall', { id: p.id, name: p.name }); } catch {}
+    try { console.info('plugin:uninstall', { id: p.id, name: p.name }); } catch (e) {}
     // 仅支持卸载本地插件
     if (!p.local) return { ok: false, error: 'not_local_plugin' };
     const fullDir = path.join(path.dirname(manifestPath), p.local);
@@ -1244,7 +1252,7 @@ module.exports.uninstall = function uninstall(idOrName) {
       console.log(`[uninstall] 调用插件 ${p.name} 的卸载生命周期失败: ${e?.message || e}`);
     }
     // 触发插件卸载事件，通知前端与其他插件及时清理（保持兼容事件名）
-    try { module.exports.emitEvent('__plugin_uninstall__', { pluginId: canonId, name: p.name, version: p.version }); } catch {}
+    try { module.exports.emitEvent('__plugin_uninstall__', { pluginId: canonId, name: p.name, version: p.version }); } catch (e) {}
     
     // 1. 先收集插件窗口信息（用于后续清理）
     const winById = pluginWindows.get(p.id);
@@ -1267,71 +1275,71 @@ module.exports.uninstall = function uninstall(idOrName) {
           eventSubscribers.delete(eventName);
         }
       }
-    } catch {}
+    } catch (e) {}
     
     try {
       // 3. 清理插件注册的API和函数
       apiRegistry.delete(canonId);
       functionRegistry.delete(canonId);
-    } catch {}
+    } catch (e) {}
     
     try {
       // 4. 清理插件注册的自动化事件
       automationEventRegistry.delete(canonId);
-    } catch {}
+    } catch (e) {}
     
     try {
       // 5. 关闭该插件所有已打开的窗口
       // 处理通过ID注册的窗口
       if (winById) {
         if (winById.webContents && !winById.webContents.isDestroyed()) {
-          try { winById.webContents.destroy(); } catch {}
+          try { winById.webContents.destroy(); } catch (e) {}
         }
         if (winById.destroy && !winById.isDestroyed()) {
-          try { winById.destroy(); } catch {}
+          try { winById.destroy(); } catch (e) {}
         }
       }
       
       // 处理通过名称注册的窗口（可能与ID窗口不同）
       if (winByName && winByName !== winById) {
         if (winByName.webContents && !winByName.webContents.isDestroyed()) {
-          try { winByName.webContents.destroy(); } catch {}
+          try { winByName.webContents.destroy(); } catch (e) {}
         }
         if (winByName.destroy && !winByName.isDestroyed()) {
-          try { winByName.destroy(); } catch {}
+          try { winByName.destroy(); } catch (e) {}
         }
       }
       
       // 从窗口注册表中移除
       pluginWindows.delete(p.id);
       pluginWindows.delete(p.name);
-    } catch {}
+    } catch (e) {}
     
     try {
       // 5. 清理插件的分钟触发器和计时器（通过自动化管理器）
       if (automationManagerRef) {
         try {
           automationManagerRef.clearPluginMinuteTriggers(canonId);
-        } catch {}
+        } catch (e) {}
         
         // 清理插件计时器（如果自动化管理器有相关方法）
         try {
           if (typeof automationManagerRef.clearPluginTimers === 'function') {
             automationManagerRef.clearPluginTimers(canonId);
           }
-        } catch {}
+        } catch (e) {}
       }
-    } catch {}
+    } catch (e) {}
     
     try {
       // 6. 删除插件目录
       if (fs.existsSync(fullDir)) fs.rmSync(fullDir, { recursive: true, force: true });
-    } catch {}
+    } catch (e) {}
     
     // 7. 从清单与配置移除
     manifest.plugins.splice(idx, 1);
-    try { delete config.enabled[p.id]; } catch {}
-    try { delete config.enabled[p.name]; } catch {}
+    try { delete config.enabled[p.id]; } catch (e) {}
+    try { delete config.enabled[p.name]; } catch (e) {}
     writeJsonSafe(configPath, config);
     
     return { ok: true };
@@ -1365,7 +1373,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
     }
     const pkgPath = path.join(tempDir, 'package.json');
     let pkg = null;
-    if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+    if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch (e) {} }
     let detectedVersion = meta.version || (pkg?.version || null);
 
     // 检查入口
@@ -1379,7 +1387,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       try {
         const mod = require(indexPathTmp);
         if (mod?.name) pluginName = mod.name;
-      } catch {}
+      } catch (e) {}
     }
     if (!pluginName) pluginName = 'plugin';
 
@@ -1395,7 +1403,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
       if (fs.existsSync(finalDir)) {
         fs.rmSync(finalDir, { recursive: true, force: true });
       }
-    } catch {}
+    } catch (e) {}
     // 将临时目录重命名为稳定目录，失败则复制回退
     try {
       fs.renameSync(tempDir, finalDir);
@@ -1451,29 +1459,29 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
           ids.forEach((id) => subs.delete(id));
           if (subs.size === 0) eventSubscribers.delete(eventName);
         }
-      } catch {}
+      } catch (e) {}
       try {
         apiRegistry.delete(canonId);
         functionRegistry.delete(canonId);
         automationEventRegistry.delete(canonId);
-      } catch {}
+      } catch (e) {}
       try {
         const w1 = pluginWindows.get(canonId);
         const w2 = pluginWindows.get(manifest.plugins[existingIdx].name);
         for (const w of [w1, w2]) {
           if (!w) continue;
-          try { if (w.webContents && !w.webContents.isDestroyed()) w.webContents.destroy(); } catch {}
-          try { if (w.destroy && !w.isDestroyed()) w.destroy(); } catch {}
+          try { if (w.webContents && !w.webContents.isDestroyed()) w.webContents.destroy(); } catch (e) {}
+          try { if (w.destroy && !w.isDestroyed()) w.destroy(); } catch (e) {}
         }
         pluginWindows.delete(canonId);
         pluginWindows.delete(manifest.plugins[existingIdx].name);
-      } catch {}
+      } catch (e) {}
       try {
         if (automationManagerRef) {
-          try { automationManagerRef.clearPluginMinuteTriggers(canonId); } catch {}
-          try { if (typeof automationManagerRef.clearPluginTimers === 'function') automationManagerRef.clearPluginTimers(canonId); } catch {}
+          try { automationManagerRef.clearPluginMinuteTriggers(canonId); } catch (e) {}
+          try { if (typeof automationManagerRef.clearPluginTimers === 'function') automationManagerRef.clearPluginTimers(canonId); } catch (e) {}
         }
-      } catch {}
+      } catch (e) {}
     }
 
     // 更新内存清单（使用稳定目录），若存在则覆盖更新
@@ -1507,7 +1515,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
         try {
           if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
           if (meta && typeof meta.variables === 'object' && meta.variables) return meta.variables;
-        } catch {}
+        } catch (e) {}
         return undefined;
       })(),
       configSchema: (() => {
@@ -1516,7 +1524,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
           if (meta && typeof meta.configSchema === 'object' && meta.configSchema) return meta.configSchema;
           if (Array.isArray(meta.config)) return meta.config;
           if (meta && typeof meta.config === 'object' && meta.config) return meta.config;
-        } catch {}
+        } catch (e) {}
         return undefined;
       })()
     };
@@ -1537,7 +1545,7 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
     const logs = [];
     try {
       const modPath = path.resolve(finalDir, 'index.js');
-      try { delete require.cache[require.resolve(modPath)]; } catch {}
+      try { delete require.cache[require.resolve(modPath)]; } catch (e) {}
       if (fs.existsSync(modPath)) {
         const mod = require(modPath);
         // 注册主进程函数
@@ -1562,17 +1570,17 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
             await Promise.resolve(mod.init(createPluginApi(pluginId)));
             progressReporter && progressReporter({ stage: 'plugin:init', message: `插件 ${pluginName} 初始化完成` });
             logs.push(`[install] 插件 ${pluginName} 初始化完成`);
-            try { console.info('plugin:init_done', { id: pluginId, name: pluginName }); } catch {}
+            try { console.info('plugin:init_done', { id: pluginId, name: pluginName }); } catch (e) {}
           } catch (e) {
             progressReporter && progressReporter({ stage: 'plugin:error', message: `插件 ${pluginName} 初始化失败：${e?.message || e}` });
             logs.push(`[install] 插件 ${pluginName} 初始化失败：${e?.message || e}`);
-            try { console.info('plugin:init_failed', { id: pluginId, name: pluginName, error: e?.message || String(e) }); } catch {}
+            try { console.info('plugin:init_failed', { id: pluginId, name: pluginName, error: e?.message || String(e) }); } catch (e) {}
           }
         }
       }
-    } catch {}
+    } catch (e) {}
 
-    try { console.info('plugin:install_success', { id: pluginId, name: pluginName }); } catch {}
+    try { console.info('plugin:install_success', { id: pluginId, name: pluginName }); } catch (e) {}
     return { ok: true, id: pluginId, name: pluginName, author: (meta.author !== undefined ? meta.author : (pkg?.author || null)), npmDependencies: updated.npmDependencies, dependencies: (typeof meta.dependencies === 'object' ? meta.dependencies : (pkg?.dependencies || undefined)), pluginDepends: Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined, logs };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -1590,7 +1598,7 @@ module.exports.registerFunctions = function registerFunctions(pluginId, function
     // 如果调用来自不同 webContents（异常情况），仍以最新 sender 为准
     pluginWindows.set(canonId, { webContents: senderWC, isProxy: true });
   }
-  try { console.info('plugin:window_registered', { pluginId: canonId, webContentsId: senderWC.id }); } catch {}
+  try { console.info('plugin:window_registered', { pluginId: canonId, webContentsId: senderWC.id }); } catch (e) {}
   return { ok: true };
 };
 
@@ -1615,16 +1623,16 @@ module.exports.listAutomationEvents = function listAutomationEvents(pluginId) {
 module.exports.callFunction = function callFunction(targetPluginId, fnName, args, callerPluginId) {
   return new Promise(async (resolve) => {
     const canonId = canonicalizePluginId(targetPluginId);
-    try { console.info('plugin:call_function:start', { pluginId: canonId, fn: fnName, caller: callerPluginId || null }); } catch {}
+    try { console.info('plugin:call_function:start', { pluginId: canonId, fn: fnName, caller: callerPluginId || null }); } catch (e) {}
     // 优先主进程注册的函数，无需窗口
     const fnMap = functionRegistry.get(canonId);
     if (fnMap && fnMap.has(fnName)) {
       try {
         const result = await Promise.resolve(fnMap.get(fnName)(...(Array.isArray(args) ? args : [])));
-        try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: true, caller: callerPluginId || null }); } catch {}
+        try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: true, caller: callerPluginId || null }); } catch (e) {}
         return resolve({ ok: true, result });
       } catch (e) {
-        try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: false, error: e?.message || String(e), caller: callerPluginId || null }); } catch {}
+        try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: false, error: e?.message || String(e), caller: callerPluginId || null }); } catch (e) {}
         return resolve({ ok: false, error: e.message });
       }
     }
@@ -1636,8 +1644,8 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
     const reqId = uuidv4();
     const onResult = (event, id, payload) => {
       if (id !== reqId) return;
-      try { module.exports._ipcMain.removeListener('plugin:invoke:result', onResult); } catch {}
-      try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: !!payload?.ok, caller: callerPluginId || null }); } catch {}
+      try { module.exports._ipcMain.removeListener('plugin:invoke:result', onResult); } catch (e) {}
+      try { console.info('plugin:call_function:done', { pluginId: canonId, fn: fnName, ok: !!payload?.ok, caller: callerPluginId || null }); } catch (e) {}
       resolve(payload);
     };
     module.exports._ipcMain.on('plugin:invoke:result', onResult);
@@ -1651,7 +1659,7 @@ module.exports.getPluginIdByWebContentsId = function getPluginIdByWebContentsId(
       const wc = win?.webContents || win;
       if (wc && wc.id === wcId) return pid;
     }
-  } catch {}
+  } catch (e) {}
   return null;
 };
 
@@ -1715,10 +1723,10 @@ function createPluginApi(pluginId) {
     // 启动页文本控制：插件可在初始化期间更新启动页状态文本
     splash: {
       setStatus: (stage, message) => {
-        try { progressReporter && progressReporter({ stage, message }); } catch {}
+        try { progressReporter && progressReporter({ stage, message }); } catch (e) {}
       },
       progress: (stage, message) => {
-        try { progressReporter && progressReporter({ stage, message }); } catch {}
+        try { progressReporter && progressReporter({ stage, message }); } catch (e) {}
       }
     }
   };
@@ -1742,9 +1750,9 @@ module.exports.emitEvent = function emitEvent(eventName, payload) {
         wc.send('plugin:event', { name: eventName, payload });
         delivered++;
       }
-    } catch {}
+    } catch (e) {}
   }
-  try { console.info('plugin:event_emit', { event: eventName, delivered }); } catch {}
+  try { console.info('plugin:event_emit', { event: eventName, delivered }); } catch (e) {}
   return { ok: true, delivered };
 };
 
@@ -1763,7 +1771,7 @@ function buildActionRegistry() {
         map.set(id, arr);
       }
     }
-  } catch {}
+  } catch (e) {}
   return map;
 }
 
@@ -1799,7 +1807,7 @@ module.exports.callAction = async function callAction(actionId, args, preferredP
         const sys = store.getAll('system') || {};
         const defMap = sys.defaultActions || {};
         defPid = defMap[id];
-      } catch {}
+      } catch (e) {}
       if (defPid) {
         const canon = canonicalizePluginId(defPid);
         targetEntry = providers.find((p) => canonicalizePluginId(p.pluginId) === canon) || null;
@@ -1810,7 +1818,7 @@ module.exports.callAction = async function callAction(actionId, args, preferredP
       if (providers.length === 1) targetEntry = providers[0];
       else return { ok: false, error: 'multiple_providers' };
     }
-    try { console.info('plugin:action:start', { actionId: id, pluginId: targetEntry.pluginId, fn: targetEntry.target }); } catch {}
+    try { console.info('plugin:action:start', { actionId: id, pluginId: targetEntry.pluginId, fn: targetEntry.target }); } catch (e) {}
     return module.exports.callFunction(targetEntry.pluginId, targetEntry.target, Array.isArray(args) ? args : []);
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1845,7 +1853,7 @@ function buildBehaviorRegistry() {
         map.set(id, arr);
       }
     }
-  } catch {}
+  } catch (e) {}
   return map;
 }
 
@@ -1892,7 +1900,7 @@ module.exports.callBehavior = async function callBehavior(behaviorId, args, pref
         const sys = store.getAll('system') || {};
         const defMap = sys.defaultBehaviors || {};
         defPid = defMap[id];
-      } catch {}
+      } catch (e) {}
       if (defPid) {
         const canon = canonicalizePluginId(defPid);
         targetEntry = providers.find((p) => canonicalizePluginId(p.pluginId) === canon) || null;
@@ -1902,7 +1910,7 @@ module.exports.callBehavior = async function callBehavior(behaviorId, args, pref
       if (providers.length === 1) targetEntry = providers[0];
       else return { ok: false, error: 'multiple_providers' };
     }
-    try { console.info('plugin:behavior:start', { behaviorId: id, pluginId: targetEntry.pluginId, fn: targetEntry.target }); } catch {}
+    try { console.info('plugin:behavior:start', { behaviorId: id, pluginId: targetEntry.pluginId, fn: targetEntry.target }); } catch (e) {}
     return module.exports.callFunction(targetEntry.pluginId, targetEntry.target, Array.isArray(args) ? args : []);
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1936,11 +1944,11 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
     if (fs.existsSync(metaPath)) meta = readJsonSafe(metaPath, {});
     const pkgPath = path.join(tempDir, 'package.json');
     let pkg = null;
-    if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch {} }
+    if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch (e) {} }
     const indexPathTmp = path.join(tempDir, 'index.js');
     let pluginName = meta.name;
     if (!pluginName) {
-      try { const mod = require(indexPathTmp); if (mod?.name) pluginName = mod.name; } catch {}
+      try { const mod = require(indexPathTmp); if (mod?.name) pluginName = mod.name; } catch (e) {}
     }
     if (!pluginName) pluginName = 'plugin';
     const rawId = String(meta.id || '').trim();
@@ -1971,7 +1979,7 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
       dependencies: (() => {
         if (Array.isArray(meta.dependencies)) return meta.dependencies;
         if (typeof meta.dependencies === 'object' && meta.dependencies) {
-          try { return Object.keys(meta.dependencies).map(k => `${k}@${meta.dependencies[k]}`); } catch {}
+          try { return Object.keys(meta.dependencies).map(k => `${k}@${meta.dependencies[k]}`); } catch (e) {}
         }
         if (Array.isArray(meta.pluginDepends)) return meta.pluginDepends;
         return undefined;
@@ -1981,11 +1989,11 @@ module.exports.inspectZip = async function inspectZip(zipPath) {
         try {
           if (Array.isArray(meta.variables)) return meta.variables.map((x) => String(x));
           if (meta && typeof meta.variables === 'object' && meta.variables) return Object.keys(meta.variables);
-        } catch {}
+        } catch (e) {}
         return undefined;
       })()
     };
-    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
     return info;
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -2021,7 +2029,7 @@ module.exports.listDependents = function listDependents(idOrName) {
         });
         if (uses) autos.push({ id: it.id, name: it.name, enabled: !!it.enabled });
       }
-    } catch {}
+    } catch (e) {}
     return { ok: true, plugins: pluginDeps, automations: autos };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -2040,7 +2048,7 @@ module.exports.listVariables = async function listVariables(idOrName) {
       } else if (p.variables && typeof p.variables === 'object') {
         names = Object.keys(p.variables);
       }
-    } catch {}
+    } catch (e) {}
     if (names.length) return { ok: true, variables: names };
     // 回退：调用插件的 listVariables 函数（若实现）
     try {
@@ -2050,7 +2058,7 @@ module.exports.listVariables = async function listVariables(idOrName) {
         if (Array.isArray(payload)) return { ok: true, variables: payload.map((x) => String(x)) };
         if (payload && typeof payload === 'object') return { ok: true, variables: Object.keys(payload) };
       }
-    } catch {}
+    } catch (e) {}
     return { ok: true, variables: [] };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -2071,7 +2079,7 @@ module.exports.getVariable = async function getVariable(idOrName, varName) {
           return module.exports.callFunction(p.id || p.name, fn, []);
         }
       }
-    } catch {}
+    } catch (e) {}
     // 标准函数：getVariable(name)
     return module.exports.callFunction(p.id || p.name, 'getVariable', [name]);
   } catch (e) {
@@ -2100,7 +2108,7 @@ module.exports.listComponents = function listComponents(group) {
           const u = require('url').pathToFileURL(entryPath.replace(/\\/g, '/')).href;
           url = u;
         }
-      } catch {}
+      } catch (e) {}
       const canon = canonicalizePluginId(p.id || p.name || '');
       const urlKey = String(url || '').trim();
       const displayKey = `${String(p.name || '').trim().toLowerCase()}|${String(p.group || '').trim().toLowerCase()}`;
@@ -2131,5 +2139,5 @@ module.exports.getComponentEntryUrl = function getComponentEntryUrl(idOrName) {
     if (!fs.existsSync(entryPath)) return null;
     const u = require('url').pathToFileURL(entryPath.replace(/\\/g, '/')).href;
     return u;
-  } catch { return null; }
+  } catch (e) { return null; }
 };

@@ -40,7 +40,7 @@ async function initDefaultsPage() {
       });
       listEl.appendChild(card);
     }
-  } catch {}
+  } catch (e) {}
 }
 
 async function showProvidersSelectModal(actionId, providers, currentPid) {
@@ -63,7 +63,7 @@ async function showProvidersSelectModal(actionId, providers, currentPid) {
         </div>
       `;
       card.innerHTML = header;
-      if (p.pluginId === currentPid) { try { card.style.outline = '2px solid var(--primary,#4caf50)'; } catch {} }
+      if (p.pluginId === currentPid) { try { card.style.outline = '2px solid var(--primary,#4caf50)'; } catch (e) {} }
       card.addEventListener('click', () => { document.body.removeChild(overlay); resolve(p.pluginId); });
       grid.appendChild(card);
     });

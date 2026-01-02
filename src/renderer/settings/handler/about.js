@@ -22,7 +22,7 @@ function initAboutPage() {
       if (nEl) nEl.textContent = nv;
       if (cEl) cEl.textContent = cv;
       if (pEl) pEl.textContent = pv;
-    } catch {
+    } catch (e) {
       vEl.textContent = vEl.textContent || '—';
       eEl.textContent = eEl.textContent || (navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] || '—');
       if (nEl) nEl.textContent = process?.versions?.node || '—';
@@ -40,7 +40,7 @@ function initAboutPage() {
       `Chrome ${cEl?.textContent || '—'}`,
       `平台 ${pEl?.textContent || '—'}`
     ].join(' | ');
-    try { await navigator.clipboard?.writeText(merged); } catch {}
+    try { await navigator.clipboard?.writeText(merged); } catch (e) {}
   });
 
   // 打开数据目录（如主进程实现该接口）
@@ -83,7 +83,7 @@ function initAboutPage() {
           if (debugNavBtn) { debugNavBtn.style.display = 'none'; }
           showToast('开发者模式已关闭', { type: 'info', duration: 2000 });
         }
-      } catch {}
+      } catch (e) {}
     });
   }
 
@@ -166,7 +166,15 @@ function initAboutPage() {
       });
       
       try {
-        await window.settingsAPI.performUpdate();
+        const res = await window.settingsAPI.performUpdate();
+        if (res && res.ok && res.updated) {
+          updateStatus.textContent = '更新完成，正在重启...';
+        } else if (res && !res.ok) {
+          updateStatus.textContent = '更新失败: ' + (res.error || '未知错误');
+          performBtn.style.display = 'inline-flex';
+          performBtn.disabled = false;
+          progressWrap.style.display = 'none';
+        }
       } catch (e) {
         updateStatus.textContent = '更新失败: ' + (e.message || String(e));
         performBtn.style.display = 'inline-flex';

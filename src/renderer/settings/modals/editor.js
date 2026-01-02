@@ -424,7 +424,7 @@ async function showAutomationJsonEditorModal(initial) {
       delete clone.id;
       return JSON.stringify(clone, null, 2);
     };
-    try { ta.value = composeInitial(); } catch { ta.value = '{}'; }
+    try { ta.value = composeInitial(); } catch (e) { ta.value = '{}'; }
 
     btnCopy.onclick = async () => {
       try {

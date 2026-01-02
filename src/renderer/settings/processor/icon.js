@@ -18,7 +18,7 @@ async function drawRemixIconCanvas(iconClass, canvas, bg = '#111827', fg = '#fff
   const bgNorm = String(bg || '').toLowerCase();
   if (bg && bgNorm !== 'transparent' && bgNorm !== 'none') { ctx.fillStyle = bg; roundRect(0,0,size,size, Math.floor(size*0.18)); ctx.fill(); } else { ctx.clearRect(0,0,size,size); }
   const i = document.createElement('i'); i.className = iconClass; i.style.fontFamily = 'remixicon'; i.style.fontStyle = 'normal'; i.style.fontWeight = 'normal'; document.body.appendChild(i);
-  try { await document.fonts.ready; } catch {}
+  try { await document.fonts.ready; } catch (e) {}
   let ch = getRemixCharFromComputed(i);
   for (let t = 0; t < 30 && (!ch || ch === 'none' || ch === '""' || ch === "''"); t++) { await new Promise(r => setTimeout(r, 50)); ch = getRemixCharFromComputed(i); }
   if (!ch || ch === 'none' || ch === '""' || ch === "''") { i.className = 'ri-flashlight-fill'; ch = getRemixCharFromComputed(i) || ''; }

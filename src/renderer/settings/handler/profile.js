@@ -115,7 +115,7 @@ async function initProfilesSettings() {
               const origIndex = students.indexOf(stu);
               if (origIndex >= 0) {
                 students.splice(origIndex, 1);
-                try { await window.settingsAPI?.configSet('profiles', 'students', students); } catch {}
+                try { await window.settingsAPI?.configSet('profiles', 'students', students); } catch (e) {}
               }
               renderBody();
             }

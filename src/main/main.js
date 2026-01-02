@@ -9,6 +9,7 @@ const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
 const backendLog = require('./backendLog');
 const AutomationManager = require('./automationManager');
+const protocol = require('./protocol');
 const store = require('./store');
 const autoUpdater = require('./autoUpdater');
 // 让插件管理器可以访问 ipcMain（用于事件回调注册）
@@ -23,8 +24,8 @@ pluginManager._ipcMain = ipcMain;
 // 进程锁：防止重复运行（单实例）
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
-  try { app.quit(); } catch {}
-  try { process.exit(0); } catch {}
+  try { app.quit(); } catch (e) {}
+  try { process.exit(0); } catch (e) {}
 }
 
 let splashWindow = null;
@@ -35,7 +36,21 @@ let splashReady = false;
 let splashQueue = [];
 let automationManager = null;
 // 判断是否通过协议参数启动（OrbiBoard://...），用于控制是否创建主窗口
-const hasProtocolArgAtBoot = Array.isArray(process.argv) && process.argv.some((s) => /^OrbiBoard:\/\//i.test(String(s || '')));
+let hasProtocolArgAtBoot = Array.isArray(process.argv) && process.argv.some((s) => /^OrbiBoard:\/\//i.test(String(s || '')));
+try {
+  const sys = store.getAll('system') || {};
+  if (sys.openSettingsOnBootOnce) {
+    hasProtocolArgAtBoot = true;
+    // 使用一次后清除标记，避免后续正常启动被拦截
+    store.set('system', 'openSettingsOnBootOnce', false);
+    // 静默处理：不主动打开任何窗口
+  }
+  // 支持通过 relaunch 参数传递的后置更新标记
+  if (process.argv.includes('--post-update')) {
+    hasProtocolArgAtBoot = true;
+    // 静默处理：不主动打开任何窗口
+  }
+} catch (e) {}
 
 let __lastProtoTask = { text: '', ts: 0 };
 let __lastProtoStore = { key: '', ts: 0 };
@@ -63,7 +78,7 @@ function __openStore(install, type, id) {
       settingsWindow.webContents.send('settings:navigate', 'market');
       if (install) settingsWindow.webContents.send('settings:marketInstall', { type, id });
       else settingsWindow.webContents.send('settings:openStoreItem', { type, id });
-    } catch {}
+    } catch (e) {}
   };
   if (settingsWindow.webContents.isLoading()) settingsWindow.webContents.once('did-finish-load', send); else send();
 }
@@ -92,7 +107,7 @@ function createSplashWindow() {
     // 将之前的队列消息发送出去
     try {
       splashQueue.forEach((p) => splashWindow?.webContents?.send('plugin-progress', p));
-    } catch {}
+    } catch (e) {}
     splashQueue = [];
   });
   splashWindow.on('closed', () => { splashWindow = null; });
@@ -143,7 +158,7 @@ function createTray() {
     if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
     settingsWindow.show();
     settingsWindow.focus();
-    const sendNav = () => { try { settingsWindow.webContents.send('settings:navigate', page); } catch {} };
+    const sendNav = () => { try { settingsWindow.webContents.send('settings:navigate', page); } catch (e) {} };
     if (settingsWindow.webContents.isLoading()) {
       settingsWindow.webContents.once('did-finish-load', sendNav);
     } else {
@@ -153,7 +168,7 @@ function createTray() {
 
   const openPluginInfo = (pluginKey) => {
     openSettingsTo('plugins');
-    const sendInfo = () => { try { settingsWindow.webContents.send('settings:openPluginInfo', pluginKey); } catch {} };
+    const sendInfo = () => { try { settingsWindow.webContents.send('settings:openPluginInfo', pluginKey); } catch (e) {} };
     if (settingsWindow.webContents.isLoading()) {
       settingsWindow.webContents.once('did-finish-load', sendInfo);
     } else {
@@ -191,13 +206,13 @@ function createTray() {
                 }
                 const inv = nativeImage.createFromBitmap(buf, { width: size.width, height: size.height });
                 return inv || scaled;
-              } catch {}
+              } catch (e) {}
             }
             return scaled;
-          } catch {}
+          } catch (e) {}
         }
       }
-    } catch {}
+    } catch (e) {}
     return null;
   };
 
@@ -221,7 +236,7 @@ function createTray() {
                   await pluginManager.callFunction(p.id || p.name, a.target, a.args || {});
                 }
               } catch (e) {
-                try { require('electron').dialog.showErrorBox('执行插件动作失败', e?.message || String(e)); } catch {}
+                try { require('electron').dialog.showErrorBox('执行插件动作失败', e?.message || String(e)); } catch (e) {}
               }
             }
           });
@@ -232,7 +247,7 @@ function createTray() {
       }
       if (!items.length) return [{ label: '暂无可用插件动作', enabled: false }];
       return items;
-    } catch { return [{ label: '加载失败', enabled: false }]; }
+    } catch (e) { return [{ label: '加载失败', enabled: false }]; }
   };
 
   const buildMenu = () => Menu.buildFromTemplate([
@@ -252,7 +267,7 @@ function createTray() {
 
   // 监听主题变化以刷新菜单项图标
   nativeTheme.on('updated', () => {
-    try { tray.setContextMenu(buildMenu()); } catch {}
+    try { tray.setContextMenu(buildMenu()); } catch (e) {}
   });
 }
 
@@ -263,13 +278,13 @@ function sendSplashProgress(payload) {
     } else {
       splashQueue.push(payload);
     }
-  } catch {}
+  } catch (e) {}
   // 同步推送到设置窗口（用于前端可视化进度显示）
   try {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.webContents.send('plugin-progress', payload);
     }
-  } catch {}
+  } catch (e) {}
 }
 
 app.whenReady().then(async () => {
@@ -294,12 +309,12 @@ app.whenReady().then(async () => {
     updateServerUrl: 'http://localhost:3030'
   });
   // 后端日志：始终捕获与保存（不再受开发者模式限制）
-  try { backendLog.init({ enabled: true }); } catch {}
+  try { backendLog.init({ enabled: true }); } catch (e) {}
   const splashEnabled = store.get('system', 'splashEnabled') !== false;
   if (splashEnabled) {
     createSplashWindow();
   }
-  try { autoUpdater.checkAndUpdate((status) => sendSplashProgress(status)); } catch {}
+  try { autoUpdater.checkAndUpdate((status) => sendSplashProgress(status)); } catch (e) {}
 
   const userRoot = path.join(app.getPath('userData'), 'OrbiBoard');
   const devPluginsOverride = '';
@@ -309,9 +324,9 @@ app.whenReady().then(async () => {
   shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
   shippedComponentsRoot = path.join(app.getAppPath(), 'src', 'components');
   const shippedRendererRoot = path.join(app.getAppPath(), 'src', 'renderer');
-  try { fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch {}
-  try { fs.mkdirSync(userComponentsRoot, { recursive: true }); } catch {}
-  try { fs.mkdirSync(userRendererRoot, { recursive: true }); } catch {}
+  try { fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(userComponentsRoot, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(userRendererRoot, { recursive: true }); } catch (e) {}
   // 可选：强制同步内置插件到用户目录（用于开发或修复用户目录旧版本）
   try {
     const shouldForceSync = true;
@@ -336,7 +351,7 @@ app.whenReady().then(async () => {
               if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
               stack.push({ s: sp, d: dp });
             } else {
-              try { fs.copyFileSync(sp, dp); } catch {}
+              try { fs.copyFileSync(sp, dp); } catch (e) {}
             }
           }
         }
@@ -363,18 +378,18 @@ app.whenReady().then(async () => {
                 if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
                 stack.push({ s: sp, d: dp });
               } else {
-                try { fs.copyFileSync(sp, dp); } catch {}
+                try { fs.copyFileSync(sp, dp); } catch (e) {}
               }
             }
           }
         }
-      } catch {}
+      } catch (e) {}
       // 配置文件也覆盖更新
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
-      try { if (fs.existsSync(shippedCfg)) fs.copyFileSync(shippedCfg, userCfg); } catch {}
+      try { if (fs.existsSync(shippedCfg)) fs.copyFileSync(shippedCfg, userCfg); } catch (e) {}
     }
-  } catch {}
+  } catch (e) {}
   // 首次运行填充内置插件与默认配置（仅当用户插件目录为空时）
   try {
     const entries = fs.existsSync(userPluginsRoot) ? fs.readdirSync(userPluginsRoot).filter((n) => {
@@ -403,7 +418,7 @@ app.whenReady().then(async () => {
               if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
               stack.push({ s: sp, d: dp });
             } else {
-              try { fs.copyFileSync(sp, dp); } catch {}
+              try { fs.copyFileSync(sp, dp); } catch (e) {}
             }
           }
         }
@@ -428,16 +443,16 @@ app.whenReady().then(async () => {
                 if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
                 stack.push({ s: sp, d: dp });
               } else {
-                try { fs.copyFileSync(sp, dp); } catch {}
+                try { fs.copyFileSync(sp, dp); } catch (e) {}
               }
             }
           }
         }
-      } catch {}
+      } catch (e) {}
       // 复制默认插件配置
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
-      try { if (fs.existsSync(shippedCfg)) fs.copyFileSync(shippedCfg, userCfg); } catch {}
+      try { if (fs.existsSync(shippedCfg)) fs.copyFileSync(shippedCfg, userCfg); } catch (e) {}
     }
     // 每次启动进行增量复制：若用户目录缺少内置插件，则补齐，但不覆盖已有插件
     try {
@@ -462,7 +477,7 @@ app.whenReady().then(async () => {
                 if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
                 stack.push({ s: sp, d: dp });
               } else {
-                try { fs.copyFileSync(sp, dp); } catch {}
+                try { fs.copyFileSync(sp, dp); } catch (e) {}
               }
             }
           }
@@ -492,26 +507,26 @@ app.whenReady().then(async () => {
                     if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
                     stack.push({ s: sp, d: dp });
                   } else {
-                    try { fs.copyFileSync(sp, dp); } catch {}
+                    try { fs.copyFileSync(sp, dp); } catch (e) {}
                   }
                 }
               }
             }
           }
         }
-      } catch {}
+      } catch (e) {}
       // 若缺少配置文件，复制默认配置；若存在则保持用户选择
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
       if (!fs.existsSync(userCfg) && fs.existsSync(shippedCfg)) {
-        try { fs.copyFileSync(shippedCfg, userCfg); } catch {}
+        try { fs.copyFileSync(shippedCfg, userCfg); } catch (e) {}
       }
-    } catch {}
-  } catch {}
+    } catch (e) {}
+  } catch (e) {}
 
   try {
     const mirror = (src, dst) => {
-      try { fs.mkdirSync(dst, { recursive: true }); } catch {}
+      try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
       const stack = [{ s: src, d: dst }];
       while (stack.length) {
         const { s, d } = stack.pop();
@@ -521,19 +536,19 @@ app.whenReady().then(async () => {
           const sp = path.join(s, it);
           const dp = path.join(d, it);
           const st = fs.statSync(sp);
-          if (st.isDirectory()) { try { fs.mkdirSync(dp, { recursive: true }); } catch {} stack.push({ s: sp, d: dp }); }
-          else { try { fs.copyFileSync(sp, dp); } catch {} }
+          if (st.isDirectory()) { try { fs.mkdirSync(dp, { recursive: true }); } catch (e) {} stack.push({ s: sp, d: dp }); }
+          else { try { fs.copyFileSync(sp, dp); } catch (e) {} }
         }
       }
     };
     mirror(shippedRendererRoot, userRendererRoot);
-  } catch {}
+  } catch (e) {}
 
   const manifestPath = path.join(userPluginsRoot, 'plugins.json');
   const configPath = path.join(userPluginsRoot, 'config.json');
-  try { if (!fs.existsSync(userPluginsRoot)) fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch {}
-  try { if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, JSON.stringify({ enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} }, null, 2), 'utf-8'); } catch {}
-  try { if (!fs.existsSync(manifestPath)) fs.writeFileSync(manifestPath, JSON.stringify({ plugins: [] }, null, 2), 'utf-8'); } catch {}
+  try { if (!fs.existsSync(userPluginsRoot)) fs.mkdirSync(userPluginsRoot, { recursive: true }); } catch (e) {}
+  try { if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, JSON.stringify({ enabled: {}, registry: 'https://registry.npmmirror.com', npmSelection: {} }, null, 2), 'utf-8'); } catch (e) {}
+  try { if (!fs.existsSync(manifestPath)) fs.writeFileSync(manifestPath, JSON.stringify({ plugins: [] }, null, 2), 'utf-8'); } catch (e) {}
 
   pluginManager.init({ manifestPath, configPath });
 
@@ -541,8 +556,8 @@ app.whenReady().then(async () => {
 
   // 提前创建自动化管理器并注入到插件管理器，以便插件 init 阶段能注册分钟触发器
   automationManager = new AutomationManager({ app, store, pluginManager });
-  try { pluginManager.setAutomationManager(automationManager); } catch {}
-  try { global.__automationManager__ = automationManager; } catch {}
+  try { pluginManager.setAutomationManager(automationManager); } catch (e) {}
+  try { global.__automationManager__ = automationManager; } catch (e) {}
 
   // 之后再加载插件（插件在 init 内可使用 automation.registerMinuteTriggers）
   try {
@@ -569,13 +584,13 @@ app.whenReady().then(async () => {
             const now = Date.now();
             if (now - last < 300) return;
             debounce.set(key, now);
-            (async () => { try { await pluginManager.toggle(key, false); await pluginManager.toggle(key, true); } catch {} })();
+            (async () => { try { await pluginManager.toggle(key, false); await pluginManager.toggle(key, true); } catch (e) {} })();
           });
           watcher.on('error', () => {});
-        } catch {}
+        } catch (e) {}
       }
     }
-  } catch {}
+  } catch (e) {}
 
   // 创建“打开用户数据”快捷脚本（每次启动检查，缺失则补齐）
   ensureUserDataShortcut();
@@ -586,58 +601,55 @@ app.whenReady().then(async () => {
   try {
     const arg = (Array.isArray(process.argv) ? process.argv.find((s) => /^OrbiBoard:\/\//i.test(String(s || ''))) : null);
     if (arg) {
-      const mTask = String(arg).match(/^OrbiBoard:\/\/task\/(.+)$/i);
-      const mStore = String(arg).match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
-      if (mTask) {
-        const text = decodeURIComponent(mTask[1]);
-        if (!__shouldSkipTask(text)) { try { await automationManager.invokeProtocol(text); } catch {} }
-      } else if (mStore) {
-        const install = !!mStore[1];
-        const type = mStore[2];
-        const id = decodeURIComponent(mStore[3]);
-        __openStore(install, type, id);
+      const info = protocol.parse(String(arg));
+      if (info.kind === 'task') {
+        const text = info.taskText;
+        if (!__shouldSkipTask(text)) { try { await automationManager.invokeProtocol(text, info.params || {}); } catch (e) {} }
+      } else if (info.kind === 'market') {
+        __openStore(!!info.install, info.type, info.id);
+      } else if (info.kind === 'open' && info.target === 'settings') {
+        try {
+          if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
+          if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
+          settingsWindow.show();
+          settingsWindow.focus();
+        } catch (e) {}
       }
     }
-  } catch {}
+  } catch (e) {}
 
   // 注册协议处理（OrbiBoard://task/<text>）
   try {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient('OrbiBoard', process.execPath, [path.resolve(process.argv[1])]);
-        try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [path.resolve(process.argv[1])]); } catch {}
+        try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [path.resolve(process.argv[1])]); } catch (e) {}
       } else {
         app.setAsDefaultProtocolClient('OrbiBoard', process.execPath, [app.getAppPath()]);
-        try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [app.getAppPath()]); } catch {}
+        try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard', process.execPath, [app.getAppPath()]); } catch (e) {}
       }
     } else {
       app.setAsDefaultProtocolClient('OrbiBoard');
-      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard'); } catch {}
+      try { if (process.platform === 'linux') app.setAsDefaultProtocolClient('orbiboard'); } catch (e) {}
     }
-  } catch {}
-  try { ensureLinuxProtocolRegistration(); } catch {}
+  } catch (e) {}
+  try { ensureLinuxProtocolRegistration(); } catch (e) {}
   app.on('second-instance', (_e, argv) => {
-    // 处理自定义协议（OrbiBoard://task/<text>）
     const arg = argv.find((s) => /^OrbiBoard:\/\//i.test(s));
     if (arg) {
-      const mTask = arg.match(/^OrbiBoard:\/\/task\/(.+)$/i);
-      const mStore = arg.match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
-      const mOpen = arg.match(/^OrbiBoard:\/\/open\/settings$/i);
-      if (mTask) {
-        const text = decodeURIComponent(mTask[1]);
-        if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
-      } else if (mStore) {
-        const install = !!mStore[1];
-        const type = mStore[2];
-        const id = decodeURIComponent(mStore[3]);
-        __openStore(install, type, id);
-      } else if (mOpen) {
+      const info = protocol.parse(String(arg));
+      if (info.kind === 'task') {
+        const text = info.taskText;
+        if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text, info.params || {});
+      } else if (info.kind === 'market') {
+        __openStore(!!info.install, info.type, info.id);
+      } else if (info.kind === 'open' && info.target === 'settings') {
         try {
           if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
           if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
           settingsWindow.show();
           settingsWindow.focus();
-        } catch {}
+        } catch (e) {}
       }
     }
     // 若为普通重复启动（非协议调用），打开设置页面；协议调用不创建主窗口
@@ -648,29 +660,23 @@ app.whenReady().then(async () => {
         settingsWindow.show();
         settingsWindow.focus();
       }
-    } catch {}
+    } catch (e) {}
   });
   if (process.platform === 'darwin') {
     app.on('open-url', (_e, url) => {
-      const u = String(url || '');
-      const mTask = u.match(/^OrbiBoard:\/\/task\/(.+)$/i);
-      const mStore = u.match(/^OrbiBoard:\/\/market\/(install\/)?(plugin|component|automation)\/([^\/?#]+)$/i);
-      const mOpen = u.match(/^OrbiBoard:\/\/open\/settings$/i);
-      if (mTask) {
-        const text = decodeURIComponent(mTask[1]);
-        if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text);
-      } else if (mStore) {
-        const install = !!mStore[1];
-        const type = mStore[2];
-        const id = decodeURIComponent(mStore[3]);
-        __openStore(install, type, id);
-      } else if (mOpen) {
+      const info = protocol.parse(String(url || ''));
+      if (info.kind === 'task') {
+        const text = info.taskText;
+        if (!__shouldSkipTask(text)) automationManager?.invokeProtocol(text, info.params || {});
+      } else if (info.kind === 'market') {
+        __openStore(!!info.install, info.type, info.id);
+      } else if (info.kind === 'open' && info.target === 'settings') {
         try {
           if (!settingsWindow || settingsWindow.isDestroyed()) createSettingsWindow();
           if (settingsWindow?.isMinimized?.()) settingsWindow.restore();
           settingsWindow.show();
           settingsWindow.focus();
-        } catch {}
+        } catch (e) {}
       }
     });
   }
@@ -686,29 +692,29 @@ app.whenReady().then(async () => {
         const wc = win?.webContents;
         const info = {
           id: win.id,
-          title: (() => { try { return win.getTitle(); } catch { return ''; } })(),
-          url: (() => { try { return wc?.getURL?.() || ''; } catch { return ''; } })(),
-          bounds: (() => { try { return win.getBounds(); } catch { return null; } })(),
-          webContentsId: (() => { try { return wc?.id || null; } catch { return null; } })(),
-          isVisible: (() => { try { return win.isVisible(); } catch { return false; } })(),
-          isFocused: (() => { try { return win.isFocused(); } catch { return false; } })(),
-          isMinimized: (() => { try { return win.isMinimized(); } catch { return false; } })(),
-          isMaximized: (() => { try { return win.isMaximized(); } catch { return false; } })(),
-          isFullScreen: (() => { try { return win.isFullScreen(); } catch { return false; } })(),
+          title: (() => { try { return win.getTitle(); } catch (e) { return ''; } })(),
+          url: (() => { try { return wc?.getURL?.() || ''; } catch (e) { return ''; } })(),
+          bounds: (() => { try { return win.getBounds(); } catch (e) { return null; } })(),
+          webContentsId: (() => { try { return wc?.id || null; } catch (e) { return null; } })(),
+          isVisible: (() => { try { return win.isVisible(); } catch (e) { return false; } })(),
+          isFocused: (() => { try { return win.isFocused(); } catch (e) { return false; } })(),
+          isMinimized: (() => { try { return win.isMinimized(); } catch (e) { return false; } })(),
+          isMaximized: (() => { try { return win.isMaximized(); } catch (e) { return false; } })(),
+          isFullScreen: (() => { try { return win.isFullScreen(); } catch (e) { return false; } })(),
           pluginId: (() => {
             try {
               const webId = wc?.id;
               return pluginManager.getPluginIdByWebContentsId(webId);
-            } catch { return null; }
+            } catch (e) { return null; }
           })()
         };
         console.info('window:created', info);
-      } catch {}
+      } catch (e) {}
       try {
-        win.on('closed', () => { try { console.info('window:closed', { id: win.id }); } catch {} });
-      } catch {}
+        win.on('closed', () => { try { console.info('window:closed', { id: win.id }); } catch (e) {} });
+      } catch (e) {}
     });
-  } catch {}
+  } catch (e) {}
 
   // 若为快速重启触发，则启动后自动打开设置页（仅一次）
   try {
@@ -719,7 +725,7 @@ app.whenReady().then(async () => {
       settingsWindow.show();
       settingsWindow.focus();
     }
-  } catch {}
+  } catch (e) {}
 
   // 关闭启动页
   // 由渲染进程的逻辑决定关闭时机，这里不强制关闭
@@ -732,9 +738,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   try {
     pluginManager.closeAllWindows();
-  } catch {}
-  try { if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.destroy(); } catch {}
-  try { if (splashWindow && !splashWindow.isDestroyed()) splashWindow.destroy(); } catch {}
+  } catch (e) {}
+  try { if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.destroy(); } catch (e) {}
+  try { if (splashWindow && !splashWindow.isDestroyed()) splashWindow.destroy(); } catch (e) {}
 });
 
 // IPC for Settings
@@ -768,7 +774,7 @@ ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
     const buf = Buffer.from(data);
     fs.writeFileSync(tmpPath, buf);
     const res = await pluginManager.installFromZip(tmpPath);
-    try { fs.unlinkSync(tmpPath); } catch {}
+    try { fs.unlinkSync(tmpPath); } catch (e) {}
     return res;
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -784,7 +790,7 @@ ipcMain.handle('plugin:inspectZipData', async (_e, fileName, data) => {
     const buf = Buffer.from(data);
     fs.writeFileSync(tmpPath, buf);
     const res = await pluginManager.inspectZip(tmpPath);
-    try { fs.unlinkSync(tmpPath); } catch {}
+    try { fs.unlinkSync(tmpPath); } catch (e) {}
     return res;
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -805,10 +811,10 @@ ipcMain.handle('plugin:reload', async (_e, key) => {
     const dstDir = path.join(userPluginsRoot, dirName);
     if (!fs.existsSync(srcDir)) return { ok: false, error: 'dev_source_missing' };
     // 卸载并清理旧目录
-    try { await pluginManager.uninstall(key); } catch {}
-    try { if (fs.existsSync(dstDir)) fs.rmSync(dstDir, { recursive: true, force: true }); } catch {}
+    try { await pluginManager.uninstall(key); } catch (e) {}
+    try { if (fs.existsSync(dstDir)) fs.rmSync(dstDir, { recursive: true, force: true }); } catch (e) {}
     // 复制开发目录到用户目录
-    try { fs.mkdirSync(dstDir, { recursive: true }); } catch {}
+    try { fs.mkdirSync(dstDir, { recursive: true }); } catch (e) {}
     const stack = [ { s: srcDir, d: dstDir } ];
     while (stack.length) {
       const { s, d } = stack.pop();
@@ -821,7 +827,7 @@ ipcMain.handle('plugin:reload', async (_e, key) => {
           if (!fs.existsSync(dp)) fs.mkdirSync(dp, { recursive: true });
           stack.push({ s: sp, d: dp });
         } else {
-          try { fs.copyFileSync(sp, dp); } catch {}
+          try { fs.copyFileSync(sp, dp); } catch (e) {}
         }
       }
     }
@@ -829,7 +835,7 @@ ipcMain.handle('plugin:reload', async (_e, key) => {
     const manifestPath = path.join(userPluginsRoot, 'plugins.json');
     const configPath = path.join(userPluginsRoot, 'config.json');
     pluginManager.init({ manifestPath, configPath });
-    try { await pluginManager.loadPlugins((status) => sendSplashProgress(status)); } catch {}
+    try { await pluginManager.loadPlugins((status) => sendSplashProgress(status)); } catch (e) {}
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -838,7 +844,7 @@ ipcMain.handle('plugin:reload', async (_e, key) => {
 
 // 新增：读取插件 README 文本（本地）
 ipcMain.handle('plugin:readme', async (_e, key) => {
-  try { return pluginManager.getPluginReadme(key); } catch { return null; }
+  try { return pluginManager.getPluginReadme(key); } catch (e) { return null; }
 });
 // 新增：在线读取插件 README（优先 npm registry）
 ipcMain.handle('plugin:readmeOnline', async (_e, key) => {
@@ -858,17 +864,17 @@ ipcMain.handle('plugin:readmeOnline', async (_e, key) => {
               const json = JSON.parse(data);
               const md = json?.readme || '';
               resolve(md || null);
-            } catch {
+            } catch (e) {
               resolve(null);
             }
           });
         }).on('error', () => resolve(null));
-      } catch { resolve(null); }
+      } catch (e) { resolve(null); }
     });
     if (content) return content;
     // 回退到本地读取
-    try { return pluginManager.getPluginReadme(key); } catch { return null; }
-  } catch { return null; }
+    try { return pluginManager.getPluginReadme(key); } catch (e) { return null; }
+  } catch (e) { return null; }
 });
 ipcMain.handle('plugin:uninstallAll', async () => {
   try {
@@ -880,7 +886,7 @@ ipcMain.handle('plugin:uninstallAll', async () => {
       try {
         await pluginManager.uninstall(key);
         removed.push(key);
-      } catch {}
+      } catch (e) {}
     }
     return { ok: true, removed };
   } catch (e) {
@@ -901,17 +907,17 @@ ipcMain.handle('window:control', async (event, action) => {
       win.isMaximized() ? win.unmaximize() : win.maximize();
       break;
     case 'fullscreen':
-      try { win.setFullScreen(!win.isFullScreen()); } catch {}
+      try { win.setFullScreen(!win.isFullScreen()); } catch (e) {}
       break;
     case 'hide':
       win.hide();
       break;
     case 'blur':
       try {
-        try { win.setFocusable(false); } catch {}
-        try { win.blur(); } catch {}
-        try { setTimeout(() => { try { win.setFocusable(true); } catch {} }, 500); } catch {}
-      } catch {}
+        try { win.setFocusable(false); } catch (e) {}
+        try { win.blur(); } catch (e) {}
+        try { setTimeout(() => { try { win.setFocusable(true); } catch (e) {} }, 500); } catch (e) {}
+      } catch (e) {}
       break;
     case 'close':
       win.close();
@@ -931,17 +937,17 @@ ipcMain.handle('settings:showMenu', async (event, coords) => {
         if (consoleWindow?.isMinimized?.()) consoleWindow.restore();
         consoleWindow.show();
         consoleWindow.focus();
-      } catch {}
+      } catch (e) {}
     } },
-    { label: '刷新设置页', click: () => { try { win?.webContents?.reload(); } catch {} } },
+    { label: '刷新设置页', click: () => { try { win?.webContents?.reload(); } catch (e) {} } },
     { type: 'separator' },
-    { label: '快速重启程序', click: () => { try { store.set('system', 'openSettingsOnBootOnce', true); } catch {} app.relaunch(); app.exit(0); } },
-    { label: '打开数据目录', click: async () => { try { const root = path.join(app.getPath('userData'), 'OrbiBoard'); try { fs.mkdirSync(root, { recursive: true }); } catch {} await require('electron').shell.openPath(root); } catch {} } },
-    { label: '打开安装目录', click: async () => { try { const dir = path.dirname(process.execPath); await require('electron').shell.openPath(dir); } catch {} } },
+    { label: '快速重启程序', click: () => { try { store.set('system', 'openSettingsOnBootOnce', true); } catch (e) {} app.relaunch(); app.exit(0); } },
+    { label: '打开数据目录', click: async () => { try { const root = path.join(app.getPath('userData'), 'OrbiBoard'); try { fs.mkdirSync(root, { recursive: true }); } catch (e) {} await require('electron').shell.openPath(root); } catch (e) {} } },
+    { label: '打开安装目录', click: async () => { try { const dir = path.dirname(process.execPath); await require('electron').shell.openPath(dir); } catch (e) {} } },
     { type: 'separator' },
     { label: '退出程序', click: () => app.quit() }
   ]);
-  try { menu.popup({ window: win }); } catch {}
+  try { menu.popup({ window: win }); } catch (e) {}
   return { ok: true };
 });
 
@@ -1005,7 +1011,7 @@ ipcMain.handle('plugin:call', async (event, targetPluginId, fnName, args) => {
   try {
     const callerId = pluginManager.getPluginIdByWebContentsId(event.sender.id);
     return pluginManager.callFunction(targetPluginId, fnName, args, callerId || null);
-  } catch {
+  } catch (e) {
     return pluginManager.callFunction(targetPluginId, fnName, args, null);
   }
 });
@@ -1021,7 +1027,7 @@ ipcMain.handle('actions:list', async () => {
   return pluginManager.listActions();
 });
 ipcMain.handle('actions:getDefaults', async () => {
-  try { return store.getAll('system')?.defaultActions || {}; } catch { return {}; }
+  try { return store.getAll('system')?.defaultActions || {}; } catch (e) { return {}; }
 });
 ipcMain.handle('actions:setDefault', async (_e, actionId, pluginId) => {
   return pluginManager.setDefaultAction(actionId, pluginId);
@@ -1035,7 +1041,7 @@ ipcMain.handle('behaviors:list', async () => {
   return pluginManager.listBehaviors();
 });
 ipcMain.handle('behaviors:getDefaults', async () => {
-  try { return store.getAll('system')?.defaultBehaviors || {}; } catch { return {}; }
+  try { return store.getAll('system')?.defaultBehaviors || {}; } catch (e) { return {}; }
 });
 ipcMain.handle('behaviors:setDefault', async (_e, behaviorId, pluginId) => {
   return pluginManager.setDefaultBehavior(behaviorId, pluginId);
@@ -1072,14 +1078,14 @@ ipcMain.handle('plugin:automation:listEvents', async (_e, pluginId) => {
 ipcMain.handle('window:isFullscreen', async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
   if (!win) return false;
-  try { return !!win.isFullScreen(); } catch { return false; }
+  try { return !!win.isFullScreen(); } catch (e) { return false; }
 });
 
 // 窗口位置与大小：用于拖动区域触发恢复
 ipcMain.handle('window:getBounds', async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
   if (!win) return null;
-  try { return win.getBounds(); } catch { return null; }
+  try { return win.getBounds(); } catch (e) { return null; }
 });
   // 从设置页直接请求为插件动作创建桌面快捷方式
   ipcMain.handle('plugin:automation:createShortcut', async (_e, pluginId, options) => {
@@ -1104,14 +1110,17 @@ ipcMain.handle('config:set', async (_e, scope, key, value) => {
       // 不再根据 developerMode 开关日志；保持始终启用
       backendLog.enableLogging(true);
     }
-  } catch {}
+  } catch (e) {}
   return r;
+});
+ipcMain.handle('config:deleteScope', async (_e, scope) => {
+  return store.deleteScope(scope);
 });
 ipcMain.handle('config:ensureDefaults', async (_e, scope, defaults) => {
   return store.ensureDefaults(scope, defaults);
 });
 ipcMain.handle('config:listScopes', async () => {
-  try { return store.listPluginScopes(); } catch { return []; }
+  try { return store.listPluginScopes(); } catch (e) { return []; }
 });
 // 规范插件配置读写（按插件规范ID，兼容旧点号ID回退）
 ipcMain.handle('config:plugin:getAll', async (_e, pluginKey) => {
@@ -1123,7 +1132,7 @@ ipcMain.handle('config:plugin:getAll', async (_e, pluginKey) => {
     if (raw && Object.keys(raw).length) return raw;
     const dot = store.getAll(String(canon).replace(/-/g, '.'));
     return dot || {};
-  } catch { return {}; }
+  } catch (e) { return {}; }
 });
 ipcMain.handle('config:plugin:get', async (_e, pluginKey, key) => {
   try {
@@ -1132,7 +1141,7 @@ ipcMain.handle('config:plugin:get', async (_e, pluginKey, key) => {
     if (val === undefined) val = store.get(pluginKey, key);
     if (val === undefined) val = store.get(String(canon).replace(/-/g, '.'), key);
     return val;
-  } catch { return undefined; }
+  } catch (e) { return undefined; }
 });
 ipcMain.handle('config:plugin:set', async (_e, pluginKey, key, value) => {
   try {
@@ -1167,7 +1176,7 @@ ipcMain.handle('automation:create', async (_e, payload) => {
 ipcMain.handle('automation:update', async (_e, id, patch) => automationManager.update(id, patch));
 ipcMain.handle('automation:remove', async (_e, id) => automationManager.remove(id));
 ipcMain.handle('automation:toggle', async (_e, id, enabled) => automationManager.toggle(id, enabled));
-ipcMain.handle('automation:invokeProtocol', async (_e, text) => automationManager.invokeProtocol(text));
+  ipcMain.handle('automation:invokeProtocol', async (_e, text, params) => automationManager.invokeProtocol(text, params || {}));
 ipcMain.handle('automation:test', async (_e, id) => {
   try {
     const res = await automationManager.test(id);
@@ -1185,6 +1194,44 @@ ipcMain.handle('system:checkUpdate', async (_e, checkOnly = false) => {
 ipcMain.handle('system:performUpdate', async (_e) => {
   // 传入 checkOnly=false 以执行更新，复用下载与替换逻辑
   return require('./autoUpdater').checkAndUpdate((payload) => sendSplashProgress(payload), false);
+});
+
+// 打包 API (adm-zip)
+const AdmZip = require('adm-zip');
+ipcMain.handle('plugin:pack', async (_e, pluginId) => {
+  try {
+    const dir = pluginManager.getPluginDir(pluginId);
+    if (!dir) return { ok: false, error: 'plugin_not_found_or_no_local_path' };
+    
+    if (!fs.existsSync(dir)) return { ok: false, error: 'dir_not_found' };
+
+    const zip = new AdmZip();
+    // 添加整个目录内容到 zip 根
+    zip.addLocalFolder(dir);
+    
+    const buffer = zip.toBuffer();
+    // 返回 buffer (Uint8Array)
+    return { ok: true, zipData: buffer };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+ipcMain.handle('automation:pack', async (_e, id) => {
+  try {
+    const item = await automationManager.get(id);
+    if (!item) return { ok: false, error: 'automation_not_found' };
+    
+    const zip = new AdmZip();
+    // 创建 automation.json
+    const content = JSON.stringify(item, null, 2);
+    zip.addFile('automation.json', Buffer.from(content, 'utf-8'));
+    
+    const buffer = zip.toBuffer();
+    return { ok: true, zipData: buffer };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
 });
 
 // 系统与时间相关 IPC
@@ -1256,12 +1303,12 @@ ipcMain.handle('system:getUserDataSize', async () => {
         for (const name of entries) {
           const sub = path.join(p, name);
           let st;
-          try { st = fs.statSync(sub); } catch { continue; }
+          try { st = fs.statSync(sub); } catch (e) { continue; }
           if (st.isDirectory()) total += dirSize(sub);
           else total += Number(st.size || 0);
         }
         return total;
-      } catch { return 0; }
+      } catch (e) { return 0; }
     };
     const bytes = dirSize(root);
     return { ok: true, bytes };
@@ -1272,7 +1319,7 @@ ipcMain.handle('system:getUserDataSize', async () => {
 ipcMain.handle('system:openUserData', async () => {
   try {
     const root = path.join(app.getPath('userData'), 'OrbiBoard');
-    try { fs.mkdirSync(root, { recursive: true }); } catch {}
+    try { fs.mkdirSync(root, { recursive: true }); } catch (e) {}
     const res = await require('electron').shell.openPath(root);
     return { ok: !res, error: res || null };
   } catch (e) {
@@ -1290,7 +1337,7 @@ ipcMain.handle('system:changeUserData', async () => {
     const currentBase = app.getPath('userData');
     const currentRoot = path.join(currentBase, 'OrbiBoard');
     const nextRoot = path.join(targetBase, 'OrbiBoard');
-    try { fs.mkdirSync(nextRoot, { recursive: true }); } catch {}
+    try { fs.mkdirSync(nextRoot, { recursive: true }); } catch (e) {}
     const copyDir = (src, dst) => {
       if (!fs.existsSync(src)) return;
       const entries = fs.readdirSync(src);
@@ -1299,10 +1346,10 @@ ipcMain.handle('system:changeUserData', async () => {
         const d = path.join(dst, name);
         const stat = fs.statSync(s);
         if (stat.isDirectory()) {
-          try { fs.mkdirSync(d, { recursive: true }); } catch {}
+          try { fs.mkdirSync(d, { recursive: true }); } catch (e) {}
           copyDir(s, d);
         } else {
-          try { fs.copyFileSync(s, d); } catch {}
+          try { fs.copyFileSync(s, d); } catch (e) {}
         }
       }
     };
@@ -1310,13 +1357,13 @@ ipcMain.handle('system:changeUserData', async () => {
     const programDir = path.dirname(process.execPath);
     const markerPath = path.join(programDir, 'user-data.json');
     let writeOk = false;
-    try { fs.writeFileSync(markerPath, JSON.stringify({ overrideDir: targetBase }, null, 2), 'utf-8'); writeOk = true; } catch {}
+    try { fs.writeFileSync(markerPath, JSON.stringify({ overrideDir: targetBase }, null, 2), 'utf-8'); writeOk = true; } catch (e) {}
     let verifyOk = false;
     try {
       const text = fs.readFileSync(markerPath, 'utf-8');
       const cfg = JSON.parse(text);
       verifyOk = String(cfg?.overrideDir || '') === targetBase;
-    } catch {}
+    } catch (e) {}
     if (!writeOk || !verifyOk) {
       return { ok: false, error: '无法写入应用目录标记文件，请检查权限后重试' };
     }
@@ -1331,7 +1378,7 @@ ipcMain.handle('system:cleanupUserData', async () => {
     const root = path.join(app.getPath('userData'), 'OrbiBoard');
     if (fs.existsSync(root)) {
       // 关闭可能打开的窗口以释放文件句柄
-      try { module.exports?.closeAllWindows?.(); } catch {}
+      try { module.exports?.closeAllWindows?.(); } catch (e) {}
       fs.rmSync(root, { recursive: true, force: true });
     }
     return { ok: true };
@@ -1351,7 +1398,7 @@ ipcMain.handle('system:getAppInfo', async () => {
     } else {
       platformText = `${name} ${release}`;
     }
-  } catch {
+  } catch (e) {
     const release = require('os').release();
     const plat = process.platform;
     const name = plat === 'win32' ? 'Windows' : (plat === 'darwin' ? 'macOS' : (plat === 'linux' ? 'Linux' : plat));
@@ -1380,7 +1427,7 @@ ipcMain.handle('system:getAutostart', async () => {
           const text = fs.readFileSync(filePath, 'utf-8');
           const m = text.match(/X-GNOME-Autostart-enabled\s*=\s*(true|false)/i);
           if (m) enabled = String(m[1]).toLowerCase() === 'true'; else enabled = true;
-        } catch { enabled = true; }
+        } catch (e) { enabled = true; }
       }
       return { ok: true, openAtLogin: enabled };
     }
@@ -1395,7 +1442,7 @@ ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
     if (process.platform === 'linux') {
       const configDir = process.env.XDG_CONFIG_HOME || path.join(require('os').homedir(), '.config');
       const autoDir = path.join(configDir, 'autostart');
-      try { fs.mkdirSync(autoDir, { recursive: true }); } catch {}
+      try { fs.mkdirSync(autoDir, { recursive: true }); } catch (e) {}
       const filePath = path.join(autoDir, 'OrbiBoard.desktop');
       if (enabled) {
         const execPath = process.env.APPIMAGE || process.execPath;
@@ -1413,9 +1460,9 @@ ipcMain.handle('system:setAutostart', async (_e, enabled, highPriority) => {
           'Hidden=false'
         ].filter(Boolean).join('\n');
         fs.writeFileSync(filePath, lines, 'utf-8');
-        try { fs.chmodSync(filePath, 0o644); } catch {}
+        try { fs.chmodSync(filePath, 0o644); } catch (e) {}
       } else {
-        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
       }
       store.set('system', 'autostartEnabled', !!enabled);
       store.set('system', 'autostartHigh', !!highPriority);
@@ -1450,9 +1497,9 @@ function ensureUserDataShortcut() {
     const fullPath = path.join(programDir, fileName);
     if (!fs.existsSync(fullPath)) {
       fs.writeFileSync(fullPath, content, 'utf-8');
-      try { fs.chmodSync(fullPath, 0o755); } catch {}
+      try { fs.chmodSync(fullPath, 0o755); } catch (e) {}
     }
-  } catch {}
+  } catch (e) {}
 }
   // 应用启动前尝试应用数据目录重定向（从程序目录标记文件读取）
 function applyUserDataOverride() {
@@ -1465,11 +1512,11 @@ function applyUserDataOverride() {
       const overrideDir = String(cfg?.overrideDir || '').trim();
       if (overrideDir) {
         const target = path.isAbsolute(overrideDir) ? overrideDir : path.join(programDir, overrideDir);
-        try { fs.mkdirSync(target, { recursive: true }); } catch {}
+        try { fs.mkdirSync(target, { recursive: true }); } catch (e) {}
         app.setPath('userData', target);
       }
     }
-  } catch {}
+  } catch (e) {}
 }
 
 applyUserDataOverride();
@@ -1478,7 +1525,7 @@ function ensureLinuxProtocolRegistration() {
   try {
     if (process.platform !== 'linux') return;
     const appsDir = path.join(require('os').homedir(), '.local', 'share', 'applications');
-    try { fs.mkdirSync(appsDir, { recursive: true }); } catch {}
+    try { fs.mkdirSync(appsDir, { recursive: true }); } catch (e) {}
     const execPath = process.env.APPIMAGE || process.execPath;
     const iconPng = path.join(app.getAppPath(), 'logo.png');
     const desktopName = 'orbiboard.desktop';
@@ -1498,16 +1545,16 @@ function ensureLinuxProtocolRegistration() {
     const spawn = require('child_process').spawn;
     spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/orbiboard'], { shell: true });
     spawn('xdg-mime', ['default', desktopName, 'x-scheme-handler/OrbiBoard'], { shell: true });
-    try { spawn('update-desktop-database', [appsDir], { shell: true }); } catch {}
-  } catch {}
-  } catch {}
+    try { spawn('update-desktop-database', [appsDir], { shell: true }); } catch (e) {}
+  } catch (e) {}
+  } catch (e) {}
 }
 
 // 图标目录与释放（将Canvas生成的PNG写入用户数据 renderer/icons）
 ipcMain.handle('icons:dir', async () => {
   try {
     const dir = path.join(app.getPath('userData'), 'OrbiBoard', 'renderer', 'icons');
-    try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
     return dir;
   } catch (e) {
     return '';
@@ -1516,7 +1563,7 @@ ipcMain.handle('icons:dir', async () => {
 ipcMain.handle('icons:write', async (_e, fileName, dataUrl) => {
   try {
     const dir = path.join(app.getPath('userData'), 'OrbiBoard', 'renderer', 'icons');
-    try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
     const safe = String(fileName || 'icon.png').replace(/[^a-zA-Z0-9._-]/g, '_');
     const target = path.join(dir, safe);
     const m = String(dataUrl || '').match(/^data:image\/png;base64,(.+)$/i);
@@ -1550,7 +1597,7 @@ ipcMain.handle('plugin:dependents', async (_e, idOrName) => {
 ipcMain.handle('system:restart', async () => {
   try {
     // 下次启动仅一次地自动打开设置页
-    try { store.set('system', 'openSettingsOnBootOnce', true); } catch {}
+    try { store.set('system', 'openSettingsOnBootOnce', true); } catch (e) {}
     app.relaunch();
     app.exit(0);
     return { ok: true };
@@ -1572,13 +1619,13 @@ ipcMain.handle('system:quit', async () => {
 });
 // 调试日志：最近记录查询与订阅实时流
 ipcMain.handle('debug:logs:get', async () => {
-  try { return backendLog.getLast(20); } catch { return []; }
+  try { return backendLog.getLast(20); } catch (e) { return []; }
 });
 ipcMain.on('debug:logs:subscribe', (event) => {
-  try { backendLog.subscribe(event.sender); } catch {}
+  try { backendLog.subscribe(event.sender); } catch (e) {}
 });
 ipcMain.handle('debug:logs:getEntries', async (_e, count = 500) => {
-  try { return backendLog.getLastEntries(count); } catch { return []; }
+  try { return backendLog.getLastEntries(count); } catch (e) { return []; }
 });
 ipcMain.handle('debug:log:write', async (_e, level, ...args) => {
   try { backendLog.write(level, ...(Array.isArray(args) ? args : [args])); return { ok: true }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
@@ -1603,24 +1650,24 @@ ipcMain.handle('console:metrics', async () => {
           try {
             const m = process.memoryUsage();
             return { rss: m.rss, heapTotal: m.heapTotal, heapUsed: m.heapUsed, external: m.external };
-          } catch { return {}; }
+          } catch (e) { return {}; }
         })(),
         cpu: (() => {
           try {
             const c = process.cpuUsage();
             return { user: c.user, system: c.system };
-          } catch { return {}; }
+          } catch (e) { return {}; }
         })(),
-        uptimeSec: (() => { try { return process.uptime(); } catch { return 0; } })()
+        uptimeSec: (() => { try { return process.uptime(); } catch (e) { return 0; } })()
       };
-    } catch {}
+    } catch (e) {}
     try {
       info.appMetrics = (typeof require('electron').app.getAppMetrics === 'function') ? require('electron').app.getAppMetrics() : [];
-    } catch { info.appMetrics = []; }
+    } catch (e) { info.appMetrics = []; }
     try {
       const list = await pluginManager.getPlugins();
       info.plugins = { total: Array.isArray(list) ? list.length : 0, enabled: (Array.isArray(list) ? list.filter(p => p.enabled).length : 0) };
-    } catch { info.plugins = { total: 0, enabled: 0 }; }
+    } catch (e) { info.plugins = { total: 0, enabled: 0 }; }
     return { ok: true, info };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1632,24 +1679,24 @@ ipcMain.handle('console:listWindows', async () => {
     const wins = BrowserWindow.getAllWindows();
     const data = wins.map((w) => {
       let url = '';
-      try { url = w.webContents.getURL(); } catch {}
+      try { url = w.webContents.getURL(); } catch (e) {}
       let title = '';
-      try { title = w.getTitle(); } catch {}
+      try { title = w.getTitle(); } catch (e) {}
       let bounds = null;
-      try { bounds = w.getBounds(); } catch {}
+      try { bounds = w.getBounds(); } catch (e) {}
       let webContentsId = null;
-      try { webContentsId = w.webContents.id; } catch {}
+      try { webContentsId = w.webContents.id; } catch (e) {}
       let pluginId = null;
-      try { pluginId = pluginManager.getPluginIdByWebContentsId(webContentsId); } catch {}
+      try { pluginId = pluginManager.getPluginIdByWebContentsId(webContentsId); } catch (e) {}
       return {
         id: w.id,
         title,
         url,
-        isVisible: (() => { try { return w.isVisible(); } catch { return false; } })(),
-        isFocused: (() => { try { return w.isFocused(); } catch { return false; } })(),
-        isMinimized: (() => { try { return w.isMinimized(); } catch { return false; } })(),
-        isMaximized: (() => { try { return w.isMaximized(); } catch { return false; } })(),
-        isFullScreen: (() => { try { return w.isFullScreen(); } catch { return false; } })(),
+        isVisible: (() => { try { return w.isVisible(); } catch (e) { return false; } })(),
+        isFocused: (() => { try { return w.isFocused(); } catch (e) { return false; } })(),
+        isMinimized: (() => { try { return w.isMinimized(); } catch (e) { return false; } })(),
+        isMaximized: (() => { try { return w.isMaximized(); } catch (e) { return false; } })(),
+        isFullScreen: (() => { try { return w.isFullScreen(); } catch (e) { return false; } })(),
         webContentsId,
         bounds,
         pluginId
@@ -1665,7 +1712,7 @@ ipcMain.handle('console:openDevTools', async (_e, windowId) => {
     const { webContents } = require('electron');
     const wc = webContents.fromId(Number(windowId));
     if (!wc) return { ok: false, error: 'window_not_found' };
-    try { wc.openDevTools({ mode: 'detach' }); } catch {}
+    try { wc.openDevTools({ mode: 'detach' }); } catch (e) {}
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1677,7 +1724,7 @@ ipcMain.handle('console:focusWindow', async (_e, windowId) => {
     const wins = BrowserWindow.getAllWindows();
     const target = wins.find(w => w.id === Number(windowId));
     if (!target) return { ok: false, error: 'window_not_found' };
-    try { target.show(); target.focus(); } catch {}
+    try { target.show(); target.focus(); } catch (e) {}
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
@@ -1689,12 +1736,12 @@ ipcMain.handle('console:controlWindow', async (_e, windowId, action) => {
     const win = BrowserWindow.getAllWindows().find(w => w.id === Number(windowId));
     if (!win) return { ok: false, error: 'window_not_found' };
     switch (String(action)) {
-      case 'minimize': try { win.minimize(); } catch {} break;
-      case 'maximize': try { win.isMaximized() ? win.unmaximize() : win.maximize(); } catch {} break;
-      case 'reload': try { win.webContents?.reload(); } catch {} break;
-      case 'close': try { win.close(); } catch {} break;
-      case 'fullscreen': try { win.setFullScreen(!win.isFullScreen()); } catch {} break;
-      case 'hide': try { win.hide(); } catch {} break;
+      case 'minimize': try { win.minimize(); } catch (e) {} break;
+      case 'maximize': try { win.isMaximized() ? win.unmaximize() : win.maximize(); } catch (e) {} break;
+      case 'reload': try { win.webContents?.reload(); } catch (e) {} break;
+      case 'close': try { win.close(); } catch (e) {} break;
+      case 'fullscreen': try { win.setFullScreen(!win.isFullScreen()); } catch (e) {} break;
+      case 'hide': try { win.hide(); } catch (e) {} break;
       default: break;
     }
     return { ok: true };

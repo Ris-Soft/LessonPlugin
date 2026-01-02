@@ -37,7 +37,7 @@ function startQuoteCountdownFromText(text) {
     const remainSec = Math.ceil(remainMs / 1000);
     if (timerRemainEl) timerRemainEl.textContent = String(remainSec);
     if (remainMs <= 0) {
-      try { clearInterval(countdownInterval); } catch {}
+      try { clearInterval(countdownInterval); } catch (e) {}
       countdownInterval = null;
     }
   };
@@ -100,7 +100,7 @@ async function loadQuote() {
       setVars({ '--bg': '#071a12', '--fg': '#d7f3e5', '--muted': '#9bd6b8', '--accent': '#22c55e', '--btn-primary': '#15803d', '--btn-secondary': '#14532d' });
       if (body) body.style.background = 'radial-gradient(900px 520px at 50% -200px, #0b2a1d, var(--bg))';
     }
-  } catch {}
+  } catch (e) {}
   const showQuote = (await window.splashAPI.configGet('system', 'splashQuoteEnabled')) !== false;
   if (!showQuote && quoteEl) {
     quoteEl.style.display = 'none';
@@ -152,7 +152,7 @@ async function loadQuote() {
         } else {
           txt = String(data);
         }
-      } catch {
+      } catch (e) {
         txt = await resp.text();
       }
       if (showQuote && quoteEl) quoteEl.textContent = txt;
