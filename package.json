@@ -1,6 +1,6 @@
 {
   "name": "orbiboard",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -59,7 +59,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "OrbiBoard",
       "runAfterFinish": true,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
     }
   },
   "devDependencies": {
