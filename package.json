@@ -1,6 +1,6 @@
 {
   "name": "orbiboard",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -9,6 +9,7 @@
     "build": "electron-builder",
     "build:linux": "electron-builder --linux",
     "publish": "node scripts/publish.js",
+    "publish:linux": "node scripts/publish.js --linux",
     "upload-plugin": "node scripts/publish-plugin.js"
   },
   "keywords": [],
