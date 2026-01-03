@@ -26,12 +26,12 @@ async function initGeneralSettings() {
   subItems.forEach((b) => b.classList.toggle('active', b.dataset.sub === 'basic'));
 
   const defaults = {
-    quoteSource: 'hitokoto',
+    quoteSource: 'engquote',
     quoteApiUrl: 'https://v1.hitokoto.cn/',
     localQuotes: [],
     splashEnabled: true,
-    splashQuoteEnabled: true,
-    splashBgStyle: 'default',
+    splashQuoteEnabled: false,
+    splashBgStyle: 'black',
     splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具',
     autoUpdateEnabled: true,
@@ -44,7 +44,7 @@ async function initGeneralSettings() {
     offsetBaseDate: new Date().toISOString().slice(0, 10),
     semesterStart: new Date().toISOString().slice(0, 10),
     biweekOffset: false,
-    marketApiBase: 'http://localhost:3030/',
+    marketApiBase: 'https://orbiboard.3r60.top/',
     timeZone: 'Asia/Shanghai'
   };
   await window.settingsAPI?.configEnsureDefaults('system', defaults);
@@ -77,9 +77,9 @@ async function initGeneralSettings() {
   const apiSample = document.getElementById('api-sample');
   const openArrayEditor = document.getElementById('open-array-editor');
 
-  const getSelectedSource = () => document.querySelector('input[name="quoteSource"]:checked')?.value || (cfg.quoteSource || 'hitokoto');
+  const getSelectedSource = () => document.querySelector('input[name="quoteSource"]:checked')?.value || (cfg.quoteSource || 'engquote');
 
-  radios.forEach((r) => { r.checked = r.value === (cfg.quoteSource || 'hitokoto'); });
+  radios.forEach((r) => { r.checked = r.value === (cfg.quoteSource || 'engquote'); });
   apiUrl.value = cfg.quoteApiUrl || 'https://v1.hitokoto.cn/';
   const switchSource = (val) => {
     fieldApi.hidden = val !== 'custom';
@@ -88,7 +88,7 @@ async function initGeneralSettings() {
     apiTest.disabled = val !== 'custom';
     apiSample.textContent = '';
   };
-  switchSource(cfg.quoteSource || 'hitokoto');
+  switchSource(cfg.quoteSource || 'engquote');
 
   radios.forEach((r) => {
     r.addEventListener('change', async () => {
@@ -207,14 +207,14 @@ async function initGeneralSettings() {
   const splashPreviewFrame = document.getElementById('splash-preview-frame');
 
   // 初始化背景风格选中状态
-  const initStyle = String(cfg.splashBgStyle || 'default');
+  const initStyle = String(cfg.splashBgStyle || 'black');
   if (splashBgStyleRadios && splashBgStyleRadios.length) {
     let matched = false;
     splashBgStyleRadios.forEach(r => {
       if (r.value === initStyle) { r.checked = true; matched = true; }
     });
     if (!matched) {
-      const def = splashBgStyleRadios.find(r => r.value === 'default');
+      const def = splashBgStyleRadios.find(r => r.value === 'black');
       if (def) def.checked = true;
     }
   }
@@ -379,8 +379,8 @@ async function initGeneralSettings() {
   // 获取当前选中的背景风格（单选按钮组）
   function getSelectedBgStyle() {
     const radios = splashBgStyleRadios || [];
-    for (const r of radios) { if (r.checked) return r.value || 'default'; }
-    return 'default';
+    for (const r of radios) { if (r.checked) return r.value || 'black'; }
+    return 'black';
   }
 
   // 基础设置：自启动、精确时间与偏移
@@ -489,15 +489,15 @@ async function initGeneralSettings() {
   const marketApiTest = document.getElementById('market-api-test');
   const marketApiSample = document.getElementById('market-api-sample');
   if (marketApiUrl) {
-    marketApiUrl.value = String(cfg.serviceBase || cfg.marketApiBase || 'http://localhost:3030/');
+    marketApiUrl.value = String(cfg.serviceBase || cfg.marketApiBase || 'https://orbiboard.3r60.top/');
     marketApiUrl.addEventListener('change', async () => {
-      const val = String(marketApiUrl.value || '').trim() || 'http://localhost:3030/';
+      const val = String(marketApiUrl.value || '').trim() || 'https://orbiboard.3r60.top/';
       await window.settingsAPI?.configSet('system', 'serviceBase', val);
     });
   }
   if (marketApiTest) {
     marketApiTest.addEventListener('click', async () => {
-      const base = String(marketApiUrl?.value || '').trim() || 'http://localhost:3030/';
+      const base = String(marketApiUrl?.value || '').trim() || 'https://orbiboard.3r60.top/';
       try {
         const url = new URL('/api/market/catalog', base).toString();
         const resp = await fetch(url);

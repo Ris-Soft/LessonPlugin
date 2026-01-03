@@ -1,6 +1,0 @@
-[
-  { "id": "all", "label": "全部", "icon": "ri-apps-2-line" },
-  { "id": "class", "label": "课堂", "icon": "ri-school-line" },
-  { "id": "notify", "label": "通知", "icon": "ri-notification-2-line" },
-  { "id": "tools", "label": "工具", "icon": "ri-tools-line" }
-]

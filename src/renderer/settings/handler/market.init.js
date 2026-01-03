@@ -4,9 +4,9 @@ async function getMarketBase() {
     const svc = await window.settingsAPI?.configGet?.('system', 'serviceBase');
     if (typeof svc === 'string' && svc) return svc;
     const legacy = await window.settingsAPI?.configGet?.('system', 'marketApiBase');
-    return (typeof legacy === 'string' && legacy) ? legacy : 'http://localhost:3030/';
+    return (typeof legacy === 'string' && legacy) ? legacy : 'https://orbiboard.3r60.top/';
   } catch (e) {
-    return 'http://localhost:3030/';
+    return 'https://orbiboard.3r60.top/';
   }
 }
 async function fetchMarket(route) {

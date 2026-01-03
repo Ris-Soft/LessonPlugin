@@ -47,6 +47,10 @@
               class="ri-close-line"></i></button>
         </div>
       </div>
+      <div style="background: #f59e0b; color: #fff; padding: 10px 16px; border-radius: 0; margin: 0; font-size: 13px; line-height: 1.5; flex-shrink: 0;">
+        <i class="ri-alert-line" style="vertical-align: -2px; margin-right: 4px;font-size: 20px;"></i>
+        Alpha测试版本可能存在问题，不建议在生产环境使用。反馈BUG请点击右上角标签。
+      </div>
       <main id="content">
         <section id="page-plugins">
           <header class="plugins-header">
@@ -152,12 +156,12 @@
                     <div class="inline" style="gap:8px;">
                       <span class="muted">背景样式</span>
                       <div class="options compact" role="group" aria-label="背景样式">
-                        <input type="radio" id="bg-default" name="splashBgStyle" value="default" />
-                        <label for="bg-default">默认</label>
-                        <input type="radio" id="bg-blue" name="splashBgStyle" value="blue" />
-                        <label for="bg-blue">深蓝</label>
                         <input type="radio" id="bg-black" name="splashBgStyle" value="black" />
                         <label for="bg-black">纯黑</label>
+                        <input type="radio" id="bg-default" name="splashBgStyle" value="default" />
+                        <label for="bg-default">深绿</label>
+                        <input type="radio" id="bg-blue" name="splashBgStyle" value="blue" />
+                        <label for="bg-blue">深蓝</label>
                       </div>
                     </div>
                     <div class="inline" style="gap:8px; margin-top:8px;">
@@ -284,11 +288,11 @@
                 <div class="setting-icon"><i class="ri-store-2-line"></i></div>
                 <div class="setting-main">
                   <div class="setting-title">在线服务地址</div>
-                  <div class="setting-desc">用于加载在线服务（功能市场/更新等，默认 http://localhost:3030/）</div>
+                  <div class="setting-desc">用于加载在线服务（功能市场/更新等，默认 https://orbiboard.3r60.top/）</div>
                 </div>
                 <div class="setting-action">
                   <div class="inline">
-                    <input id="market-api-url" type="text" placeholder="http://localhost:3030/" />
+                    <input id="market-api-url" type="text" placeholder="https://orbiboard.3r60.top/" />
                     <button id="market-api-test" class="btn primary"><i class="ri-refresh-line"></i> 测试连接</button>
                   </div>
                   <div id="market-api-sample" class="muted"></div>
@@ -667,7 +671,7 @@
               </div>
             </div>
             <div class="about-links">
-              <a href="https://github.com/Ris-Soft/LessonPlugin" target="_blank" class="btn"><i
+              <a href="https://github.com/OrbiBoard/OrbiBoard" target="_blank" class="btn"><i
                   class="ri-git-repository-line"></i> 仓库</a>
               <div class="spacer"></div>
               <button id="about-copy" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制版本信息</button>

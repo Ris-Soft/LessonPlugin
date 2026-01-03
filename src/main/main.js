@@ -293,8 +293,8 @@ app.whenReady().then(async () => {
   // 确保默认系统设置存在
   store.ensureDefaults('system', {
     splashEnabled: true,
-    splashQuoteEnabled: true,
-    quoteSource: 'hitokoto',
+    splashQuoteEnabled: false,
+    quoteSource: 'engquote',
     quoteApiUrl: 'https://v1.hitokoto.cn/',
     localQuotes: [],
     autostartEnabled: false,
@@ -306,7 +306,7 @@ app.whenReady().then(async () => {
     developerMode: false,
     timeZone: 'Asia/Shanghai',
     autoUpdateEnabled: true,
-    updateServerUrl: 'http://localhost:3030'
+    updateServerUrl: 'https://orbiboard.3r60.top'
   });
   // 后端日志：始终捕获与保存（不再受开发者模式限制）
   try { backendLog.init({ enabled: true }); } catch (e) {}

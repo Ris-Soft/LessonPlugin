@@ -349,7 +349,7 @@ function renderPlugin(item) {
       : { type: 'pluginEvent', pluginId, event: eventName, params: Array.isArray(params) ? params : [] };
     const ok = await showShortcutCreateDialog(item, chosen, pluginId, action);
     if (ok?.res) {
-      const proto = ok.res?.protocolText ? `LessonPlugin://task/${encodeURIComponent(ok.res.protocolText)}` : '';
+      const proto = ok.res?.protocolText ? `OrbiBoard://task/${encodeURIComponent(ok.res.protocolText)}` : '';
       const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式';
       await showAlert(msg);
     }

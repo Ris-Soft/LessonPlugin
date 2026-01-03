@@ -265,7 +265,7 @@ module.exports.init = function init(paths) {
       } catch (e) {}
     }
   } catch (e) {}
-  // 组件目录：%USER_DATA%/LessonPlugin/components
+  // 组件目录：%USER_DATA%/OrbiBoard/components
   try {
     const componentsRoot = path.resolve(pluginsRoot, '..', 'components');
     const entries = fs.existsSync(componentsRoot) ? fs.readdirSync(componentsRoot) : [];

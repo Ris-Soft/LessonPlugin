@@ -159,7 +159,7 @@ async function checkAndUpdate(onProgress, checkOnly = false) {
     const enabled = cfg.autoUpdateEnabled !== false;
     // 如果是 checkOnly（手动检查），即使禁用了自动更新也允许检查
     if (!enabled && !checkOnly) return { ok: false, error: 'disabled' };
-    const base = cfg.updateServerUrl || 'http://localhost:3030';
+    const base = cfg.updateServerUrl || 'https://orbiboard.3r60.top';
     const versionUrl = `${base.replace(/\/+$/,'')}/api/version`;
     if (onProgress) { try { onProgress({ stage: 'update', message: '检查更新...' }); } catch (e) {} }
     const info = await getJson(versionUrl);

@@ -152,10 +152,17 @@ body::-webkit-scrollbar-thumb:hover {
   border-color: rgba(34, 197, 94, 0.35);
 }
 
+.main-col {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 #content {
   position: relative;
-  height: calc(100vh - 34px);
-  /* 标题栏高度：34px */
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 

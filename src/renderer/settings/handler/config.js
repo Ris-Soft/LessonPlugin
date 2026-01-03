@@ -301,12 +301,12 @@ async function initConfigOverview() {
   refreshBtn?.addEventListener('click', async () => { cached = await loadAll(); await render(cached, searchInput?.value || ''); });
 }
   const systemDefaults = {
-    quoteSource: 'hitokoto',
+    quoteSource: 'engquote',
     quoteApiUrl: 'https://v1.hitokoto.cn/',
     localQuotes: [],
     splashEnabled: true,
-    splashQuoteEnabled: true,
-    splashBgStyle: 'default',
+    splashQuoteEnabled: false,
+    splashBgStyle: 'black',
     splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具',
     autostartEnabled: false,
@@ -318,7 +318,7 @@ async function initConfigOverview() {
     offsetBaseDate: new Date().toISOString().slice(0, 10),
     semesterStart: new Date().toISOString().slice(0, 10),
     biweekOffset: false,
-    serviceBase: 'http://localhost:3030/',
+    serviceBase: 'https://orbiboard.3r60.top/',
     timeZone: 'Asia/Shanghai'
   };
 
@@ -339,5 +339,5 @@ async function initConfigOverview() {
     timeOffset: { type: 'number', label: '时间偏移（秒）', desc: '对当前时间进行加减，负数为减', default: systemDefaults.timeOffset },
     autoOffsetDaily: { type: 'number', label: '自动时间偏移（秒/天）', desc: '每天自动叠加该偏移值', default: systemDefaults.autoOffsetDaily },
     timeZone: { type: 'string', label: '时区', desc: '用于时间显示的时区（如 Asia/Shanghai）', default: systemDefaults.timeZone },
-    serviceBase: { type: 'string', label: '在线服务地址', desc: '功能市场/更新等，例如 http://localhost:3030/', default: systemDefaults.serviceBase }
+    serviceBase: { type: 'string', label: '在线服务地址', desc: '功能市场/更新等，例如 https://orbiboard.3r60.top/', default: systemDefaults.serviceBase }
   };

@@ -1,5 +1,0 @@
-[
-  { "id": "all", "label": "全部", "icon": "ri-apps-2-line" },
-  { "id": "ui", "label": "界面", "icon": "ri-layout-grid-line" },
-  { "id": "basic", "label": "基础", "icon": "ri-shape-line" }
-]
