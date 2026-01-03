@@ -2052,7 +2052,11 @@ module.exports.listVariables = async function listVariables(idOrName) {
     if (names.length) return { ok: true, variables: names };
     // 回退：调用插件的 listVariables 函数（若实现）
     try {
-      const res = await module.exports.callFunction(p.id || p.name, 'listVariables', []);
+      // 增加超时控制，防止插件无响应导致 UI 卡死
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ ok: false, error: 'timeout' }), 1000));
+      const callPromise = module.exports.callFunction(p.id || p.name, 'listVariables', []);
+      const res = await Promise.race([callPromise, timeoutPromise]);
+      
       const payload = res?.result ?? res;
       if (res?.ok) {
         if (Array.isArray(payload)) return { ok: true, variables: payload.map((x) => String(x)) };

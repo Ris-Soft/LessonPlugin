@@ -55,31 +55,68 @@ async function showCondEditorModal(type, initial) {
 }
 
 async function openVarOverlaySimple(defaultPluginId, inputEl) {
+  // 加载中提示
+  const loadingToast = document.createElement('div');
+  loadingToast.className = 'toast show';
+  loadingToast.style.zIndex = '2000';
+  loadingToast.textContent = '正在加载插件变量...';
+  document.body.appendChild(loadingToast);
+
   const pluginsRaw = await (window.settingsAPI?.getPlugins?.() || []);
-  const withVars = [];
-  for (const p of pluginsRaw) {
-    const key = p.id || p.name;
-    const res = await window.settingsAPI?.pluginVariablesList?.(key);
-    const names = Array.isArray(res?.variables) ? res.variables : [];
-    if (names.length) withVars.push({ key, name: p.name || p.id, vars: names, icon: p.icon || 'ri-puzzle-line' });
-  }
+  
+  // 并行获取变量列表，提高加载速度
+  const promises = pluginsRaw.map(async (p) => {
+    try {
+      const key = p.id || p.name;
+      const res = await window.settingsAPI?.pluginVariablesList?.(key);
+      const names = Array.isArray(res?.variables) ? res.variables : [];
+      if (names.length) return { key, name: p.name || p.id, vars: names, icon: p.icon || 'ri-puzzle-line' };
+    } catch (e) { }
+    return null;
+  });
+  
+  const results = await Promise.all(promises);
+  const withVars = results.filter(Boolean);
+
+  // 移除加载提示
+  loadingToast.remove();
+
   if (!withVars.length) { await showAlert('暂无可用插件变量'); return; }
-  await new Promise(async (resolveOuter) => {
-    const overlay = document.createElement('div'); overlay.className='modal-overlay';
+  await new Promise((resolveOuter, rejectOuter) => {
+    (async () => {
+      try {
+        const overlay = document.createElement('div'); overlay.className='modal-overlay';
     overlay.style.zIndex = '1001';
     const box = document.createElement('div'); box.className='modal-box';
     const title = document.createElement('div'); title.className='modal-title'; title.textContent='快速编辑栏';
     const body = document.createElement('div'); body.className='modal-body';
     const style = document.createElement('style'); style.textContent = `
-      .custom-scroll::-webkit-scrollbar{width:8px}
+      .custom-scroll::-webkit-scrollbar{width:8px;height:8px}
       .custom-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.06);border-radius:8px}
       .custom-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.18);border-radius:8px}
       .custom-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.28)}
+      .modal-box * { box-sizing: border-box; }
     `; box.appendChild(style);
-    const grid = document.createElement('div'); grid.style.display='grid'; grid.style.gridTemplateColumns='200px 1fr'; grid.style.gap='12px';
+    const grid = document.createElement('div'); grid.style.display='grid'; grid.style.gridTemplateColumns='200px minmax(0, 1fr)'; grid.style.gap='12px';
     const pluginWrap = document.createElement('div'); pluginWrap.className='custom-scroll'; pluginWrap.style.display='flex'; pluginWrap.style.flexDirection='column'; pluginWrap.style.gap='6px'; pluginWrap.style.overflow='auto'; pluginWrap.style.maxHeight='220px'; pluginWrap.style.padding='4px'; pluginWrap.style.border='1px solid var(--border,#2a2a2a)'; pluginWrap.style.borderRadius='8px';
-    const right = document.createElement('div');
-    const editorBar = document.createElement('div'); editorBar.style.minHeight='48px'; editorBar.style.height='56px'; editorBar.style.width='100%'; editorBar.style.border='1px solid var(--border,#2a2a2a)'; editorBar.style.borderRadius='8px'; editorBar.style.padding='8px'; editorBar.style.display='block'; editorBar.style.whiteSpace='nowrap'; editorBar.style.overflowX='auto'; editorBar.style.overflowY='hidden'; editorBar.style.fontSize='12px'; editorBar.style.lineHeight='20px'; editorBar.style.marginBottom='10px';
+    const right = document.createElement('div'); right.style.minWidth = '0';
+    
+    // 编辑器容器：固定高度，包含滚动区域和固定按钮
+    const editorContainer = document.createElement('div'); 
+    editorContainer.style.cssText = 'min-height:48px; height:56px; width:100%; border:1px solid var(--border,#2a2a2a); border-radius:8px; padding:4px 8px; display:flex; align-items:center; margin-bottom:10px; box-sizing:border-box; background:var(--bg-input, rgba(0,0,0,0.2));';
+    
+    // 滚动区域：显示 tokens
+    const editorScroll = document.createElement('div');
+    editorScroll.className = 'custom-scroll';
+    editorScroll.style.cssText = 'flex:1; height:100%; white-space:nowrap; overflow-x:auto; overflow-y:hidden; font-size:12px; display:flex; align-items:center; box-sizing:border-box;';
+    
+    // 回退按钮容器（固定）
+    const backspaceWrap = document.createElement('div');
+    backspaceWrap.style.marginLeft = '8px';
+    
+    editorContainer.appendChild(editorScroll);
+    editorContainer.appendChild(backspaceWrap);
+
     const varWrap = document.createElement('div'); varWrap.className='action-list'; varWrap.style.maxHeight='240px'; varWrap.style.overflow='auto'; varWrap.style.border='1px solid var(--border,#2a2a2a)'; varWrap.style.borderRadius='8px'; varWrap.style.padding='6px';
     const actions = document.createElement('div'); actions.className='modal-actions';
     const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='取消'; cancel.onclick=()=>{ overlay.remove(); resolveOuter(); };
@@ -98,7 +135,7 @@ async function openVarOverlaySimple(defaultPluginId, inputEl) {
     let tokens = parseTokens(inputEl.value || '');
     let insertPos = tokens.length; // 默认指针在末尾
     const makeBackspace = () => {
-      const back = document.createElement('button'); back.className='btn secondary'; back.title='回退'; back.textContent='回退 ⌫'; back.style.marginLeft='8px'; back.onclick=()=>{
+      const back = document.createElement('button'); back.className='btn secondary'; back.title='回退'; back.textContent='回退 ⌫'; back.onclick=()=>{
         const pos = Math.max(0, insertPos);
         if (pos===0) return;
         const prevIdx = pos-1;
@@ -124,25 +161,33 @@ async function openVarOverlaySimple(defaultPluginId, inputEl) {
       };
       return back;
     };
+    // 初始化回退按钮
+    backspaceWrap.appendChild(makeBackspace());
+
     const renderEditor = () => {
-      editorBar.innerHTML='';
-      const makePointer = () => { const p=document.createElement('span'); p.style.display='inline-block'; p.style.width='2px'; p.style.height='18px'; p.style.background='var(--primary,#4caf50)'; p.style.margin='0 2px'; p.title='插入位置'; return p; };
+      editorScroll.innerHTML='';
+      const makePointer = () => { const p=document.createElement('span'); p.style.display='inline-block'; p.style.width='2px'; p.style.height='18px'; p.style.background='var(--primary,#4caf50)'; p.style.margin='0 2px'; p.title='插入位置'; p.style.flexShrink='0'; return p; };
       // 渲染：在 insertPos 对应的位置前插入指针，无额外占位方框
       for (let i=0;i<=tokens.length;i++){
-        if (i===insertPos) editorBar.appendChild(makePointer());
+        if (i===insertPos) editorScroll.appendChild(makePointer());
         if (i<tokens.length){
           const t = tokens[i];
           if (t.type==='text'){
-            const span=document.createElement('span'); span.className='muted'; span.style.fontSize='12px'; span.style.lineHeight='20px'; span.textContent=t.value || ''; span.onclick=()=>{ insertPos=i+1; renderEditor(); }; editorBar.appendChild(span);
+            const span=document.createElement('span'); span.className='muted'; span.style.fontSize='12px'; span.style.lineHeight='20px'; span.textContent=t.value || ''; span.onclick=()=>{ insertPos=i+1; renderEditor(); }; editorScroll.appendChild(span);
           } else {
-            const chip=document.createElement('span'); chip.style.display='inline-flex'; chip.style.alignItems='center'; chip.style.gap='6px'; chip.style.padding='2px 6px'; chip.style.fontSize='12px'; chip.style.lineHeight='18px'; chip.style.border='1px solid var(--border,#2a2a2a)'; chip.style.borderRadius='14px'; chip.style.background='var(--pill,#222)'; const label=document.createElement('span'); label.textContent=`${t.plugin}:${t.name}`; chip.appendChild(label); chip.onclick=()=>{ insertPos=i+1; renderEditor(); }; editorBar.appendChild(chip);
+            const chip=document.createElement('span'); chip.style.display='inline-flex'; chip.style.alignItems='center'; chip.style.gap='6px'; chip.style.padding='2px 6px'; chip.style.fontSize='12px'; chip.style.lineHeight='18px'; chip.style.border='1px solid var(--border,#2a2a2a)'; chip.style.borderRadius='14px'; chip.style.background='var(--pill,#222)'; const label=document.createElement('span'); label.textContent=`${t.plugin}:${t.name}`; chip.appendChild(label); chip.onclick=()=>{ insertPos=i+1; renderEditor(); }; editorScroll.appendChild(chip);
           }
         }
       }
-      // 点击编辑栏空白区域时，移动到末尾
-      editorBar.onclick = (e) => { if (e.target === editorBar) { insertPos = tokens.length; renderEditor(); } };
-      // 固定显示回退按钮（靠右）
-      editorBar.appendChild(makeBackspace());
+      // 点击编辑栏空白区域时，移动到末尾（同时监听容器与滚动区，确保覆盖点击）
+      const focusEnd = (e) => { 
+        if (e.target === editorScroll || e.target === editorContainer) { 
+          insertPos = tokens.length; 
+          renderEditor(); 
+        } 
+      };
+      editorScroll.onclick = focusEnd;
+      editorContainer.onclick = focusEnd;
     };
     const applyResult = () => { const s = tokens.map(t=> t.type==='text' ? String(t.value||'') : `\${${t.plugin}:${t.name}}`).join(''); inputEl.value = s; inputEl.dispatchEvent(new Event('input')); overlay.remove(); resolveOuter(); };
     save.onclick = applyResult;
@@ -156,11 +201,15 @@ async function openVarOverlaySimple(defaultPluginId, inputEl) {
     withVars.forEach(p=>{ const b=document.createElement('button'); b.className='btn secondary'; b.style.width='100%'; b.style.marginBottom='6px'; b.style.textAlign='left'; b.innerHTML = `<i class="${p.icon || 'ri-puzzle-line'}" style="font-size:16px;margin-right:8px;"></i>${p.name}`; b.onclick=()=>{ selKey=p.key; [...pluginWrap.children].forEach(x=>{ x.classList.remove('selected'); x.style.background=''; }); b.classList.add('selected'); b.style.background='rgba(255,255,255,0.08)'; renderVars(); }; pluginWrap.appendChild(b); });
     const pre = withVars.find(x=> x.key===defaultPluginId) || withVars[0]; selKey = pre.key; renderVars();
     [...pluginWrap.children].forEach(btn=>{ if ((btn.innerText||'').includes(pre.name)) { btn.classList.add('selected'); btn.style.background='rgba(255,255,255,0.08)'; } });
-    right.appendChild(editorBar);
+    right.appendChild(editorContainer);
     right.appendChild(varWrap);
     grid.appendChild(pluginWrap); grid.appendChild(right);
     renderEditor();
     box.appendChild(title); body.appendChild(grid); box.appendChild(body); box.appendChild(actions); overlay.appendChild(box); document.body.appendChild(overlay);
+      } catch (e) {
+        rejectOuter(e);
+      }
+    })();
   });
 }
 
