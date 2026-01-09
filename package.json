@@ -73,6 +73,7 @@
     "adm-zip": "^0.5.16",
     "extract-zip": "^2.0.1",
     "formdata-node": "^6.0.3",
+    "koffi": "^2.14.1",
     "uuid": "^13.0.0"
   }
 }

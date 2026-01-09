@@ -8,6 +8,8 @@ const Module = require('module');
 const { app, webContents } = require('electron');
 const https = require('https');
 const http = require('http');
+const store = require('./store');
+const win32 = require('./win32');
 let tar = null;
 
 let manifestPath = '';
@@ -26,6 +28,12 @@ let functionRegistry = new Map(); // pluginId -> Map(fnName -> function)
 let eventSubscribers = new Map(); // eventName -> Set(webContentsId)
 let storeRoot = '';
 let progressReporter = null; // 供插件在初始化期间更新启动页文本
+let missingPluginHandler = null; // 供主进程注册缺失插件的处理逻辑
+
+module.exports.setMissingPluginHandler = function setMissingPluginHandler(handler) {
+  missingPluginHandler = handler;
+};
+
 // 引入自动化管理器引用，供插件入口 API 使用
 let automationManagerRef = null;
 try { tar = require('tar'); } catch (e) {}
@@ -262,6 +270,9 @@ module.exports.init = function init(paths) {
         if (cleanId) nameToId.set(String(cleanId), id);
         if (slugFromName) nameToId.set(String(slugFromName), id);
         nameToId.set(String(id), id);
+        if (Array.isArray(meta.aliases)) {
+          meta.aliases.forEach(a => nameToId.set(String(a), id));
+        }
       } catch (e) {}
     }
   } catch (e) {}
@@ -301,6 +312,8 @@ module.exports.init = function init(paths) {
         type: 'component',
         group: meta.group || null,
         entry: meta.entry || 'index.html',
+        usage: meta.usage || null,
+        recommendedSize: meta.recommendedSize || undefined,
         npmDependencies: (() => {
           if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
           if (pkg && typeof pkg.dependencies === 'object' && !Array.isArray(pkg.dependencies)) return pkg.dependencies;
@@ -313,7 +326,16 @@ module.exports.init = function init(paths) {
         version: detectedVersion,
         studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
         dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined),
-        variables: undefined
+        variables: undefined,
+        configSchema: (() => {
+          try {
+            if (Array.isArray(meta.configSchema)) return meta.configSchema;
+            if (meta && typeof meta.configSchema === 'object' && meta.configSchema) return meta.configSchema;
+            if (Array.isArray(meta.config)) return meta.config;
+            if (meta && typeof meta.config === 'object' && meta.config) return meta.config;
+          } catch (e) {}
+          return undefined;
+        })()
       });
       try {
         if (name) nameToId.set(String(name), id);
@@ -1378,12 +1400,18 @@ module.exports.installFromZip = async function installFromZip(zipPath) {
 
     // 检查入口
     const indexPathTmp = path.join(tempDir, 'index.js');
+    const isComponent = String(meta?.type || '').toLowerCase() === 'component';
+    const entryHtml = meta?.entry || 'index.html';
+    const entryPathTmp = path.join(tempDir, entryHtml);
+
     if (!fs.existsSync(indexPathTmp)) {
-      return { ok: false, error: '安装包缺少 index.js' };
+      if (!isComponent || !fs.existsSync(entryPathTmp)) {
+        return { ok: false, error: isComponent ? `组件缺少入口文件 ${entryHtml}` : '安装包缺少 index.js' };
+      }
     }
     // 获取插件名称（优先 meta.name，其次从入口导出）
     let pluginName = meta.name;
-    if (!pluginName) {
+    if (!pluginName && fs.existsSync(indexPathTmp)) {
       try {
         const mod = require(indexPathTmp);
         if (mod?.name) pluginName = mod.name;
@@ -1640,7 +1668,12 @@ module.exports.callFunction = function callFunction(targetPluginId, fnName, args
     // 回退到插件窗口注册的函数
     const win = pluginWindows.get(canonId);
     const wc = win?.webContents || win;
-    if (!wc) return resolve({ ok: false, error: '目标插件未打开窗口或未注册' });
+    if (!wc) {
+      if (typeof missingPluginHandler === 'function') {
+        try { missingPluginHandler(targetPluginId); } catch (e) {}
+      }
+      return resolve({ ok: false, error: '目标插件未打开窗口或未注册' });
+    }
     const reqId = uuidv4();
     const onResult = (event, id, payload) => {
       if (id !== reqId) return;
@@ -1727,6 +1760,30 @@ function createPluginApi(pluginId) {
       },
       progress: (stage, message) => {
         try { progressReporter && progressReporter({ stage, message }); } catch (e) {}
+      }
+    },
+    // 为插件提供配置存储访问能力
+    store: {
+      get: (key) => store.get(pluginId, key),
+      set: (key, value) => store.set(pluginId, key, value),
+      getAll: () => store.getAll(pluginId),
+      setAll: (obj) => store.setAll(pluginId, obj)
+    },
+    // 为插件提供桌面窗口能力
+    desktop: {
+      attachToDesktop: (browserWindow) => {
+        try {
+          if (!browserWindow) return { ok: false, error: 'window_required' };
+          const hwnd = browserWindow.getNativeWindowHandle();
+          const desktop = win32.getDesktopWindow();
+          if (desktop && !desktop.isNull()) {
+            win32.setParent(hwnd, desktop);
+            return { ok: true };
+          }
+          return { ok: false, error: 'desktop_not_found' };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
       }
     }
   };
@@ -2125,7 +2182,16 @@ module.exports.listComponents = function listComponents(group) {
       if (canon) seenCanon.add(canon);
       if (urlKey) seenUrl.add(urlKey);
       if (displayKey) seenDisplay.add(displayKey);
-      out.push({ id: p.id, name: p.name, group: p.group || null, entry: entryRel, url });
+      out.push({ 
+        id: p.id, 
+        name: p.name, 
+        group: p.group || null, 
+        entry: entryRel, 
+        url,
+        usage: p.usage,
+        recommendedSize: p.recommendedSize,
+        configSchema: (Array.isArray(p.configSchema) || (p.configSchema && typeof p.configSchema === 'object')) ? p.configSchema : undefined
+      });
     }
     return { ok: true, components: out };
   } catch (e) { return { ok: false, error: e?.message || String(e) }; }

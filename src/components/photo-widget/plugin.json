@@ -1,0 +1,46 @@
+{
+  "id": "photo-widget",
+  "name": "相框",
+  "version": "1.1.0",
+  "type": "component",
+  "entry": "index.html",
+  "description": "桌面相框组件",
+  "usage": "desktop",
+  "recommendedSize": {
+    "width": 400,
+    "height": 300
+  },
+  "configSchema": {
+    "imageUrl": {
+      "type": "text",
+      "label": "图片URL (Image URL)",
+      "default": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80"
+    },
+    "objectFit": {
+      "type": "select",
+      "label": "填充方式 (Fit)",
+      "default": "cover",
+      "options": [
+        { "label": "覆盖 (Cover)", "value": "cover" },
+        { "label": "包含 (Contain)", "value": "contain" },
+        { "label": "拉伸 (Fill)", "value": "fill" }
+      ]
+    },
+    "borderRadius": {
+      "type": "range",
+      "label": "圆角 (Radius)",
+      "default": 0,
+      "min": 0,
+      "max": 50,
+      "step": 1
+    },
+    "opacity": {
+      "type": "range",
+      "label": "不透明度 (Opacity)",
+      "default": 1,
+      "min": 0.1,
+      "max": 1,
+      "step": 0.1
+    }
+  }
+}

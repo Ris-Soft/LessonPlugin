@@ -8,6 +8,7 @@ const https = require('https');
 const isDev = process.env.NODE_ENV === 'development';
 const pluginManager = require('./pluginManager');
 const backendLog = require('./backendLog');
+const win32 = require('./win32');
 const AutomationManager = require('./automationManager');
 const protocol = require('./protocol');
 const store = require('./store');
@@ -310,6 +311,7 @@ app.whenReady().then(async () => {
   });
   // 后端日志：始终捕获与保存（不再受开发者模式限制）
   try { backendLog.init({ enabled: true }); } catch (e) {}
+  try { win32.init(); } catch (e) {}
   const splashEnabled = store.get('system', 'splashEnabled') !== false;
   if (splashEnabled) {
     createSplashWindow();
@@ -552,6 +554,14 @@ app.whenReady().then(async () => {
 
   pluginManager.init({ manifestPath, configPath });
 
+  // 设置缺失插件处理逻辑：当调用不存在的插件时，自动打开市场并提示安装
+  pluginManager.setMissingPluginHandler((id) => {
+    // 延迟执行以避免阻塞当前IPC调用，并给用户反应时间
+    setTimeout(() => {
+      try { __openStore(true, 'plugin', id); } catch (e) {}
+    }, 100);
+  });
+
   sendSplashProgress({ stage: 'init', message: '初始化插件管理器...' });
 
   // 提前创建自动化管理器并注入到插件管理器，以便插件 init 阶段能注册分钟触发器
@@ -776,6 +786,15 @@ ipcMain.handle('plugin:installZipData', async (_e, fileName, data) => {
     const res = await pluginManager.installFromZip(tmpPath);
     try { fs.unlinkSync(tmpPath); } catch (e) {}
     return res;
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+ipcMain.handle('win32:msgbox', async (_e, text, title) => {
+  try {
+    win32.messageBox(text, title || 'OrbiBoard');
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };
   }

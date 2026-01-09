@@ -13,6 +13,8 @@
     "../profiles-selector",
     "../rollcall-random",
     "../screen-compass",
+    "../desktop-widgets",
+    "../screen-annotate",
     "../ui-lowbar",
     "../ui-lowbar-caller"
   ]

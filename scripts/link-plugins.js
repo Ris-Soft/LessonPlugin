@@ -143,7 +143,7 @@ function main() {
     let fp = '';
     try { fp = fingerprintDir(abs); } catch (e) { fp = ''; }
     try { syncPlugin(abs, target); } catch (e) {}
-    lastFinger.set(id, fp);
+    lastFinger.set(abs, fp);
     try {
       const debounce = { t: 0 };
       const w = fs.watch(abs, { recursive: true }, (eventType, filename) => {
@@ -152,16 +152,56 @@ function main() {
         debounce.t = now;
         let cur = '';
         try { cur = fingerprintDir(abs); } catch (e) { cur = ''; }
-        const prev = lastFinger.get(id) || '';
+        const prev = lastFinger.get(abs) || '';
         if (cur === prev) return;
         try { syncPlugin(abs, target); } catch (e) {}
-        lastFinger.set(id, cur);
+        lastFinger.set(abs, cur);
         const rel = filename ? String(filename) : '';
         console.log(`[${stamp()}] Synced ${id}${rel ? `:${rel}` : ''} → ${target}`);
       });
       w.on('error', () => {});
       console.log(`[${stamp()}] Watching ${id} → ${target}`);
     } catch (e) {}
+  }
+
+  const componentsSrc = path.join(repoRoot, 'components');
+  const componentsDst = path.join(orbiRoot, 'src', 'components');
+  if (fs.existsSync(componentsSrc) && fs.statSync(componentsSrc).isDirectory()) {
+    ensureDir(componentsDst);
+    const componentItems = fs.readdirSync(componentsSrc);
+    for (const item of componentItems) {
+      if (item === '.git') continue;
+      const abs = path.join(componentsSrc, item);
+      try { if (!fs.statSync(abs).isDirectory()) continue; } catch (e) { continue; }
+      
+      const id = resolvePluginId(abs);
+      const target = path.join(componentsDst, id);
+      
+      let fp = '';
+      try { fp = fingerprintDir(abs); } catch (e) { fp = ''; }
+      try { syncPlugin(abs, target); } catch (e) {}
+      lastFinger.set(abs, fp);
+      
+      try {
+        const debounce = { t: 0 };
+        const w = fs.watch(abs, { recursive: true }, (eventType, filename) => {
+          const now = Date.now();
+          if (now - debounce.t < 600) return;
+          debounce.t = now;
+          let cur = '';
+          try { cur = fingerprintDir(abs); } catch (e) { cur = ''; }
+          const prev = lastFinger.get(abs) || '';
+          if (cur === prev) return;
+          try { syncPlugin(abs, target); } catch (e) {}
+          lastFinger.set(abs, cur);
+          const rel = filename ? String(filename) : '';
+          console.log(`[${stamp()}] Synced Component ${id}${rel ? `:${rel}` : ''} → ${target}`);
+        });
+        w.on('error', () => {});
+        console.log(`[${stamp()}] Watching Component ${id} → ${target}`);
+      } catch (e) {}
+    }
+    console.log(`[${stamp()}] Components root (src): ${componentsDst}`);
   }
   console.log(`[${stamp()}] Plugins root (src): ${devRoot}`);
   if (process.argv.includes('--once')) {

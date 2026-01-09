@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+    #clock {
+      font-size: 4em;
+      font-weight: 300;
+      text-align: center;
+      line-height: 1;
+    }
+    #date {
+      font-size: 1em;
+      margin-top: 10px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div id="clock">00:00</div>
+    <div id="date">Loading...</div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    let config = { showSeconds: true, theme: 'dark', color: '#ffffff' };
+
+    function updateTime() {
+      const now = new Date();
+      let timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      if (config.showSeconds) {
+        timeStr += ':' + now.getSeconds().toString().padStart(2, '0');
+      }
+      document.getElementById('clock').innerText = timeStr;
+      
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      document.getElementById('date').innerText = now.toLocaleDateString(undefined, options);
+    }
+
+    function applyConfig(cfg) {
+      if (!cfg) return;
+      config = { ...config, ...cfg };
+      
+      const body = document.body;
+      const clock = document.getElementById('clock');
+      
+      // Theme logic
+      if (config.theme === 'light') {
+        body.style.background = 'rgba(255, 255, 255, 0.9)';
+        body.style.color = '#333';
+      } else {
+        // Dark or default
+        body.style.background = 'rgba(0, 0, 0, 0.6)';
+        body.style.color = '#fff';
+      }
+      
+      // Explicit color override
+      if (config.color) {
+        body.style.color = config.color;
+      }
+
+      // Font Size
+      if (config.fontSize) {
+          clock.style.fontSize = `${config.fontSize}px`;
+      }
+      
+      updateTime();
+    }
+
+    // Listen for config updates
+    ipcRenderer.on('config-updated', (event, newConfig) => {
+      applyConfig(newConfig);
+    });
+    
+    // Initial config might be passed via URL or we wait for update?
+    // Since we didn't implement passing config via URL in renderer.js, 
+    // we need to ask for it or wait for the renderer to send it.
+    // Let's make the renderer send 'config-updated' on load too.
+    
+    setInterval(updateTime, 1000);
+    updateTime();
+    
+    // Default style
+    applyConfig(config);
+  </script>
+</body>
+</html>

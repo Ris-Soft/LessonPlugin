@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 10px;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #note {
+      flex: 1;
+      outline: none;
+      resize: none;
+      border: none;
+      background: transparent;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+    }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+  </style>
+</head>
+<body>
+  <textarea id="note" placeholder="Type here..."></textarea>
+  <script>
+    const { ipcRenderer } = require('electron');
+    let config = { backgroundColor: '#fff740', fontSize: 16, content: '' };
+    const note = document.getElementById('note');
+
+    function applyConfig(cfg) {
+      if (!cfg) return;
+      config = { ...config, ...cfg };
+      
+      document.body.style.background = config.backgroundColor;
+      note.style.fontSize = `${config.fontSize}px`;
+      
+      if (config.content !== undefined && note.value !== config.content) {
+          note.value = config.content;
+      }
+    }
+
+    // Save content on change
+    note.addEventListener('input', () => {
+      config.content = note.value;
+      // Send back to host to save in global config
+      ipcRenderer.sendToHost('save-settings', config);
+    });
+
+    ipcRenderer.on('config-updated', (event, newConfig) => {
+      applyConfig(newConfig);
+    });
+    
+    // Initial apply
+    applyConfig(config);
+  </script>
+</body>
+</html>

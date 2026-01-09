@@ -247,11 +247,13 @@ async function initMarketPage() {
       refreshBtn.addEventListener('click', async () => {
         try {
           refreshBtn.disabled = true; refreshBtn.innerHTML = '<i class="ri-loader-4-line"></i> 刷新中...';
+          if (loadingEl) loadingEl.hidden = false;
           await reloadMarket();
           buildSubnav(currentTab);
           await renderGrid();
         } finally {
           refreshBtn.disabled = false; refreshBtn.innerHTML = '<i class="ri-refresh-line"></i> 刷新';
+          if (loadingEl) loadingEl.hidden = true;
         }
       });
     }

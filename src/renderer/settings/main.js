@@ -141,7 +141,11 @@ async function main() {
       const arr = type === 'automation' ? (catlog.automation || []) : (type === 'component' || type === 'components' ? (catlog.components || []) : (catlog.plugins || []));
       const item = arr.find((x) => String(x.id || x.name) === id);
       if (!item) { await showAlert(`未找到：${id}`); return; }
-      showStorePluginModal(item);
+      
+      const ok = await showConfirm(`检测到缺失插件/功能：${item.name || id}，是否查看详情并安装？`);
+      if (ok) {
+        showStorePluginModal(item);
+      }
     } catch (e) {}
   });
 

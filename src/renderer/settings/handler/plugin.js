@@ -258,10 +258,12 @@ function renderPlugin(item) {
             if (cur && cur.enabled) {
               await window.settingsAPI?.togglePlugin?.(key, false);
               const restarted = await window.settingsAPI?.togglePlugin?.(key, true);
-              if (Array.isArray(restarted?.logs) && restarted.logs.length) {
-                await showLogModal('插件重启日志', restarted.logs);
+              const logs = Array.isArray(restarted?.logs) ? restarted.logs : [];
+              if (logs.length) {
+                showLogNotification(`已重启插件：${item.name}`, logs);
+              } else {
+                showToast(`已重启插件：${item.name}`, { type: 'success', duration: 2000 });
               }
-              showToast(`已重启插件：${item.name}`, { type: 'success', duration: 2000 });
             }
           } catch (e) {}
         }
@@ -399,7 +401,7 @@ function renderPlugin(item) {
       try { el.querySelectorAll('.action-btn').forEach((btn) => { btn.disabled = !checked; }); } catch (e) {}
       // 启用时显示初始化日志（若返回）
       if (checked && Array.isArray(res?.logs) && res.logs.length) {
-        try { await showLogModal('插件初始化日志', res.logs); } catch (e) {}
+        try { showLogNotification(`已启用插件：${item.name}`, res.logs); } catch (e) {}
       }
     } catch (e) {}
   });
@@ -464,7 +466,7 @@ function renderPluginIcon(item) {
       const ok = await showShortcutCreateDialog(item, chosen, pluginId, action);
       if (ok?.res) { const proto = ok.res?.protocolText ? `LessonPlugin://task/${encodeURIComponent(ok.res.protocolText)}` : ''; const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式'; await showAlert(msg); }
     } });
-    items.push({ icon: item.enabled ? 'ri-toggle-line' : 'ri-toggle-fill', text: item.enabled ? '禁用插件' : '启用插件', run: async () => { const key = item.id || item.name; const res = await window.settingsAPI?.togglePlugin?.(key, !item.enabled); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); await renderPluginsByMode(mode); try { overlay.remove(); } catch (e) {}; if (Array.isArray(res?.logs) && res.logs.length) { try { await showLogModal('插件初始化日志', res.logs); } catch (e) {} } } });
+    items.push({ icon: item.enabled ? 'ri-toggle-line' : 'ri-toggle-fill', text: item.enabled ? '禁用插件' : '启用插件', run: async () => { const key = item.id || item.name; const res = await window.settingsAPI?.togglePlugin?.(key, !item.enabled); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); await renderPluginsByMode(mode); try { overlay.remove(); } catch (e) {}; if (Array.isArray(res?.logs) && res.logs.length) { try { showLogNotification(`已启用插件：${item.name}`, res.logs); } catch (e) {} } } });
     items.push({ icon: 'ri-delete-bin-line', text: '卸载插件', run: async () => { const { confirmed, dep } = await showUninstallConfirm(item); if (!confirmed) return; const key = item.id || item.name; try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {} } } } } catch (e) {} const out = await window.settingsAPI?.uninstallPlugin?.(key); if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; } const container = document.getElementById('plugins'); const list = await fetchPlugins(); container.innerHTML = ''; const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin'); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); if (mode === 'icon') { filtered.forEach((p) => container.appendChild(renderPluginIcon(p))); container.classList.add('icons-view'); } else { filtered.forEach((p) => container.appendChild(renderPlugin(p))); container.classList.remove('icons-view'); } showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 }); } });
     items.forEach(it => {
       if (it.sep) { const s = document.createElement('div'); s.className = 'app-menu-sep'; menu.appendChild(s); return; }

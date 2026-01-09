@@ -1,0 +1,37 @@
+{
+  "id": "clock-widget",
+  "name": "简易时钟",
+  "version": "1.1.0",
+  "type": "component",
+  "entry": "index.html",
+  "description": "一个简单的数字时钟组件",
+  "usage": "desktop",
+  "recommendedSize": {
+    "width": 300,
+    "height": 150
+  },
+  "configSchema": {
+    "theme": {
+      "type": "select",
+      "label": "主题 (Theme)",
+      "default": "light",
+      "options": [
+        { "label": "浅色 (Light)", "value": "light" },
+        { "label": "深色 (Dark)", "value": "dark" }
+      ]
+    },
+    "fontSize": {
+      "type": "range",
+      "label": "字体大小 (Font Size)",
+      "default": 48,
+      "min": 12,
+      "max": 96,
+      "step": 2
+    },
+    "showSeconds": {
+      "type": "boolean",
+      "label": "显示秒 (Show Seconds)",
+      "default": true
+    }
+  }
+}

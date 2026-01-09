@@ -722,14 +722,32 @@
     const pluginIdentifier = res.id || res.name || item?.id || item?.name;
     const ensure = await window.settingsAPI?.pluginEnsureDeps?.(pluginIdentifier);
 
-    // 第六步：显示安装完成信息
+    // 第六步：尝试重启并合并日志（在显示完成提示前执行）
+    const mergedLogs = [];
+    if (Array.isArray(res?.logs)) mergedLogs.push(...res.logs);
+    if (Array.isArray(ensure?.logs)) mergedLogs.push(...ensure.logs);
+
+    try {
+      const list = await window.settingsAPI?.getPlugins?.();
+      const cur = Array.isArray(list) ? list.find(p => (p.id === pluginIdentifier) || (p.name === pluginIdentifier)) : null;
+      if (cur && cur.enabled) {
+        mergedLogs.push('--- 正在重启插件 ---');
+        await window.settingsAPI?.togglePlugin?.(pluginIdentifier, false);
+        const restarted = await window.settingsAPI?.togglePlugin?.(pluginIdentifier, true);
+        if (Array.isArray(restarted?.logs) && restarted.logs.length) {
+          mergedLogs.push(...restarted.logs);
+        }
+        mergedLogs.push('--- 插件重启完成 ---');
+      }
+    } catch (e) {
+      mergedLogs.push(`[error] 重启插件失败: ${e.message || e}`);
+    }
+
+    // 第七步：显示安装完成信息
     const metaAuthor = (typeof res.author === 'object') ? (res.author?.name || JSON.stringify(res.author)) : (res.author || '未知作者');
     const npmObj = (typeof res.npmDependencies === 'object' && !Array.isArray(res.npmDependencies) && res.npmDependencies) ? res.npmDependencies : (typeof item?.npmDependencies === 'object' && !Array.isArray(item.npmDependencies) ? item.npmDependencies : null);
     const npmNames = npmObj ? Object.keys(npmObj) : [];
     const pluginDepends = Array.isArray(res.pluginDepends) ? res.pluginDepends : (Array.isArray(res.dependencies) ? res.dependencies : (Array.isArray(item?.dependencies) ? item.dependencies : []));
-    const mergedLogs = [];
-    if (Array.isArray(res?.logs)) mergedLogs.push(...res.logs);
-    if (Array.isArray(ensure?.logs)) mergedLogs.push(...ensure.logs);
     
     // 构建插件信息对象
     const pluginInfo = {
@@ -741,20 +759,7 @@
       npmDepends: npmNames
     };
     
-    await showAlertWithLogs('插件安装完成', pluginInfo, mergedLogs);
-
-    try {
-      const list = await window.settingsAPI?.getPlugins?.();
-      const cur = Array.isArray(list) ? list.find(p => (p.id === pluginIdentifier) || (p.name === pluginIdentifier)) : null;
-      if (cur && cur.enabled) {
-        await window.settingsAPI?.togglePlugin?.(pluginIdentifier, false);
-        const restarted = await window.settingsAPI?.togglePlugin?.(pluginIdentifier, true);
-        if (Array.isArray(restarted?.logs) && restarted.logs.length) {
-          await showLogModal('插件重启日志', restarted.logs);
-        }
-        showToast(`已重启插件：${pluginInfo.name}`, { type: 'success', duration: 2000 });
-      }
-    } catch (e) {}
+    await showAlertWithLogs(`插件：${pluginInfo.name} 安装成功`, pluginInfo, mergedLogs);
 
     // 刷新插件列表
     await refreshPluginsList();

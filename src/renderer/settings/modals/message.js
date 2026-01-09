@@ -156,6 +156,73 @@ function showToast(message = '', { type = 'info', duration = 2000 } = {}) {
   } catch (e) { }
 }
 
+// 日志通知：右下角显示日志摘要（非模态）
+function showLogNotification(title = '日志', lines = []) {
+  try {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-info';
+    toast.style.display = 'flex';
+    toast.style.flexDirection = 'column';
+    toast.style.gap = '4px';
+    toast.style.maxWidth = '400px';
+
+    const header = document.createElement('div');
+    header.style.fontWeight = '600';
+    header.textContent = title;
+    toast.appendChild(header);
+
+    const body = document.createElement('div');
+    body.style.fontSize = '12px';
+    body.style.fontFamily = 'monospace';
+    body.style.whiteSpace = 'pre-wrap';
+    body.style.maxHeight = '160px';
+    body.style.overflow = 'hidden';
+    body.style.opacity = '0.9';
+    body.style.lineHeight = '1.4';
+    
+    const contentLines = Array.isArray(lines) ? lines : String(lines || '').split('\n');
+    const previewCount = 8;
+    const previewLines = contentLines.slice(0, previewCount);
+    body.textContent = previewLines.join('\n');
+    toast.appendChild(body);
+
+    if (contentLines.length > previewCount) {
+      const more = document.createElement('div');
+      more.style.fontSize = '11px';
+      more.style.color = 'rgba(255,255,255,0.6)';
+      more.style.marginTop = '2px';
+      more.textContent = `...还有 ${contentLines.length - previewCount} 行 (点击查看)`;
+      toast.appendChild(more);
+      
+      toast.style.cursor = 'pointer';
+      toast.title = '点击查看完整日志';
+      toast.addEventListener('click', (e) => {
+        // 防止点击穿透或重复触发
+        e.stopPropagation();
+        showLogModal(title, lines);
+        try { toast.remove(); } catch(e) {}
+      });
+    }
+
+    container.appendChild(toast);
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    // 较长时间后自动消失（8秒），给予阅读时间
+    setTimeout(() => {
+      try { toast.classList.remove('show'); } catch (e) { }
+      setTimeout(() => { try { toast.remove(); } catch (e) { } }, 300);
+    }, 8000);
+  } catch (e) { }
+}
+
 async function showLinuxTarGuide(errorText = '') {
   return new Promise((resolve) => {
     const old = document.querySelector('.modal-overlay');

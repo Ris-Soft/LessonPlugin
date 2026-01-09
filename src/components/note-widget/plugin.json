@@ -1,0 +1,33 @@
+{
+  "id": "note-widget",
+  "name": "便签",
+  "version": "1.1.0",
+  "type": "component",
+  "entry": "index.html",
+  "description": "桌面便签组件",
+  "usage": "desktop",
+  "recommendedSize": {
+    "width": 300,
+    "height": 300
+  },
+  "configSchema": {
+    "content": {
+      "type": "textarea",
+      "label": "默认内容 (Content)",
+      "default": "Write something..."
+    },
+    "backgroundColor": {
+      "type": "color",
+      "label": "背景颜色 (Background)",
+      "default": "#fff740"
+    },
+    "fontSize": {
+      "type": "range",
+      "label": "字体大小 (Font Size)",
+      "default": 16,
+      "min": 12,
+      "max": 32,
+      "step": 1
+    }
+  }
+}

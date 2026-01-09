@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { margin: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; background: transparent; }
+    img { width: 100%; height: 100%; object-fit: cover; transition: all 0.3s; }
+  </style>
+</head>
+<body>
+  <img id="img" src="" />
+  <script>
+    const { ipcRenderer } = require('electron');
+    const img = document.getElementById('img');
+    
+    ipcRenderer.on('config-updated', (event, config) => {
+      if (config.imageUrl) img.src = config.imageUrl;
+      if (config.objectFit) img.style.objectFit = config.objectFit;
+      if (config.borderRadius !== undefined) img.style.borderRadius = `${config.borderRadius}px`;
+      if (config.opacity !== undefined) img.style.opacity = config.opacity;
+    });
+  </script>
+</body>
+</html>
