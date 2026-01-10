@@ -5,7 +5,7 @@
   "type": "component",
   "entry": "index.html",
   "description": "桌面相框组件",
-  "usage": "desktop",
+  "group": "desktop_widget",
   "recommendedSize": {
     "width": 400,
     "height": 300

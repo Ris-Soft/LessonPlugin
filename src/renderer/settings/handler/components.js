@@ -10,7 +10,11 @@ window.initComponentsPage = async function initComponentsPage() {
       <div class="card-header">
         <i class="ri-layout-3-line"></i>
         <div>
-          <div class="card-title">${c.name || c.id} <span class="pill small">${c.group || '未分组'}</span></div>
+          <div class="card-title">
+            ${c.name || c.id} 
+            <span class="pill small">${c.group || '未分组'}</span>
+            ${c.sourcePlugin ? '<span class="pill small" style="background:rgba(var(--color-primary-rgb), 0.1);color:var(--color-primary);">由插件提供</span>' : ''}
+          </div>
           <div class="card-desc" style="word-break: break-all; overflow-wrap: anywhere;">入口：${c.entry || 'index.html'}</div>
         </div>
       </div>
@@ -20,7 +24,7 @@ window.initComponentsPage = async function initComponentsPage() {
         </div>
         <div class="actions-right">
           <button class="icon-btn about-btn" title="关于组件"><i class="ri-information-line"></i></button>
-          <button class="icon-btn uninstall-btn" title="卸载"><i class="ri-delete-bin-line"></i></button>
+          ${!c.sourcePlugin ? '<button class="icon-btn uninstall-btn" title="卸载"><i class="ri-delete-bin-line"></i></button>' : ''}
         </div>
       </div>
     `;

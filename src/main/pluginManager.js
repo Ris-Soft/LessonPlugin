@@ -226,6 +226,7 @@ module.exports.init = function init(paths) {
         type: String(meta.type || 'plugin'),
         group: meta.group || null,
         entry: isComponent ? (meta.entry || 'index.html') : undefined,
+        componentsDir: meta.componentsDir || null,
         // 统一 npmDependencies：仅接收对象（非数组）；dependencies 为数组表示插件依赖
         npmDependencies: (() => {
           if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
@@ -276,6 +277,94 @@ module.exports.init = function init(paths) {
       } catch (e) {}
     }
   } catch (e) {}
+
+  // 扫描插件提供的组件
+  try {
+    const pluginComponents = [];
+    for (const p of manifest.plugins) {
+      if (p.type === 'plugin' && p.componentsDir && p.local) {
+        const pDir = path.resolve(pluginsRoot, p.local);
+        const cRoot = path.join(pDir, p.componentsDir);
+        if (fs.existsSync(cRoot) && fs.statSync(cRoot).isDirectory()) {
+          const entries = fs.readdirSync(cRoot);
+          for (const entry of entries) {
+            const full = path.join(cRoot, entry);
+            if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) continue;
+            const metaPath = path.join(full, 'plugin.json');
+            if (!fs.existsSync(metaPath)) continue;
+            const meta = readJsonSafe(metaPath, {});
+            if (String(meta.type || '').toLowerCase() !== 'component') continue;
+            
+            const entryHtml = meta?.entry || 'index.html';
+            const entryPath = path.join(full, entryHtml);
+            if (!fs.existsSync(entryPath)) continue;
+
+            const pkgPath = path.join(full, 'package.json');
+            let pkg = null;
+            if (fs.existsSync(pkgPath)) { try { pkg = readJsonSafe(pkgPath, {}); } catch (e) {} }
+            let detectedVersion = meta.version || (pkg?.version || null);
+
+            const rel = path.join(p.local, p.componentsDir, entry).replace(/\\/g, '/');
+            let name = meta.name || entry;
+            
+            const rawId = String(meta.id || '').trim();
+            const cleanId = rawId.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+            const slugFromName = String(name || '').toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+            let id = cleanId || slugFromName || String(entry).toLowerCase().replace(/\./g, '-').replace(/^-+|-+$/g, '');
+            if (!id) id = `component_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+            pluginComponents.push({
+              id,
+              name,
+              npm: meta.npm || null,
+              local: rel,
+              enabled: meta.enabled !== undefined ? !!meta.enabled : true,
+              icon: meta.icon || null,
+              description: meta.description || '',
+              author: (meta.author !== undefined ? meta.author : (pkg?.author || null)),
+              type: 'component',
+              group: meta.group || null,
+              entry: meta.entry || 'index.html',
+              usage: meta.usage || null,
+              recommendedSize: meta.recommendedSize || undefined,
+              npmDependencies: (() => {
+                if (meta && typeof meta.npmDependencies === 'object' && !Array.isArray(meta.npmDependencies)) return meta.npmDependencies;
+                if (pkg && typeof pkg.dependencies === 'object' && !Array.isArray(pkg.dependencies)) return pkg.dependencies;
+                return undefined;
+              })(),
+              actions: Array.isArray(meta.actions) ? meta.actions : [],
+              behaviors: Array.isArray(meta.behaviors) ? meta.behaviors : [],
+              functions: typeof meta.functions === 'object' ? meta.functions : undefined,
+              packages: Array.isArray(meta.packages) ? meta.packages : undefined,
+              version: detectedVersion,
+              studentColumns: Array.isArray(meta.studentColumns) ? meta.studentColumns : [],
+              dependencies: Array.isArray(meta.dependencies) ? meta.dependencies : (Array.isArray(meta.pluginDepends) ? meta.pluginDepends : undefined),
+              variables: undefined,
+              configSchema: (() => {
+                try {
+                  if (Array.isArray(meta.configSchema)) return meta.configSchema;
+                  if (meta && typeof meta.configSchema === 'object' && meta.configSchema) return meta.configSchema;
+                  if (Array.isArray(meta.config)) return meta.config;
+                  if (meta && typeof meta.config === 'object' && meta.config) return meta.config;
+                } catch (e) {}
+                return undefined;
+              })(),
+              sourcePlugin: { id: p.id, name: p.name }
+            });
+
+            try {
+              if (name) nameToId.set(String(name), id);
+              nameToId.set(String(id), id);
+            } catch (e) {}
+          }
+        }
+      }
+    }
+    manifest.plugins.push(...pluginComponents);
+  } catch (e) {
+    try { console.error('Error scanning plugin components:', e); } catch (_) {}
+  }
+
   // 组件目录：%USER_DATA%/OrbiBoard/components
   try {
     const componentsRoot = path.resolve(pluginsRoot, '..', 'components');
@@ -1256,6 +1345,10 @@ module.exports.uninstall = function uninstall(idOrName) {
     if (idx < 0) return { ok: false, error: 'not_found' };
     const p = manifest.plugins[idx];
     try { console.info('plugin:uninstall', { id: p.id, name: p.name }); } catch (e) {}
+    
+    // 不允许卸载由插件提供的组件
+    if (p.sourcePlugin) return { ok: false, error: 'plugin_provided_component' };
+
     // 仅支持卸载本地插件
     if (!p.local) return { ok: false, error: 'not_local_plugin' };
     const fullDir = path.join(path.dirname(manifestPath), p.local);
@@ -1776,7 +1869,7 @@ function createPluginApi(pluginId) {
           if (!browserWindow) return { ok: false, error: 'window_required' };
           const hwnd = browserWindow.getNativeWindowHandle();
           const desktop = win32.getDesktopWindow();
-          if (desktop && !desktop.isNull()) {
+          if (desktop) {
             win32.setParent(hwnd, desktop);
             return { ok: true };
           }
@@ -2190,7 +2283,8 @@ module.exports.listComponents = function listComponents(group) {
         url,
         usage: p.usage,
         recommendedSize: p.recommendedSize,
-        configSchema: (Array.isArray(p.configSchema) || (p.configSchema && typeof p.configSchema === 'object')) ? p.configSchema : undefined
+        configSchema: (Array.isArray(p.configSchema) || (p.configSchema && typeof p.configSchema === 'object')) ? p.configSchema : undefined,
+        sourcePlugin: p.sourcePlugin || undefined
       });
     }
     return { ok: true, components: out };

@@ -15,7 +15,9 @@
     "../screen-compass",
     "../desktop-widgets",
     "../screen-annotate",
+    "../desktop-launcher",
     "../ui-lowbar",
-    "../ui-lowbar-caller"
+    "../ui-lowbar-caller",
+    "../homework-board"
   ]
 }

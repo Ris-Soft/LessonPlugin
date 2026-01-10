@@ -13,6 +13,7 @@
       font-family: 'Segoe UI', sans-serif;
       overflow: hidden;
       transition: background 0.3s, color 0.3s;
+      box-sizing: border-box; /* Ensure padding doesn't overflow width */
     }
     #clock {
       font-size: 4em;
@@ -54,25 +55,63 @@
       
       const body = document.body;
       const clock = document.getElementById('clock');
+      const container = document.querySelector('body > div');
       
       // Theme logic
+      // Only apply theme defaults if color is NOT overridden by user
+      // Default color logic needs to be more robust.
+      // If user clears the color input or sets it to empty string, we should fallback to theme default.
+      // The issue is that the color picker might always return a value.
+      // Let's assume if config.color is the DEFAULT value for the OTHER theme, we switch it.
+      
+      const isDefaultLightColor = (c) => !c || c === '#333333' || c === '#333';
+      const isDefaultDarkColor = (c) => !c || c === '#ffffff' || c === '#fff';
+
       if (config.theme === 'light') {
         body.style.background = 'rgba(255, 255, 255, 0.9)';
-        body.style.color = '#333';
+        // If current color is white (dark mode default), switch to dark
+        if (isDefaultDarkColor(config.color)) { 
+             body.style.color = '#333';
+        } else {
+             body.style.color = config.color;
+        }
       } else {
         // Dark or default
         body.style.background = 'rgba(0, 0, 0, 0.6)';
-        body.style.color = '#fff';
-      }
-      
-      // Explicit color override
-      if (config.color) {
-        body.style.color = config.color;
+        // If current color is dark (light mode default), switch to white
+        if (isDefaultLightColor(config.color)) { 
+             body.style.color = '#fff';
+        } else {
+             body.style.color = config.color;
+        }
       }
 
       // Font Size
       if (config.fontSize) {
           clock.style.fontSize = `${config.fontSize}px`;
+      }
+      
+      // Alignment
+      if (config.align) {
+          // Reset padding first
+          body.style.paddingLeft = '0';
+          body.style.paddingRight = '0';
+          
+          if (config.align === 'left') {
+              body.style.justifyContent = 'flex-start';
+              body.style.paddingLeft = '20px';
+              clock.style.textAlign = 'left';
+              container.style.textAlign = 'left';
+          } else if (config.align === 'right') {
+              body.style.justifyContent = 'flex-end';
+              body.style.paddingRight = '20px';
+              clock.style.textAlign = 'right';
+              container.style.textAlign = 'right';
+          } else {
+              body.style.justifyContent = 'center';
+              clock.style.textAlign = 'center';
+              container.style.textAlign = 'center';
+          }
       }
       
       updateTime();

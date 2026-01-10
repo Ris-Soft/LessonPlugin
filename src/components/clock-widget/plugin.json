@@ -5,7 +5,7 @@
   "type": "component",
   "entry": "index.html",
   "description": "一个简单的数字时钟组件",
-  "usage": "desktop",
+  "group": "desktop_widget",
   "recommendedSize": {
     "width": 300,
     "height": 150
@@ -18,6 +18,16 @@
       "options": [
         { "label": "浅色 (Light)", "value": "light" },
         { "label": "深色 (Dark)", "value": "dark" }
+      ]
+    },
+    "align": {
+      "type": "select",
+      "label": "对齐 (Align)",
+      "default": "center",
+      "options": [
+        { "label": "居左 (Left)", "value": "left" },
+        { "label": "居中 (Center)", "value": "center" },
+        { "label": "居右 (Right)", "value": "right" }
       ]
     },
     "fontSize": {
