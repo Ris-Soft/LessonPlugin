@@ -1,6 +1,12 @@
+# Node模块
 node_modules
+
+# 构建产物
 dist/*
+
+# 本地的插件与组件
 src/plugins/
-dev-plugins/
-renderer/
+src/components/
+
+# 敏感信息
 .admin_password
