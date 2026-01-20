@@ -52,6 +52,12 @@ class PluginRegistry {
     if (!s) return s;
     // 直接映射命中
     if (this.nameToId.has(s)) return this.nameToId.get(s);
+    
+    // 特殊处理：如果是完全匹配ID但未在映射中（可能是初始化顺序问题或未扫描到），尝试直接返回
+    // 这能解决某些情况下插件已存在但映射表未更新导致的“找不到插件”问题
+    const exactMatch = this.manifest.plugins.find(p => p.id === s || p.name === s);
+    if (exactMatch) return exactMatch.id;
+
     // 尝试清洗点号与非法字符
     const normalized = s.toLowerCase().replace(/\./g, '-').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
     if (this.nameToId.has(normalized)) return this.nameToId.get(normalized);

@@ -60,6 +60,21 @@ async function initDebugSettings() {
         document.getElementById('debug-platform').textContent = info?.platform || (process?.platform || navigator?.platform || '—');
       } catch (e) {}
     })();
+
+    // 插件同步开关
+    const syncPluginsSwitch = document.getElementById('debug-sync-plugins');
+    if (syncPluginsSwitch) {
+      try {
+        const cfg = await window.settingsAPI?.configGet?.('system', 'debugSyncPlugins');
+        syncPluginsSwitch.checked = !!cfg;
+        syncPluginsSwitch.addEventListener('change', async () => {
+          try {
+            await window.settingsAPI?.configSet?.('system', 'debugSyncPlugins', syncPluginsSwitch.checked);
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+
     const restartBtn = document.getElementById('debug-restart');
     restartBtn?.addEventListener('click', async () => {
       try {

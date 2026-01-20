@@ -147,7 +147,7 @@ async function showStorePluginModal(item) {
   readmeBox.style.overflowX = 'hidden';
   readmeBox.style.wordBreak = 'break-word';
   readmeBox.style.whiteSpace = 'normal';
-  readmeBox.innerHTML = '<div class=\"muted\">加载说明文档...</div>';
+  readmeBox.innerHTML = '';
 
   body.innerHTML = `
     <div class=\"setting-item\">

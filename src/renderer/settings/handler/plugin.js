@@ -1,3 +1,5 @@
+let currentPluginFilter = 'all';
+
 async function fetchPlugins() {
   if (!window.settingsAPI) {
     return [
@@ -133,10 +135,8 @@ function renderPlugin(item) {
               try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {} } } } } catch (e) {}
               const out = await window.settingsAPI?.uninstallPlugin?.(key);
               if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
-              const container = document.getElementById('plugins');
-              const list = await fetchPlugins();
-              container.innerHTML = '';
-              list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin').forEach((p) => container.appendChild(renderPlugin(p)));
+              const mode = (localStorage.getItem('pluginsViewMode') || 'card');
+              await renderPluginsByMode(mode);
               showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 });
             }
           }
@@ -341,10 +341,8 @@ function renderPlugin(item) {
     const out = await window.settingsAPI?.uninstallPlugin?.(key);
     if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
     // 重新刷新插件列表
-    const container = document.getElementById('plugins');
-    const list = await fetchPlugins();
-    container.innerHTML = '';
-    list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin').forEach((p) => container.appendChild(renderPlugin(p)));
+    const mode = (localStorage.getItem('pluginsViewMode') || 'card');
+    await renderPluginsByMode(mode);
     showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 });
   });
   // 关于插件
@@ -536,7 +534,7 @@ function renderPluginIcon(item) {
         run: () => { window.publishResource && window.publishResource('plugin', item); }
       });
     }
-    items.push({ icon: 'ri-delete-bin-line', text: '卸载插件', run: async () => { const { confirmed, dep } = await showUninstallConfirm(item); if (!confirmed) return; const key = item.id || item.name; try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {} } } } } catch (e) {} const out = await window.settingsAPI?.uninstallPlugin?.(key); if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; } const container = document.getElementById('plugins'); const list = await fetchPlugins(); container.innerHTML = ''; const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin'); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); if (mode === 'icon') { filtered.forEach((p) => container.appendChild(renderPluginIcon(p))); container.classList.add('icons-view'); } else { filtered.forEach((p) => container.appendChild(renderPlugin(p))); container.classList.remove('icons-view'); } showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 }); } });
+    items.push({ icon: 'ri-delete-bin-line', text: '卸载插件', run: async () => { const { confirmed, dep } = await showUninstallConfirm(item); if (!confirmed) return; const key = item.id || item.name; try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {} } } } } catch (e) {} const out = await window.settingsAPI?.uninstallPlugin?.(key); if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; } const mode = (localStorage.getItem('pluginsViewMode') || 'card'); await renderPluginsByMode(mode); showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 }); } });
     items.forEach(it => {
       if (it.sep) { const s = document.createElement('div'); s.className = 'app-menu-sep'; menu.appendChild(s); return; }
       const btn = document.createElement('div');
@@ -564,11 +562,104 @@ function renderPluginIcon(item) {
   return el;
 }
 
+function renderPluginSubnav(plugins) {
+  const container = document.getElementById('plugins-subnav');
+  if (!container) return;
+
+  const validGroups = new Set();
+  const pluginMap = new Map(); // name -> plugin
+  plugins.forEach(p => {
+      if (String(p.type || 'plugin').toLowerCase() === 'plugin') {
+          pluginMap.set(p.name, p);
+      }
+  });
+
+  // 第一遍扫描：收集明确的 XXX. 分类
+  plugins.forEach(p => {
+    if (String(p.type || 'plugin').toLowerCase() !== 'plugin') return;
+    const name = p.name || '';
+    const parts = name.split('.');
+    if (parts.length > 1) {
+      validGroups.add(parts[0]);
+    }
+  });
+
+  // 第二遍扫描：处理无点号的插件，如果它本身就是某个已有分类的主插件（或作为分类名存在），则归入该分类
+  // 如果不存在对应分类，则暂不归入任何特定分类（将在 "全部" 中显示，或归入 "其它"）
+  // 根据需求：“如果不存在 XXX. 那么不显示XXX的分类”，意味着只有 validGroups 中的才显示 Tab
+  
+  const groups = ['全部', ...Array.from(validGroups).sort()];
+  
+  // 检查当前选中的分类是否有效
+  if (currentPluginFilter !== 'all' && !validGroups.has(currentPluginFilter)) {
+      currentPluginFilter = 'all';
+  }
+
+  container.innerHTML = '';
+  groups.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'sub-item';
+    const isAll = g === '全部';
+    const filterKey = isAll ? 'all' : g;
+    
+    if (filterKey === currentPluginFilter) {
+      btn.classList.add('active');
+    }
+    
+    // 图标处理
+    let iconClass = null;
+    if (isAll) {
+        iconClass = 'ri-apps-2-line';
+    } else {
+        // 尝试寻找同名插件或同名开头插件的图标
+        if (pluginMap.has(g)) {
+            iconClass = pluginMap.get(g).icon;
+        } else {
+            // 找 g.Anything 的第一个
+            const firstChild = plugins.find(p => p.name && p.name.startsWith(g + '.'));
+            if (firstChild) iconClass = firstChild.icon;
+        }
+    }
+    
+    const iconHtml = iconClass ? `<i class="${iconClass}"></i> ` : '';
+    btn.innerHTML = `${iconHtml}${g}`;
+    
+    btn.addEventListener('click', async () => {
+        if (currentPluginFilter === filterKey) return;
+        currentPluginFilter = filterKey;
+        const mode = (localStorage.getItem('pluginsViewMode') || 'card');
+        await renderPluginsByMode(mode); 
+    });
+    
+    container.appendChild(btn);
+  });
+}
+
 async function renderPluginsByMode(mode) {
   const container = document.getElementById('plugins');
   const list = await fetchPlugins();
+  
+  renderPluginSubnav(list);
+  
   container.innerHTML = '';
-  const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin');
+  let filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin');
+  
+  if (currentPluginFilter !== 'all') {
+      filtered = filtered.filter(p => {
+          const name = p.name || '';
+          const parts = name.split('.');
+          // 如果名字就是 FilterKey (如 "Office")，且 "Office" 是有效组（意味着存在 "Office.Word"），则归入
+          // 这里的判断逻辑要与 renderPluginSubnav 保持一致的归类逻辑
+          
+          if (parts.length > 1) {
+              return parts[0] === currentPluginFilter;
+          } else {
+              // 没有点号，只有当它名字等于 filterKey 时才归入
+              return name === currentPluginFilter;
+          }
+      });
+  }
+
   if (mode === 'icon') {
     filtered.forEach((p) => container.appendChild(renderPluginIcon(p)));
     container.classList.add('icons-view');

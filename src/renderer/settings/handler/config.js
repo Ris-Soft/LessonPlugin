@@ -147,6 +147,7 @@ async function initConfigOverview() {
   function renderScope(scope) {
     const card = document.createElement('div');
     card.className = 'plugin-card';
+    card.dataset.id = scope.id;
     const defs = normalizeSchema(scope.schema, scope.values);
     const iconCls = scope.icon || (scope.id === 'system' ? 'ri-settings-3-line' : 'ri-puzzle-line');
     const header = `
@@ -299,6 +300,33 @@ async function initConfigOverview() {
   await render(cached, '');
   searchBtn?.addEventListener('click', async () => { await render(cached, searchInput?.value || ''); });
   refreshBtn?.addEventListener('click', async () => { cached = await loadAll(); await render(cached, searchInput?.value || ''); });
+
+  window.openConfigScope = async (id) => {
+    // 确保数据已加载
+    if (!cached || cached.length === 0) cached = await loadAll();
+    // 重新渲染全部（清除筛选）
+    if (searchInput) searchInput.value = '';
+    await render(cached, '');
+    // 查找并触发点击
+    setTimeout(() => {
+        const card = listEl.querySelector(`.plugin-card[data-id="${id}"]`);
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // 高亮提示
+            card.style.borderColor = 'var(--accent)';
+            card.style.boxShadow = '0 0 12px rgba(34, 197, 94, 0.4)';
+            setTimeout(() => { 
+                card.click();
+                setTimeout(() => {
+                     card.style.borderColor = '';
+                     card.style.boxShadow = '';
+                }, 1000);
+            }, 300);
+        } else {
+            showToast(`未找到该插件的配置项`, { type: 'warning' });
+        }
+    }, 100);
+  };
 }
   const systemDefaults = {
     quoteSource: 'engquote',

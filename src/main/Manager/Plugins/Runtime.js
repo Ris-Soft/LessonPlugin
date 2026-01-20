@@ -1,8 +1,11 @@
 const { webContents } = require('electron');
+const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const Registry = require('./Registry');
 const store = require('../Store/Main');
 const win32 = require('../../System/Win32');
+const backendLog = require('../../Debug/backendLog');
 
 // -------- API / 事件总线 --------
 
@@ -73,6 +76,12 @@ function callFunction(targetPluginId, fnName, args, callerPluginId, ipcMain) {
     };
     ipcMain.on('plugin:invoke:result', onResult);
     wc.send('plugin:invoke', { id: reqId, fn: fnName, args: Array.isArray(args) ? args : [] });
+
+    // 增加5秒超时保护，防止插件无响应导致主进程卡死
+    setTimeout(() => {
+      try { ipcMain.removeListener('plugin:invoke:result', onResult); } catch (e) {}
+      resolve({ ok: false, error: 'timeout_waiting_for_plugin_response' });
+    }, 5000);
   });
 }
 
@@ -409,10 +418,29 @@ function createPluginApi(pluginId, ipcMain) {
     // 启动页文本控制：插件可在初始化期间更新启动页状态文本
     splash: {
       setStatus: (stage, message) => {
-        try { Registry.progressReporter && Registry.progressReporter({ stage, message }); } catch (e) {}
+        try {
+          const msg = String(message || '');
+          backendLog.logFromPlugin(pluginId, 'info', msg);
+        } catch (e) {}
+        
+        const p = Registry.findPluginByIdOrName(pluginId);
+        const prefix = p ? `[${p.name}] ` : `[${pluginId}] `;
+        const msg = String(message || '');
+        const finalMsg = msg.startsWith('[') ? msg : prefix + msg;
+        
+        try { Registry.progressReporter && Registry.progressReporter({ stage: stage || 'plugin:init', message: finalMsg }); } catch (e) {}
       },
       progress: (stage, message) => {
-        try { Registry.progressReporter && Registry.progressReporter({ stage, message }); } catch (e) {}
+        try {
+          const msg = String(message || '');
+          backendLog.logFromPlugin(pluginId, 'info', msg);
+        } catch (e) {}
+
+        const p = Registry.findPluginByIdOrName(pluginId);
+        const prefix = p ? `[${p.name}] ` : `[${pluginId}] `;
+        const msg = String(message || '');
+        const finalMsg = msg.startsWith('[') ? msg : prefix + msg;
+        try { Registry.progressReporter && Registry.progressReporter({ stage: stage || 'plugin:init', message: finalMsg }); } catch (e) {}
       }
     },
     // 为插件提供配置存储访问能力
@@ -438,6 +466,25 @@ function createPluginApi(pluginId, ipcMain) {
           return { ok: false, error: e.message };
         }
       }
+    },
+    // 获取学生列定义（聚合所有插件的配置）
+    getStudentColumnDefs: () => {
+      try {
+        const defs = [];
+        const seen = new Set();
+        for (const p of Registry.manifest.plugins) {
+          const cols = Array.isArray(p.studentColumns) ? p.studentColumns : [];
+          for (const c of cols) {
+            const key = String(c?.key || '').trim();
+            const label = String(c?.label || key).trim();
+            if (!key) continue;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            defs.push({ key, label });
+          }
+        }
+        return { ok: true, columns: defs };
+      } catch (e) { return { ok: false, error: e?.message || String(e) }; }
     }
   };
 }

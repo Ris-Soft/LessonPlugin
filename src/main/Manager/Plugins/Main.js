@@ -77,6 +77,10 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
           if (fs.existsSync(modPath)) {
             // 启动阶段仅链接已有依赖，不触发下载以加速启动
             try { await PackageManager.ensureDeps(p.id, { downloadIfMissing: false }); } catch (e) {}
+            
+            // 清除缓存以确保重载
+            try { delete require.cache[require.resolve(modPath)]; } catch(e) {}
+            
             const mod = require(modPath);
             // 仅从 functions 中注册函数，排除 actions
             const fnObj = (mod && typeof mod.functions === 'object') ? mod.functions : null;
@@ -86,6 +90,14 @@ module.exports.loadPlugins = async function loadPlugins(onProgress) {
               for (const [fn, impl] of Object.entries(fnObj)) {
                 if (fn === 'actions') continue;
                 if (typeof impl === 'function') map.set(fn, impl);
+              }
+            } else if (mod && typeof mod === 'object') {
+              // 兼容直接导出函数的情况
+              const keys = Object.keys(mod).filter(k => typeof mod[k] === 'function' && k !== 'init' && k !== 'functions');
+              if (keys.length > 0) {
+                 if (!Registry.functionRegistry.has(p.id)) Registry.functionRegistry.set(p.id, new Map());
+                 const map = Registry.functionRegistry.get(p.id);
+                 for (const k of keys) map.set(k, mod[k]);
               }
             }
             // 自动化事件：若插件导出 automationEvents，则直接注册以便设置页可查询
@@ -207,6 +219,15 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
               if (typeof impl === 'function') map.set(fn, impl);
             }
             logs.push('[enable] 已注册后端函数');
+          } else if (mod && typeof mod === 'object') {
+             // 兼容直接导出函数的情况
+             const keys = Object.keys(mod).filter(k => typeof mod[k] === 'function' && k !== 'init' && k !== 'functions');
+             if (keys.length > 0) {
+                if (!Registry.functionRegistry.has(p.id)) Registry.functionRegistry.set(p.id, new Map());
+                const map = Registry.functionRegistry.get(p.id);
+                for (const k of keys) map.set(k, mod[k]);
+                logs.push(`[enable] 已注册顶层导出函数: ${keys.join(', ')}`);
+             }
           }
           // 注册自动化事件
           if (mod && Array.isArray(mod.automationEvents)) {
@@ -221,12 +242,17 @@ module.exports.toggle = async function toggle(idOrName, enabled) {
               logs.push(`[enable] 插件 ${p.name} 初始化完成`);
               try { console.info('plugin:init_done', { id: p.id, name: p.name }); } catch (e) {}
             } catch (e) {
+              // 捕获插件初始化错误并显示在日志中
               logs.push(`[enable] 插件 ${p.name} 初始化失败：${e?.message || e}`);
+              // 同时记录到后端日志
+              try { console.error(`[PluginError] [${p.name}] Init Failed:`, e); } catch (ex) {}
               try { console.info('plugin:init_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch (e) {}
             }
           }
         } catch (e) {
+          // 捕获模块加载错误（如语法错误）
           logs.push(`[enable] 启用失败：${e?.message || String(e)}`);
+          try { console.error(`[PluginError] [${p.name}] Enable Failed:`, e); } catch (ex) {}
           try { console.info('plugin:enable_failed', { id: p.id, name: p.name, error: e?.message || String(e) }); } catch (e) {}
         }
       } else {
@@ -260,6 +286,56 @@ module.exports.closeAllWindows = function closeAllWindows() {
     Registry.pluginWindows.clear();
   } catch (e) {}
   try { Registry.eventSubscribers.clear(); } catch (e) {}
+};
+
+module.exports.getPluginStats = async function getPluginStats(idOrName) {
+  try {
+    const p = Registry.findPluginByIdOrName(idOrName);
+    if (!p) return { ok: false, error: 'plugin_not_found' };
+    if (!p.local) return { ok: false, error: 'plugin_not_local' };
+    const baseDir = path.resolve(Registry.pluginsRoot, p.local);
+    if (!fs.existsSync(baseDir)) return { ok: false, error: 'dir_not_found' };
+    
+    // 递归计算目录大小和文件数
+    let size = 0;
+    let files = 0;
+    let birthtime = 0; // 最早创建时间
+    let mtime = 0; // 最新修改时间
+    
+    const walk = (dir) => {
+      const list = fs.readdirSync(dir);
+      for (const item of list) {
+        if (item === 'node_modules' || item.startsWith('.')) continue; // 跳过 node_modules 和隐藏文件
+        const full = path.join(dir, item);
+        try {
+          const s = fs.statSync(full);
+          if (s.isDirectory()) {
+            walk(full);
+          } else {
+            size += s.size;
+            files++;
+            if (birthtime === 0 || s.birthtimeMs < birthtime) birthtime = s.birthtimeMs;
+            if (s.mtimeMs > mtime) mtime = s.mtimeMs;
+          }
+        } catch (e) {}
+      }
+    };
+    
+    walk(baseDir);
+    
+    // 如果没有文件，取目录时间
+    if (files === 0) {
+      try {
+        const s = fs.statSync(baseDir);
+        birthtime = s.birthtimeMs;
+        mtime = s.mtimeMs;
+      } catch (e) {}
+    }
+    
+    return { ok: true, stats: { size, files, birthtime, mtime } };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 };
 
 // -------- 导出各模块功能 --------

@@ -58,10 +58,10 @@ function detectOrigin() {
   return { sourceType: 'system', sourceId: 'unknown', module: 'unknown' };
 }
 
-function append(level, args) {
+function append(level, args, originOverride) {
   if (!enabled) return;
   const line = formatLine(level, args);
-  const origin = detectOrigin();
+  const origin = originOverride || detectOrigin();
   const entry = {
     ts: new Date().toISOString(),
     level,
@@ -145,5 +145,10 @@ module.exports = {
   getLast,
   getLastEntries,
   subscribe,
-  write: (level, ...args) => { try { append(String(level || 'info'), args); } catch (e) {} }
+  write: (level, ...args) => { try { append(String(level || 'info'), args); } catch (e) {} },
+  logFromPlugin: (pluginId, level, ...args) => {
+    try {
+      append(String(level || 'info'), args, { sourceType: 'plugin', sourceId: pluginId, module: pluginId });
+    } catch (e) {}
+  }
 };

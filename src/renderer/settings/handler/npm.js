@@ -145,6 +145,41 @@
   window.renderInstalled = renderInstalled;
   window.renderVersions = renderVersions;
 
+  window.locateNpmPackage = async (name) => {
+    // 1. 切换页面（在调用方处理或这里处理？建议调用方已切换，这里负责加载定位）
+    const navNpm = document.querySelector('.nav-item[data-page="npm"]');
+    if (navNpm && !navNpm.classList.contains('active')) navNpm.click();
+    
+    // 2. 确保列表加载
+    await renderInstalled();
+    
+    // 3. 查找
+    setTimeout(() => {
+        const pkgs = Array.from(installedEl.querySelectorAll('.pkg'));
+        const target = pkgs.find(el => {
+            const title = el.querySelector('.pkg-name');
+            return title && title.textContent.trim().includes(name);
+        });
+        
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.style.borderColor = 'var(--accent)';
+            target.style.boxShadow = '0 0 12px rgba(34, 197, 94, 0.4)';
+            
+            // 4. 触发删除按钮以展开操作面板
+            const delBtn = target.querySelector('button[data-act="delete"]');
+            if (delBtn) delBtn.click();
+            
+            setTimeout(() => {
+                target.style.borderColor = '';
+                target.style.boxShadow = '';
+            }, 2000);
+        } else {
+            showToast(`未找到已安装的包：${name}`, { type: 'warning' });
+        }
+    }, 300);
+  };
+
   const activeNav = document.querySelector('.nav-item.active');
   if (activeNav?.dataset.page === 'npm') {
     renderInstalled();

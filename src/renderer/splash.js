@@ -183,8 +183,20 @@ if (window.splashAPI) {
   }
   window.splashAPI.onProgress((payload) => {
     const { stage, message } = payload || {};
+    // 将日志显示为 [PluginName] Message 格式
+    let displayMsg = String(message || '');
+    // 尝试从 message 中提取插件名（如果是 plugin:init 阶段）
+    if (stage === 'plugin:init' && displayMsg.startsWith('初始化 ')) {
+      // 保持原样，因为后端已经格式化好了
+    }
+    // 如果是 npm 阶段，格式化一下
+    if (stage === 'npm') {
+      displayMsg = `[NPM] ${displayMsg}`;
+    }
+    
     console.log('splash progress:', stage, message);
-    setStatus(stage || 'info', String(message || ''));
+    setStatus(stage || 'info', displayMsg);
+    
     if (stage === 'done') {
       // 程序加载完成，等待名言倒计时结束后关闭
       loadFinished = true;

@@ -246,6 +246,8 @@ function register() {
   });
 
   ipcMain.handle('plugin:updateVersion', async (_e, pluginId, version) => pluginManager.updatePluginVersion(pluginId, version));
+
+  ipcMain.handle('plugin:stats', async (_e, idOrName) => pluginManager.getPluginStats(idOrName));
 }
 
 module.exports = { register };

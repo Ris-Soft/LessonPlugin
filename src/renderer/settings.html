@@ -67,10 +67,7 @@
               </div>
             </div>
           </header>
-          <div id="drop-install" class="drop-install">
-            <i class="ri-folder-zip-line"></i>
-            拖入插件ZIP安装包以开始安装
-          </div>
+          <div id="plugins-subnav" class="subnav" style="margin-bottom: 16px;"></div>
           <div id="plugins" class="plugins"></div>
         </section>
         <section id="page-components" hidden>
@@ -596,6 +593,23 @@
                 <div class="setting-action">
                   <button id="debug-restart" class="btn"><i class="ri-refresh-line"></i> 快速重启程序</button>
                 </div>
+              </div>
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-folder-sync-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">启动时同步插件</div>
+                  <div class="setting-desc">每次启动时从开发工作区强制同步插件（适用于开发调试）。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="debug-sync-plugins" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div id="drop-install" class="drop-install" style="margin: 16px 0;">
+                <i class="ri-folder-zip-line"></i>
+                拖入插件ZIP安装包以开始安装
               </div>
             </div>
           </div>

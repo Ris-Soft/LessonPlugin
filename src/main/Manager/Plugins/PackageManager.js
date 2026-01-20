@@ -243,6 +243,12 @@ async function ensureDeps(idOrName, options) {
     if (!p.local) return { ok: true, logs: ['[deps] 插件未安装到本地目录，跳过依赖链接'] };
     const baseDir = path.join(path.dirname(Registry.manifestPath), p.local);
     const deps = collectPluginDeps(p);
+    
+    // 如果插件没有声明依赖，直接返回成功，避免无关日志和检查开销
+    if (!deps || deps.length === 0) {
+      return { ok: true, logs: [] };
+    }
+
     // 确保 config.npmSelection 存在，防止 undefined 错误
     if (!Registry.config.npmSelection) Registry.config.npmSelection = {};
     const selMap = (Registry.config.npmSelection[p.id] || Registry.config.npmSelection[p.name] || {});

@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getPluginReadme: (name) => ipcRenderer.invoke('plugin:readme', name),
   // 新增：在线获取插件 README（优先 npm registry）
   getPluginReadmeOnline: (name) => ipcRenderer.invoke('plugin:readmeOnline', name),
+  // 新增：获取插件统计信息（大小、文件数、时间）
+  getPluginStats: (name) => ipcRenderer.invoke('plugin:stats', name),
   windowControl: (action) => ipcRenderer.invoke('window:control', action),
   showAppMenu: (coords) => ipcRenderer.invoke('settings:showMenu', coords),
   npmGetVersions: (name) => ipcRenderer.invoke('npm:versions', name),
@@ -57,6 +59,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   automationTest: (id) => ipcRenderer.invoke('automation:test', id),
   // 插件自动化事件查询
   pluginAutomationListEvents: (pluginId) => ipcRenderer.invoke('plugin:automation:listEvents', pluginId),
+  // 新增：手动触发插件事件
+  pluginEmitEvent: (eventName, payload) => ipcRenderer.invoke('plugin:event:emit', eventName, payload),
   // 为插件创建桌面快捷方式（包装自动化动作）
   pluginAutomationCreateShortcut: (pluginId, options) => ipcRenderer.invoke('plugin:automation:createShortcut', pluginId, options),
   // 直接调用插件函数（用于 actions 目标指向 functions 中的函数）

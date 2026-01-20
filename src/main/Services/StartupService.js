@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
+const store = require('../Manager/Store/Main');
 
 function syncPluginsAndComponents() {
   const userRoot = path.join(app.getPath('userData'), 'OrbiBoard');
@@ -11,19 +12,15 @@ function syncPluginsAndComponents() {
   let shippedPluginsRoot = path.join(app.getAppPath(), 'src', 'plugins');
   let shippedComponentsRoot = path.join(app.getAppPath(), 'src', 'components');
 
-  // 适配重构后的目录结构：如果 src 下不存在，则尝试在上级目录查找（开发环境/源码结构）
-  if (!fs.existsSync(shippedPluginsRoot)) {
-    const workspacePlugins = path.resolve(app.getAppPath(), '..', 'Plugins');
-    if (fs.existsSync(workspacePlugins)) {
-      shippedPluginsRoot = workspacePlugins;
-    }
+  // 优先检查工作区目录（开发环境/外部挂载），如果存在则覆盖默认的 src 目录
+  const workspacePlugins = path.resolve(app.getAppPath(), '..', 'Plugins');
+  if (fs.existsSync(workspacePlugins)) {
+    shippedPluginsRoot = workspacePlugins;
   }
 
-  if (!fs.existsSync(shippedComponentsRoot)) {
-    const workspaceComponents = path.resolve(app.getAppPath(), '..', 'Components');
-    if (fs.existsSync(workspaceComponents)) {
-      shippedComponentsRoot = workspaceComponents;
-    }
+  const workspaceComponents = path.resolve(app.getAppPath(), '..', 'Components');
+  if (fs.existsSync(workspaceComponents)) {
+    shippedComponentsRoot = workspaceComponents;
   }
   const shippedRendererRoot = path.join(app.getAppPath(), 'src', 'renderer');
 
@@ -33,7 +30,7 @@ function syncPluginsAndComponents() {
 
   // Force sync shipped plugins to user directory (development or repair)
   try {
-    const shouldForceSync = true;
+    const shouldForceSync = store.get('system', 'debugSyncPlugins') === true;
     if (shouldForceSync) {
       if (fs.existsSync(shippedPluginsRoot)) {
         const shippedEntries = fs.readdirSync(shippedPluginsRoot).filter((n) => {
@@ -41,9 +38,43 @@ function syncPluginsAndComponents() {
           return fs.existsSync(p) && fs.statSync(p).isDirectory();
         });
         for (const entry of shippedEntries) {
-          const src = path.join(shippedPluginsRoot, entry);
-          const dest = path.join(userPluginsRoot, entry);
-          copyRecursive(src, dest);
+          try {
+            const src = path.join(shippedPluginsRoot, entry);
+            const dest = path.join(userPluginsRoot, entry);
+            
+            // Sync with node_modules preservation
+            if (fs.existsSync(dest)) {
+               const nodeModulesSrc = path.join(dest, 'node_modules');
+               const nodeModulesTmp = path.join(userPluginsRoot, `.${entry}_nm_tmp`);
+               let hasModules = false;
+               if (fs.existsSync(nodeModulesSrc)) {
+                 try { fs.renameSync(nodeModulesSrc, nodeModulesTmp); hasModules = true; } catch (e) {}
+               }
+               
+               // Clear destination except temp
+               try { fs.rmSync(dest, { recursive: true, force: true }); } catch (e) {}
+               
+               // Copy new files
+               copyRecursive(src, dest);
+               
+               // Restore node_modules
+               if (hasModules) {
+                 try { 
+                    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+                    const targetNm = path.join(dest, 'node_modules');
+                    if (fs.existsSync(targetNm)) fs.rmSync(targetNm, { recursive: true, force: true });
+                    fs.renameSync(nodeModulesTmp, targetNm); 
+                 } catch (e) {
+                    // fallback clean
+                    try { fs.rmSync(nodeModulesTmp, { recursive: true, force: true }); } catch (e) {}
+                 }
+               }
+            } else {
+               copyRecursive(src, dest);
+            }
+          } catch (e) {
+            console.error(`[Startup] Failed to sync plugin ${entry}:`, e);
+          }
         }
       }
 
@@ -53,15 +84,24 @@ function syncPluginsAndComponents() {
           return fs.existsSync(p) && fs.statSync(p).isDirectory();
         });
         for (const entry of shippedCompEntries) {
-          const src = path.join(shippedComponentsRoot, entry);
-          const dest = path.join(userComponentsRoot, entry);
-          copyRecursive(src, dest);
+          try {
+            const src = path.join(shippedComponentsRoot, entry);
+            const dest = path.join(userComponentsRoot, entry);
+            try { if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true }); } catch (e) {}
+            copyRecursive(src, dest);
+          } catch (e) {
+            console.error(`[Startup] Failed to sync component ${entry}:`, e);
+          }
         }
       }
 
       const shippedCfg = path.join(shippedPluginsRoot, 'config.json');
       const userCfg = path.join(userPluginsRoot, 'config.json');
-      try { if (fs.existsSync(shippedCfg)) fs.copyFileSync(shippedCfg, userCfg); } catch (e) {}
+      // Only copy config if user config missing to avoid overwriting preferences
+      // Or maybe merge? For now let's safe guard it.
+      if (!fs.existsSync(userCfg) && fs.existsSync(shippedCfg)) {
+        try { fs.copyFileSync(shippedCfg, userCfg); } catch (e) {}
+      }
     }
   } catch (e) {}
 
@@ -157,6 +197,7 @@ function copyRecursive(src, dest) {
     const { s, d } = stack.pop();
     const items = fs.readdirSync(s);
     for (const it of items) {
+      if (it === 'node_modules' || it === '.git') continue;
       const sp = path.join(s, it);
       const dp = path.join(d, it);
       const stat = fs.statSync(sp);
