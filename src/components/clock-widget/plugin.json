@@ -1,8 +1,9 @@
 {
   "id": "clock-widget",
   "name": "简易时钟",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "type": "component",
+  "author": "OrbiBoard",
   "entry": "index.html",
   "description": "一个简单的数字时钟组件",
   "group": "desktop_widget",
@@ -16,8 +17,14 @@
       "label": "主题 (Theme)",
       "default": "light",
       "options": [
-        { "label": "浅色 (Light)", "value": "light" },
-        { "label": "深色 (Dark)", "value": "dark" }
+        {
+          "label": "浅色 (Light)",
+          "value": "light"
+        },
+        {
+          "label": "深色 (Dark)",
+          "value": "dark"
+        }
       ]
     },
     "align": {
@@ -25,9 +32,18 @@
       "label": "对齐 (Align)",
       "default": "center",
       "options": [
-        { "label": "居左 (Left)", "value": "left" },
-        { "label": "居中 (Center)", "value": "center" },
-        { "label": "居右 (Right)", "value": "right" }
+        {
+          "label": "居左 (Left)",
+          "value": "left"
+        },
+        {
+          "label": "居中 (Center)",
+          "value": "center"
+        },
+        {
+          "label": "居右 (Right)",
+          "value": "right"
+        }
       ]
     },
     "fontSize": {

@@ -164,7 +164,7 @@ function main() {
     } catch (e) {}
   }
 
-  const componentsSrc = path.join(repoRoot, 'components');
+  const componentsSrc = path.join(repoRoot, 'Components');
   const componentsDst = path.join(orbiRoot, 'src', 'components');
   if (fs.existsSync(componentsSrc) && fs.statSync(componentsSrc).isDirectory()) {
     ensureDir(componentsDst);

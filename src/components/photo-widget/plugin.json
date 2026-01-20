@@ -1,9 +1,10 @@
 {
   "id": "photo-widget",
   "name": "相框",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "type": "component",
   "entry": "index.html",
+  "author": "OrbiBoard",
   "description": "桌面相框组件",
   "group": "desktop_widget",
   "recommendedSize": {
@@ -21,9 +22,18 @@
       "label": "填充方式 (Fit)",
       "default": "cover",
       "options": [
-        { "label": "覆盖 (Cover)", "value": "cover" },
-        { "label": "包含 (Contain)", "value": "contain" },
-        { "label": "拉伸 (Fill)", "value": "fill" }
+        {
+          "label": "覆盖 (Cover)",
+          "value": "cover"
+        },
+        {
+          "label": "包含 (Contain)",
+          "value": "contain"
+        },
+        {
+          "label": "拉伸 (Fill)",
+          "value": "fill"
+        }
       ]
     },
     "borderRadius": {

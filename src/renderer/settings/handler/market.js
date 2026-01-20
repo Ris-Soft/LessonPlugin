@@ -287,7 +287,10 @@ window.publishResource = async (type, item) => {
     <div style="margin-bottom:16px;">
       <div class="muted" style="margin-bottom:8px;">资源：${item.name || item.id} (${type})</div>
       <div class="muted" style="margin-bottom:8px;">ID：${item.id}</div>
-      <div class="muted" style="margin-bottom:16px;">版本：${item.version || '1.0.0'}</div>
+      <div style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+        <span class="muted">版本：</span>
+        <input type="text" id="pub-version" value="${item.version || '1.0.0'}" style="flex:1; padding:4px 8px; border:1px solid var(--border); background:var(--bg); color:var(--fg); border-radius:4px;">
+      </div>
       <input type="password" id="pub-pass" placeholder="管理员密码" style="width:100%; padding:8px; border:1px solid var(--border); background:var(--bg); color:var(--fg); border-radius:4px; box-sizing:border-box;">
     </div>
     <div style="display:flex; justify-content:flex-end; gap:8px;">
@@ -301,14 +304,33 @@ window.publishResource = async (type, item) => {
     overlay.querySelector('#pub-cancel').onclick = close;
     overlay.querySelector('#pub-confirm').onclick = async () => {
       const pass = overlay.querySelector('#pub-pass').value;
+      const newVersion = overlay.querySelector('#pub-version').value.trim();
       const btn = overlay.querySelector('#pub-confirm');
+      
+      if (!newVersion) { await showAlert('请输入版本号'); return; }
+      
       btn.disabled = true; btn.textContent = '发布中...';
       try {
+        // 更新插件版本（同步更新运行目录与源目录）
+        if (window.settingsAPI && window.settingsAPI.updatePluginVersion) {
+            try {
+                const verRes = await window.settingsAPI.updatePluginVersion(item.id || item.name, newVersion);
+                if (verRes && verRes.ok) {
+                    item.version = newVersion;
+                } else {
+                    console.warn('自动更新版本号失败，将仅在发布包中生效', verRes?.error);
+                }
+            } catch(e) {
+                console.warn('自动更新版本号异常', e);
+            }
+        }
+        
         let zipBuf = null;
         let metadata = { ...item };
         metadata.type = type;
         if (!metadata.id) metadata.id = item.name;
-        if (!metadata.version) metadata.version = '1.0.0';
+        metadata.version = newVersion;
+        
         if (type === 'automation') {
           const res = await window.settingsAPI?.packAutomation?.(item.id);
           if (!res?.ok || !res.zipData) throw new Error(res?.error || '打包失败');

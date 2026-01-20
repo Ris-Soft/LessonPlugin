@@ -4,7 +4,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const url = require('url');
-const store = require('./store');
+const store = require('../Manager/Store/Main');
 const { spawn } = require('child_process');
 
 function cmp(a, b) {
@@ -164,7 +164,7 @@ async function checkAndUpdate(onProgress, checkOnly = false) {
     if (onProgress) { try { onProgress({ stage: 'update', message: '检查更新...' }); } catch (e) {} }
     const info = await getJson(versionUrl);
     const remote = String(info?.version || '');
-    const local = String(app.getVersion ? app.getVersion() : (require('../../package.json').version || '0.0.0'));
+    const local = String(app.getVersion ? app.getVersion() : (require('../../../package.json').version || '0.0.0'));
     if (!remote) return { ok: false, error: 'no_remote_version' };
     
     // 获取更新日志

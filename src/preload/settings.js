@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   inspectPluginZipData: (fileName, data) => ipcRenderer.invoke('plugin:inspectZipData', fileName, data),
   // 新增：打包插件/自动化为 zip (返回 Uint8Array buffer)
   packPlugin: (pluginId) => ipcRenderer.invoke('plugin:pack', pluginId),
+  updatePluginVersion: (id, version) => ipcRenderer.invoke('plugin:updateVersion', id, version),
   packAutomation: (id) => ipcRenderer.invoke('automation:pack', id),
   uninstallPlugin: (name) => ipcRenderer.invoke('plugin:uninstall', name),
   // 新增：重载本地插件（仅开发环境）

@@ -83,39 +83,91 @@ function renderPlugin(item) {
     el.querySelectorAll('.action-btn').forEach((btn) => { btn.disabled = !item.enabled; });
   } catch (e) {}
 
-  // 开发环境：追加“重载”按钮
+  // 开发环境：卡片视图下，将卸载、重载、发布合并到“更多”菜单
   try {
     if (window.__isDev__) {
       const right = el.querySelector('.actions-right');
-      const reloadBtn = document.createElement('button');
-      reloadBtn.className = 'icon-btn reload-btn';
-      reloadBtn.title = '重载（开发环境）';
-      reloadBtn.innerHTML = '<i class="ri-refresh-line"></i>';
-      right.appendChild(reloadBtn);
-      reloadBtn.addEventListener('click', async () => {
-        const key = item.id || item.name;
-        const res = await window.settingsAPI?.reloadPlugin?.(key);
-        if (!res?.ok) {
-          await showAlert(`重载失败：${res?.error || '未知错误'}`);
-          return;
-        }
-        // 重新刷新插件列表
-        const container = document.getElementById('plugins');
-        const list = await fetchPlugins();
-        container.innerHTML = '';
-        list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin' && Array.isArray(p.actions) && p.actions.length > 0).forEach((p) => container.appendChild(renderPlugin(p)));
-        await showAlert('已重载插件（开发目录 -> 用户目录）');
-      });
+      const uninstallBtn = el.querySelector('.uninstall-btn');
+      if (uninstallBtn) uninstallBtn.remove(); // 移除原有卸载按钮
 
-      // 发布按钮
-      const publishBtn = document.createElement('button');
-      publishBtn.className = 'icon-btn publish-btn';
-      publishBtn.title = '发布到市场';
-      publishBtn.innerHTML = '<i class="ri-upload-cloud-2-line"></i>';
-      right.appendChild(publishBtn);
-      publishBtn.addEventListener('click', () => {
-        // 调用统一发布逻辑（将在 market.js 中实现）
-        window.publishResource && window.publishResource('plugin', item);
+      const menuBtn = document.createElement('button');
+      menuBtn.className = 'icon-btn menu-btn';
+      menuBtn.title = '更多操作';
+      menuBtn.innerHTML = '<i class="ri-more-2-fill"></i>';
+      right.appendChild(menuBtn);
+
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const rect = menuBtn.getBoundingClientRect();
+        // 构造菜单：重载、发布、卸载
+        const overlayOld = document.querySelector('.app-menu-overlay');
+        try { overlayOld && overlayOld.remove(); } catch (e) {}
+        const overlay = document.createElement('div');
+        overlay.className = 'app-menu-overlay';
+        const menu = document.createElement('div');
+        menu.className = 'app-menu';
+
+        const items = [
+          {
+            icon: 'ri-refresh-line',
+            text: '重载：卸载并重启',
+            run: async () => {
+              const key = item.id || item.name;
+              const res = await window.settingsAPI?.uninstallPlugin?.(key);
+              if (!res?.ok) { await showAlert(`卸载失败：${res?.error || '未知错误'}`); return; }
+              await window.settingsAPI?.restartApp?.();
+            }
+          },
+          {
+            icon: 'ri-upload-cloud-2-line',
+            text: '发布到市场',
+            run: () => { window.publishResource && window.publishResource('plugin', item); }
+          },
+          {
+            icon: 'ri-delete-bin-line',
+            text: '卸载插件',
+            run: async () => {
+              const { confirmed, dep } = await showUninstallConfirm(item);
+              if (!confirmed) return;
+              const key = item.id || item.name;
+              try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {} } } } } catch (e) {}
+              const out = await window.settingsAPI?.uninstallPlugin?.(key);
+              if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; }
+              const container = document.getElementById('plugins');
+              const list = await fetchPlugins();
+              container.innerHTML = '';
+              list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin').forEach((p) => container.appendChild(renderPlugin(p)));
+              showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 });
+            }
+          }
+        ];
+
+        items.forEach(it => {
+          const btn = document.createElement('div');
+          btn.className = 'app-menu-item';
+          btn.innerHTML = `<i class="${it.icon}"></i><span>${it.text}</span>`;
+          btn.addEventListener('click', () => {
+            try { overlay.remove(); } catch (e) {}
+            try { Promise.resolve().then(() => it.run()).catch(() => {}); } catch (e) {}
+          });
+          menu.appendChild(btn);
+        });
+
+        overlay.appendChild(menu);
+        document.body.appendChild(overlay);
+
+        const x = rect.left;
+        const y = rect.bottom + 4;
+        const margin = 8;
+        const w = menu.offsetWidth;
+        const h = menu.offsetHeight;
+        let left = Math.min(Math.max(margin, x - w + rect.width), (window.innerWidth || document.documentElement.clientWidth) - w - margin);
+        let top = Math.min(Math.max(margin, y), (window.innerHeight || document.documentElement.clientHeight) - h - margin);
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+
+        const close = (ev) => { const t = ev.target; if (!menu.contains(t)) { try { overlay.remove(); document.removeEventListener('mousedown', close); } catch (e) {} } };
+        document.addEventListener('mousedown', close);
       });
     }
   } catch (e) {}
@@ -467,6 +519,23 @@ function renderPluginIcon(item) {
       if (ok?.res) { const proto = ok.res?.protocolText ? `LessonPlugin://task/${encodeURIComponent(ok.res.protocolText)}` : ''; const msg = proto ? `已在桌面创建快捷方式\n协议：${proto}` : '已在桌面创建快捷方式'; await showAlert(msg); }
     } });
     items.push({ icon: item.enabled ? 'ri-toggle-line' : 'ri-toggle-fill', text: item.enabled ? '禁用插件' : '启用插件', run: async () => { const key = item.id || item.name; const res = await window.settingsAPI?.togglePlugin?.(key, !item.enabled); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); await renderPluginsByMode(mode); try { overlay.remove(); } catch (e) {}; if (Array.isArray(res?.logs) && res.logs.length) { try { showLogNotification(`已启用插件：${item.name}`, res.logs); } catch (e) {} } } });
+    if (window.__isDev__) {
+      items.push({
+        icon: 'ri-refresh-line',
+        text: '重载：卸载并重启',
+        run: async () => {
+          const key = item.id || item.name;
+          const res = await window.settingsAPI?.uninstallPlugin?.(key);
+          if (!res?.ok) { await showAlert(`卸载失败：${res?.error || '未知错误'}`); return; }
+          await window.settingsAPI?.restartApp?.();
+        }
+      });
+      items.push({
+        icon: 'ri-upload-cloud-2-line',
+        text: '发布到市场',
+        run: () => { window.publishResource && window.publishResource('plugin', item); }
+      });
+    }
     items.push({ icon: 'ri-delete-bin-line', text: '卸载插件', run: async () => { const { confirmed, dep } = await showUninstallConfirm(item); if (!confirmed) return; const key = item.id || item.name; try { if (Array.isArray(dep?.automations)) { for (const a of dep.automations) { if (a.enabled) { try { await window.settingsAPI?.automationToggle?.(a.id, false); } catch (e) {} } } } } catch (e) {} const out = await window.settingsAPI?.uninstallPlugin?.(key); if (!out?.ok) { await showAlert(`卸载失败：${out?.error || '未知错误'}`); return; } const container = document.getElementById('plugins'); const list = await fetchPlugins(); container.innerHTML = ''; const filtered = list.filter((p) => String(p.type || 'plugin').toLowerCase() === 'plugin'); const mode = (localStorage.getItem('pluginsViewMode') || 'card'); if (mode === 'icon') { filtered.forEach((p) => container.appendChild(renderPluginIcon(p))); container.classList.add('icons-view'); } else { filtered.forEach((p) => container.appendChild(renderPlugin(p))); container.classList.remove('icons-view'); } showToast(`已卸载插件：${item.name}`, { type: 'success', duration: 2000 }); } });
     items.forEach(it => {
       if (it.sep) { const s = document.createElement('div'); s.className = 'app-menu-sep'; menu.appendChild(s); return; }

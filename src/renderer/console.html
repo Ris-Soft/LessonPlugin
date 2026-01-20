@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>调试控制台</title>
+  <link rel="stylesheet" href="./settings.css" />
+  <link rel="stylesheet" href="./titlebar.css" />
+  <link rel="stylesheet" href="./remixicon-local.css" />
+  <link rel="stylesheet" href="./console.css" />
+</head>
+<body>
+  <div class="titlebar">
+    <div class="drag"></div>
+    <div class="window-actions">
+      <button class="win-btn" data-act="menu" title="更多"><i style="font-size:18px;" class="ri-more-2-fill"></i></button>
+      <button class="win-btn" data-act="minimize" title="最小化"><i style="font-size:18px;" class="ri-subtract-line"></i></button>
+      <button class="win-btn max" data-act="maximize" title="最大化"><i class="ri-checkbox-blank-line"></i></button>
+      <button class="win-btn close" data-act="close" title="关闭"><i style="font-size:18px;" class="ri-close-line"></i></button>
+    </div>
+  </div>
+  <main id="console-main">
+    <div class="subnav" style="margin-bottom:8px;">
+      <button class="sub-item active" data-sub="logs"><i class="ri-terminal-box-line"></i> 日志</button>
+      <button class="sub-item" data-sub="metrics"><i class="ri-pulse-line"></i> 资源</button>
+      <button class="sub-item" data-sub="windows"><i class="ri-window-line"></i> 窗口</button>
+    </div>
+    <!-- 日志子页 -->
+    <div id="console-logs" class="panel main">
+      <div class="inline filters-row" style="gap:8px; align-items:center;">
+        <span class="muted">来源</span>
+        <select id="filter-source-type" style="min-width:120px;">
+          <option value="all">全部</option>
+          <option value="system">系统模块</option>
+          <option value="plugin">插件</option>
+        </select>
+        <select id="filter-source-id" style="min-width:180px;">
+          <option value="all">全部来源</option>
+        </select>
+        <span class="muted" style="margin-left:12px;">类型</span>
+        <label class="inline" style="display:inline-flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="level-log" checked />
+          <span class="muted">log</span>
+        </label>
+        <label class="inline" style="display:inline-flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="level-info" checked />
+          <span class="muted">info</span>
+        </label>
+        <label class="inline" style="display:inline-flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="level-warn" checked />
+          <span class="muted">warn</span>
+        </label>
+        <label class="inline" style="display:inline-flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="level-error" checked />
+          <span class="muted">error</span>
+        </label>
+        <div class="spacer" style="margin-left:auto;"></div>
+        <button id="clear-console" class="btn secondary"><i class="ri-eraser-line"></i> 清屏</button>
+      </div>
+      <div id="console-log-list" class="log-list" aria-label="后端日志"></div>
+      <div class="inline" id="logs-tools" style="gap:6px; align-items:center; margin-top:4px;">
+        <button id="logs-copy-all" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制全部</button>
+        <button id="logs-export" class="btn"><i class="ri-download-2-line"></i> 导出日志</button>
+      </div>
+    </div>
+    <!-- 资源子页 -->
+    <div id="console-metrics" class="panel main" hidden>
+      <div class="inline" style="gap:8px; align-items:center;">
+        <button id="metrics-refresh" class="btn"><i class="ri-refresh-line"></i> 刷新</button>
+        <div class="spacer" style="margin-left:auto;"></div>
+        <label class="inline" title="每秒自动更新" style="display:inline-flex;align-items:center;gap:6px;">
+          <input id="metrics-auto" type="checkbox" checked />
+          <span class="muted">自动更新</span>
+        </label>
+      </div>
+      <div id="metrics-content" style="margin-top:12px;"></div>
+      <div class="muted" style="margin-top:8px;">数据来源：app.getAppMetrics + Node 进程信息</div>
+    </div>
+    <!-- 窗口子页 -->
+    <div id="console-windows" class="panel main" hidden>
+      <div class="inline" style="gap:8px; align-items:center;">
+        <button id="windows-refresh" class="btn"><i class="ri-refresh-line"></i> 刷新</button>
+        <div class="spacer" style="margin-left:auto;"></div>
+        <label class="inline" title="每秒自动更新" style="display:inline-flex;align-items:center;gap:6px;">
+          <input id="windows-auto" type="checkbox" checked />
+          <span class="muted">自动更新</span>
+        </label>
+      </div>
+      <div id="windows-list" class="windows-list" style="margin-top:12px;"></div>
+    </div>
+  </main>
+  <script src="./console.js"></script>
+</body>
+</html>
