@@ -153,8 +153,13 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   checkUpdate: (checkOnly) => ipcRenderer.invoke('system:checkUpdate', checkOnly),
   performUpdate: () => ipcRenderer.invoke('system:performUpdate'),
   // 查询依赖反向引用（依赖此插件的插件与自动化）
-  pluginDependents: (idOrName) => ipcRenderer.invoke('plugin:dependents', idOrName)
-  ,
+  pluginDependents: (idOrName) => ipcRenderer.invoke('plugin:dependents', idOrName),
+
+  // 获取上次自动更新结果
+  pluginGetLastAutoUpdateResult: () => ipcRenderer.invoke('plugin:lastAutoUpdateResult'),
+
+  // Notification Test
+  testNotification: (type) => ipcRenderer.invoke('notification:test', type),
   // 后端日志（调试）：获取最近记录与订阅实时日志
   backendLogsGet: () => ipcRenderer.invoke('debug:logs:get'),
   onBackendLog: (handler) => {

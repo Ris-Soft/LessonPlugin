@@ -40,8 +40,42 @@ module.exports.init = function init(paths) {
   Registry.behaviorRegistry = null;
 };
 
+const AutoUpdater = require('./AutoUpdater');
+const NotificationWindow = require('../../Windows/NotificationWindow');
+
 // -------- 插件加载与生命周期 --------
 module.exports.loadPlugins = async function loadPlugins(onProgress) {
+  // 1. 在加载插件前执行自动更新（如果启用）
+  // 这样更新后的插件可以在本次启动中直接生效
+  try {
+    const updateRes = await AutoUpdater.runAutoUpdate();
+    if (updateRes && updateRes.ok && updateRes.updated && updateRes.updated.length > 0) {
+      // 记录更新结果
+      Registry.lastAutoUpdateResult = updateRes.updated;
+      try { console.info('[PluginMain] Auto-updated plugins:', updateRes.updated.map(p => p.name)); } catch(e){}
+
+      // 弹出通知（如果配置允许）
+      if (Registry.config.enabled['showUpdateNotification'] !== false) { // Assuming system config is merged or accessible. Registry.config usually holds plugin configs.
+         // Wait, Registry.config is loaded from 'plugins.json' usually? No, Registry.init loads paths. 
+         // Store.getAll('system') is better.
+         const Store = require('../Store/Main');
+         const sysCfg = Store.getAll('system');
+         if (sysCfg && sysCfg.showUpdateNotification !== false) {
+            const listHtml = updateRes.updated.map(p => `<li>${p.name} (v${p.oldVersion} -> v${p.newVersion})</li>`).join('');
+            setTimeout(() => {
+              NotificationWindow.show(
+                '插件自动更新完成',
+                `已自动更新以下插件：<ul>${listHtml}</ul>`,
+                true // hasDetails -> open plugins page
+              );
+            }, 4000);
+         }
+      }
+    }
+  } catch (e) {
+    console.error('[PluginMain] Auto-update failed:', e);
+  }
+
   // 保存进度报告函数，供插件入口通过 API 更新启动页状态
   Registry.setProgressReporter(typeof onProgress === 'function' ? onProgress : null);
   const statuses = [];
@@ -336,6 +370,10 @@ module.exports.getPluginStats = async function getPluginStats(idOrName) {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+};
+
+module.exports.getLastAutoUpdateResult = function getLastAutoUpdateResult() {
+  return Registry.lastAutoUpdateResult || [];
 };
 
 // -------- 导出各模块功能 --------

@@ -78,6 +78,8 @@ body {
 .auto-list::-webkit-scrollbar,
 .auto-editor::-webkit-scrollbar,
 .profiles-table-wrap::-webkit-scrollbar,
+.custom-scroll::-webkit-scrollbar,
+pre::-webkit-scrollbar,
 textarea::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -89,6 +91,8 @@ textarea::-webkit-scrollbar {
 .auto-list::-webkit-scrollbar-track,
 .auto-editor::-webkit-scrollbar-track,
 .profiles-table-wrap::-webkit-scrollbar-track,
+.custom-scroll::-webkit-scrollbar-track,
+pre::-webkit-scrollbar-track,
 textarea::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.04);
   border-left: 1px solid var(--border);
@@ -100,6 +104,8 @@ textarea::-webkit-scrollbar-track {
 .auto-list::-webkit-scrollbar-thumb,
 .auto-editor::-webkit-scrollbar-thumb,
 .profiles-table-wrap::-webkit-scrollbar-thumb,
+.custom-scroll::-webkit-scrollbar-thumb,
+pre::-webkit-scrollbar-thumb,
 textarea::-webkit-scrollbar-thumb {
   background: rgba(64, 75, 88, 0.685);
   border: 1px solid rgba(72, 87, 107, 0.45);
@@ -112,6 +118,8 @@ textarea::-webkit-scrollbar-thumb {
 .auto-list::-webkit-scrollbar-thumb:hover,
 .auto-editor::-webkit-scrollbar-thumb:hover,
 .profiles-table-wrap::-webkit-scrollbar-thumb:hover,
+.custom-scroll::-webkit-scrollbar-thumb:hover,
+pre::-webkit-scrollbar-thumb:hover,
 textarea::-webkit-scrollbar-thumb:hover {
   background: rgba(69, 83, 90, 0.5);
 }
@@ -2078,3 +2086,21 @@ a.topnav-item { text-decoration: none; }
 .config-editor *,
 .json-editor,
 .json-editor * { user-select: text !important; -webkit-user-select: text !important; }
+
+/* Ensure custom scrollbar for plugin modal panels */
+.custom-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 1px solid var(--border);
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(64, 75, 88, 0.685);
+  border: 1px solid rgba(72, 87, 107, 0.45);
+  border-radius: 999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(69, 83, 90, 0.5);
+}

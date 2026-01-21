@@ -18,6 +18,7 @@
     "../Plugins/desktop-launcher",
     "../Plugins/ui-lowbar",
     "../Plugins/ui-lowbar-caller",
-    "../Plugins/homework-board"
+    "../Plugins/homework-board",
+    "../Plugins/wandering-earth-widget"
   ]
 }

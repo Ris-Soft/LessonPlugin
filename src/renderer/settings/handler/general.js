@@ -35,6 +35,8 @@ async function initGeneralSettings() {
     splashProgramName: 'OrbiBoard',
     splashProgramDesc: '插件化大屏课堂辅助工具',
     autoUpdateEnabled: true,
+    autoUpdatePluginsEnabled: true,
+    showUpdateNotification: true,
     autostartEnabled: false,
     autostartHigh: false,
     preciseTimeEnabled: false,
@@ -386,6 +388,8 @@ async function initGeneralSettings() {
   // 基础设置：自启动、精确时间与偏移
   const autostartEnabled = document.getElementById('autostart-enabled');
   const autoUpdateEnabled = document.getElementById('auto-update-enabled');
+  const autoUpdatePluginsEnabled = document.getElementById('auto-update-plugins-enabled');
+  const showUpdateNotification = document.getElementById('show-update-notification');
   const autostartHigh = document.getElementById('autostart-high');
   const preciseTime = document.getElementById('precise-time');
   const semesterStart = document.getElementById('semester-start');
@@ -398,6 +402,8 @@ async function initGeneralSettings() {
 
   autostartEnabled.checked = !!cfg.autostartEnabled;
   autoUpdateEnabled.checked = cfg.autoUpdateEnabled !== false;
+  if (autoUpdatePluginsEnabled) autoUpdatePluginsEnabled.checked = cfg.autoUpdatePluginsEnabled !== false;
+  if (showUpdateNotification) showUpdateNotification.checked = cfg.showUpdateNotification !== false;
   autostartHigh.checked = !!cfg.autostartHigh;
   preciseTime.checked = !!cfg.preciseTimeEnabled;
   semesterStart.value = String(cfg.semesterStart || cfg.offsetBaseDate || new Date().toISOString().slice(0, 10));
@@ -537,6 +543,16 @@ async function initGeneralSettings() {
   autoUpdateEnabled.addEventListener('change', async () => {
     await window.settingsAPI?.configSet('system', 'autoUpdateEnabled', !!autoUpdateEnabled.checked);
   });
+  if (autoUpdatePluginsEnabled) {
+    autoUpdatePluginsEnabled.addEventListener('change', async () => {
+      await window.settingsAPI?.configSet('system', 'autoUpdatePluginsEnabled', !!autoUpdatePluginsEnabled.checked);
+    });
+  }
+  if (showUpdateNotification) {
+    showUpdateNotification.addEventListener('change', async () => {
+      await window.settingsAPI?.configSet('system', 'showUpdateNotification', !!showUpdateNotification.checked);
+    });
+  }
   autostartHigh.addEventListener('change', async () => {
     await window.settingsAPI?.configSet('system', 'autostartHigh', !!autostartHigh.checked);
     await window.settingsAPI?.setAutostart?.(!!autostartEnabled.checked, !!autostartHigh.checked);

@@ -133,6 +133,107 @@ async function showAlertWithLogs(title = '安装完成', pluginInfo = {}, lines 
   });
 }
 
+// 右下角置顶更新通知（带关闭按钮，不自动消失）
+function showUpdateNotification(title = '更新提示', content = '', onDetails = null) {
+  try {
+    // 检查配置，如果用户关闭了更新通知则不显示
+    // 这里需要异步获取配置，或者假设调用方已经检查过了
+    // 为了简单，我们假设调用此函数时已经决定要显示了
+    
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast'; // 不加 toast-info 避免默认样式干扰，使用自定义样式
+    toast.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 280px;
+      max-width: 320px;
+      background: var(--bg-secondary); /* 适配深色模式 */
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      color: var(--fg);
+      padding: 12px;
+      border-radius: 8px;
+      pointer-events: auto;
+      cursor: default;
+    `;
+    
+    // 标题栏
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex; justify-content:space-between; align-items:center;';
+    
+    const titleEl = document.createElement('div');
+    titleEl.innerHTML = `<i class="ri-notification-badge-line" style="color:var(--accent);margin-right:6px;"></i><span style="font-weight:600;">${title}</span>`;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn icon small';
+    closeBtn.innerHTML = '<i class="ri-close-line"></i>';
+    closeBtn.style.cssText = 'background:transparent; border:none; color:var(--muted); cursor:pointer; padding:4px;';
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    };
+
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+    toast.appendChild(header);
+
+    // 内容区
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size:13px; color:var(--fg-secondary); line-height:1.5; max-height:200px; overflow-y:auto;';
+    
+    if (typeof content === 'string') {
+      body.innerHTML = content; // 允许简单的 HTML
+    } else if (Array.isArray(content)) {
+      // 如果是列表（如插件列表）
+      const ul = document.createElement('ul');
+      ul.style.paddingLeft = '20px';
+      ul.style.margin = '4px 0';
+      content.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+      body.appendChild(ul);
+    }
+
+    toast.appendChild(body);
+
+    // 操作栏（如果有详情点击）
+    if (onDetails) {
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex; justify-content:flex-end; margin-top:4px;';
+      const detailBtn = document.createElement('button');
+      detailBtn.className = 'btn primary small';
+      detailBtn.textContent = '查看详情';
+      detailBtn.onclick = () => {
+        onDetails();
+        // toast.classList.remove('show'); // 点击详情后是否关闭？根据需求，暂不关闭或由详情页决定
+      };
+      actions.appendChild(detailBtn);
+      toast.appendChild(actions);
+    }
+
+    container.appendChild(toast);
+    
+    // 动画显示
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 // Toast 通知：非模态、自动消失
 function showToast(message = '', { type = 'info', duration = 2000 } = {}) {
   try {

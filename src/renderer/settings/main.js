@@ -497,6 +497,53 @@ NPM依赖：${depNames.length ? depNames.join('，') : '无'}
       pendingZipPath = null; pendingZipData = null; pendingItemMeta = null;
     }
   });
+
+  // Check for Main Program Update and Plugin Auto-Update Notification
+  async function checkUpdateNotifications() {
+    try {
+      // 1. Main Program Update
+      const justUpdated = await window.settingsAPI?.configGet?.('system', 'justUpdated');
+      const showNotif = await window.settingsAPI?.configGet?.('system', 'showUpdateNotification');
+      
+      if (justUpdated) {
+        // Reset the flag
+        await window.settingsAPI?.configSet?.('system', 'justUpdated', false);
+        
+        if (showNotif !== false) {
+           const prevVer = await window.settingsAPI?.configGet?.('system', 'previousVersion');
+           const currentVer = await window.settingsAPI?.getAppInfo?.().then(i => i.appVersion);
+           const changelog = await window.settingsAPI?.checkUpdate?.(true).then(r => r.notes);
+
+           showUpdateNotification('主程序已更新', 
+             `版本：v${prevVer || '?'} → v${currentVer || '?'}<br>点击查看详细更新日志`,
+             () => {
+               // Show changelog modal
+               showLogModal(`更新日志 v${currentVer}`, changelog || '暂无详细日志');
+             }
+           );
+        }
+      }
+
+      // 2. Plugin Auto-Update
+      if (showNotif !== false) {
+         const updatedPlugins = await window.settingsAPI?.pluginGetLastAutoUpdateResult?.();
+         
+         if (updatedPlugins && updatedPlugins.length > 0) {
+            const listHtml = updatedPlugins.map(p => `<li>${p.name} (v${p.oldVersion} -> v${p.newVersion})</li>`).join('');
+            showUpdateNotification('插件自动更新完成', 
+              `已自动更新以下插件：<ul>${listHtml}</ul>`,
+              () => {
+                 navigateToPage('plugins');
+              }
+            );
+         }
+      }
+
+    } catch(e) { console.error(e); }
+  }
+  
+  // Delay slightly to ensure UI is ready
+  // setTimeout(checkUpdateNotifications, 1500); // Disabled: Now handled by Main Process NotificationWindow
 }
 
 main();

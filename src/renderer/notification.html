@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notification</title>
+  <link rel="stylesheet" href="./notification.css">
+  <link rel="stylesheet" href="./remixicon-local.css">
+  <link rel="stylesheet" href="./fonts-local.css">
+</head>
+<body>
+  <div class="notification-container">
+    <div class="header">
+      <div class="title">
+        <i class="ri-notification-badge-line icon"></i>
+        <span id="title-text">通知</span>
+      </div>
+      <button id="close-btn" class="icon-btn"><i class="ri-close-line"></i></button>
+    </div>
+    <div class="content" id="content-text">
+      <!-- Content goes here -->
+    </div>
+    <div class="actions" id="actions-container">
+      <button id="detail-btn" class="btn primary small">查看详情</button>
+    </div>
+  </div>
+  <script src="./notification.js"></script>
+</body>
+</html>

@@ -20,6 +20,8 @@ const automationIpc = require('../Ipc/AutomationIpc');
 const configIpc = require('../Ipc/ConfigIpc');
 const consoleIpc = require('../Ipc/ConsoleIpc');
 const windowIpc = require('../Ipc/WindowIpc');
+const notificationIpc = require('../Ipc/NotificationIpc');
+const NotificationWindow = require('../Windows/NotificationWindow');
 
 let automationManager = null;
 let hasProtocolArgAtBoot = false;
@@ -72,6 +74,21 @@ async function init(appInstance) {
 
   app.whenReady().then(async () => {
     store.init(app);
+
+    // 检查主程序版本更新
+    try {
+      const currentVersion = app.getVersion();
+      const lastRunVersion = store.get('system', 'lastRunVersion');
+      if (currentVersion !== lastRunVersion) {
+        store.set('system', 'lastRunVersion', currentVersion);
+        // 如果不是初次安装（即存在上一版本记录），则标记为刚刚更新
+        if (lastRunVersion) {
+          store.set('system', 'justUpdated', true);
+          store.set('system', 'previousVersion', lastRunVersion);
+        }
+      }
+    } catch(e) {}
+
     store.ensureDefaults('system', {
       splashEnabled: true,
       splashQuoteEnabled: false,
@@ -125,6 +142,29 @@ async function init(appInstance) {
     configIpc.register();
     consoleIpc.register();
     windowIpc.register();
+    notificationIpc.register();
+
+    // 启动时检查是否有“刚刚更新”标记，若有则弹出通知
+    try {
+      const justUpdated = store.get('system', 'justUpdated');
+      const showNotif = store.get('system', 'showUpdateNotification') !== false;
+      
+      if (justUpdated && showNotif) {
+         const prevVer = store.get('system', 'previousVersion') || 'old';
+         const currentVer = app.getVersion();
+         // Reset flag
+         store.set('system', 'justUpdated', false);
+         
+         // Show notification
+         setTimeout(() => {
+           NotificationWindow.show(
+             '主程序已更新', 
+             `版本：v${prevVer} → v${currentVer}<br>点击查看详细更新日志`, 
+             true // hasDetails -> open settings
+           );
+         }, 3000); // Wait for app to settle
+      }
+    } catch (e) { console.error('Notification check error:', e); }
 
     try {
       const statuses = await pluginManager.loadPlugins((status) => {

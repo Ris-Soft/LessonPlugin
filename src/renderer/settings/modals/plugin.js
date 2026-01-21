@@ -20,8 +20,10 @@ async function showPluginAboutModal(pluginItem) {
   const tabHeader = document.createElement('div');
   tabHeader.className = 'subnav'; // Use global subnav class
   tabHeader.style.padding = '0'; // Override padding for modal context
-  tabHeader.style.marginBottom = '6px'; // Reduced margin
+  tabHeader.style.marginBottom = '0'; // Removed bottom margin
+  tabHeader.style.marginTop = '10px'; // Added top margin
   tabHeader.style.borderBottom = 'none';
+  tabHeader.style.justifyContent = 'center';
 
   const tabs = [
     { key: 'basic', label: '基本', icon: 'ri-file-info-line' },
@@ -51,7 +53,7 @@ async function showPluginAboutModal(pluginItem) {
     panel.style.display = 'none';
     panel.style.flex = '1';
     panel.style.overflowY = 'auto';
-    panel.className = 'tab-panel-' + t.key;
+    panel.className = 'tab-panel-' + t.key + ' custom-scroll';
     tabPanels[t.key] = panel;
     body.appendChild(panel);
   });
@@ -187,6 +189,40 @@ async function showPluginAboutModal(pluginItem) {
   desc.innerHTML = `<div class="muted">描述</div><div>${descText}</div>`;
   basicPanel.appendChild(metaGrid);
   basicPanel.appendChild(desc);
+
+  // README section
+  const readmeContainer = document.createElement('div');
+  readmeContainer.className = 'modal-readme'; // Use same class as market for consistency
+  readmeContainer.style.marginTop = '16px';
+  readmeContainer.style.paddingTop = '16px';
+  readmeContainer.style.borderTop = '1px solid var(--border)';
+  basicPanel.appendChild(readmeContainer);
+
+  (async () => {
+    readmeContainer.innerHTML = '<div class="muted">正在加载说明文档...</div>';
+    try {
+        const key = pluginItem.id || pluginItem.name;
+        let md = await window.settingsAPI?.getPluginReadme?.(key);
+        
+        // If no local README, try online if it's an npm plugin
+        if (!md && pluginItem.npm) {
+            md = await window.settingsAPI?.getPluginReadmeOnline?.(key);
+        }
+
+        if (md) {
+            if (typeof renderMarkdown === 'function') {
+                readmeContainer.innerHTML = renderMarkdown(md);
+            } else {
+                readmeContainer.textContent = md;
+                readmeContainer.style.whiteSpace = 'pre-wrap';
+            }
+        } else {
+            readmeContainer.innerHTML = '<div class="muted">暂无说明文档</div>';
+        }
+    } catch (e) {
+        readmeContainer.innerHTML = `<div class="danger">加载说明文档失败: ${e.message}</div>`;
+    }
+  })();
 
   // --- Tab Content: Features (Merged Actions & Events) ---
   const featuresPanel = tabPanels['features'];

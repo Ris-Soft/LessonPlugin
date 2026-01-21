@@ -259,12 +259,42 @@
               <div class="setting-item">
                 <div class="setting-icon"><i class="ri-refresh-line"></i></div>
                 <div class="setting-main">
-                  <div class="setting-title">自动更新</div>
-                  <div class="setting-desc">允许在启动时自动检查并应用 ASAR 更新或安装包更新。</div>
+                  <div class="setting-title">自动更新主程序</div>
+                  <div class="setting-desc">允许在启动时自动检查并应用主程序更新。</div>
                 </div>
                 <div class="setting-action">
                   <label class="switch">
                     <input id="auto-update-enabled" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 插件自动更新开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-puzzle-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">自动更新插件</div>
+                  <div class="setting-desc">允许在启动时自动检查并更新已安装的插件。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="auto-update-plugins-enabled" type="checkbox" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 更新提示框开关 -->
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-notification-badge-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">显示更新日志提示</div>
+                  <div class="setting-desc">在更新主程序或插件后，在屏幕右下角显示更新日志提示框。</div>
+                </div>
+                <div class="setting-action">
+                  <label class="switch">
+                    <input id="show-update-notification" type="checkbox" />
                     <span class="slider"></span>
                   </label>
                 </div>
@@ -573,6 +603,7 @@
             <button class="sub-item active" data-sub="run"><i class="ri-roadster-line"></i> 运行管理</button>
             <button class="sub-item" data-sub="icons"><i class="ri-tools-line"></i> 图标工具</button>
             <button class="sub-item" data-sub="logs"><i class="ri-terminal-box-line"></i> 后端日志</button>
+            <button class="sub-item" data-sub="update-test"><i class="ri-notification-badge-line"></i> 更新测试</button>
           </div>
           <!-- 运行管理子页（默认） -->
           <div id="debug-run" class="panel">
@@ -665,6 +696,42 @@
             </div>
             <div id="backend-log-list" class="log-list" aria-label="后端日志"></div>
           </div>
+
+          <!-- 更新测试子页 -->
+          <div id="debug-update-test" class="panel" hidden>
+            <div class="form">
+              <div class="setting-item">
+                <div class="setting-icon"><i class="ri-notification-badge-line"></i></div>
+                <div class="setting-main">
+                  <div class="setting-title">更新提示框测试</div>
+                  <div class="setting-desc">测试主程序与插件更新后的通知样式与逻辑。</div>
+                </div>
+              </div>
+              
+              <div class="setting-item">
+                <div class="setting-main">
+                  <div class="setting-title">UI 样式预览</div>
+                  <div class="setting-desc">直接触发前端通知组件，不修改系统状态。</div>
+                  <div class="inline" style="margin-top:12px; gap:12px;">
+                    <button id="debug-test-main-update" class="btn primary">模拟主程序更新通知</button>
+                    <button id="debug-test-plugin-update" class="btn primary">模拟插件更新通知</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-main">
+                  <div class="setting-title">启动行为模拟</div>
+                  <div class="setting-desc">修改配置标记，使下次启动时触发真实的更新检测逻辑。</div>
+                  <div class="inline" style="margin-top:12px; gap:12px;">
+                    <button id="debug-sim-next-update" class="btn danger">设置下次启动为“刚刚更新”</button>
+                  </div>
+                  <div class="muted" style="margin-top:8px;">点击后重启应用即可看到效果。</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </section>
 
         <!-- 关于页面 -->
@@ -754,7 +821,6 @@
               </ul>
             </div>
           </div>
-        </section>
         </section>
         <section id="page-npm" hidden>
           <header>

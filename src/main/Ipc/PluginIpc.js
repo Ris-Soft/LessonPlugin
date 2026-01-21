@@ -248,6 +248,8 @@ function register() {
   ipcMain.handle('plugin:updateVersion', async (_e, pluginId, version) => pluginManager.updatePluginVersion(pluginId, version));
 
   ipcMain.handle('plugin:stats', async (_e, idOrName) => pluginManager.getPluginStats(idOrName));
+
+  ipcMain.handle('plugin:lastAutoUpdateResult', async () => pluginManager.getLastAutoUpdateResult());
 }
 
 module.exports = { register };
