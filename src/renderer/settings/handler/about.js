@@ -108,7 +108,22 @@ function initAboutPage() {
       updateDetails.hidden = true;
       
       try {
-        const res = await window.settingsAPI.checkUpdate(true); // true = checkOnly
+        let res;
+        // 检查是否为开发环境（未打包），如果是则模拟更新
+        const appInfo = await window.settingsAPI?.getAppInfo?.();
+        if (appInfo && appInfo.isDev) {
+          // 模拟延迟
+          await new Promise(r => setTimeout(r, 1000));
+          res = {
+            ok: true,
+            hasUpdate: true,
+            remoteVersion: '1.2.3-preview',
+            notes: '这是一条模拟的更新日志（仅开发模式可见）。\n\n1. 修复了若干问题\n2. 优化了用户体验\n3. 新增了模拟更新功能\n\n点击“立即更新”将演示进度条效果。'
+          };
+        } else {
+          res = await window.settingsAPI.checkUpdate(true); // true = checkOnly
+        }
+
         const now = new Date();
         updateInfo.textContent = `最后检查时间：${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
         
@@ -144,6 +159,27 @@ function initAboutPage() {
       performBtn.disabled = true;
       performBtn.style.display = 'none';
       progressWrap.style.display = 'flex';
+
+      // 检查是否为开发环境
+      const appInfo = await window.settingsAPI?.getAppInfo?.();
+      if (appInfo && appInfo.isDev) {
+        // 模拟下载进度
+        let p = 0;
+        const timer = setInterval(() => {
+          p += 5;
+          if (p > 100) p = 100;
+          progressBar.style.width = p + '%';
+          progressText.textContent = p + '%';
+          if (p === 100) {
+            clearInterval(timer);
+            updateStatus.textContent = '模拟更新完成，正在重启...';
+            setTimeout(() => {
+              window.location.reload(); // 模拟重启刷新页面
+            }, 1000);
+          }
+        }, 200);
+        return;
+      }
       
       // 监听进度事件
       const off = window.settingsAPI.onProgress((payload) => {
@@ -185,6 +221,17 @@ function initAboutPage() {
         // 但如果失败了需要解绑
         if (off) off(); 
       }
+    });
+  }
+
+  // 详细信息切换
+  const toggleBtn = document.getElementById('about-toggle-details');
+  const detailsArea = document.getElementById('about-details-area');
+  if (toggleBtn && detailsArea) {
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = detailsArea.hidden;
+      detailsArea.hidden = !isHidden;
+      toggleBtn.classList.toggle('active', !isHidden);
     });
   }
 }

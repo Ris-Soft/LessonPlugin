@@ -736,60 +736,68 @@
 
         <!-- 关于页面 -->
         <section id="page-about" hidden>
-          <header>
-            <h1>关于</h1>
-            <p>OrbiBoard — 插件化大屏课堂辅助工具</p>
-          </header>
-          <div class="panel">
-            <div class="about-hero">
-              <img class="about-logo" src="../../icon.ico" alt="OrbiBoard" />
-              <div class="about-title">
-                <div class="name">OrbiBoard</div>
-                <div class="tagline">插件化大屏课堂辅助工具</div>
+          <!-- 渐变色卡片：仅包含软件名称和 Logo -->
+          <div class="panel" style="background: linear-gradient(135deg, #10b981, #047857); border: none; padding: 40px 20px;">
+            <div class="about-hero" style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+              <img class="about-logo" src="../../icon.ico" alt="OrbiBoard" style="width: 96px; height: 96px; border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.1);" />
+              <div class="about-title" style="text-align: center;">
+                <div class="name" style="color: #fff; font-size: 28px;">OrbiBoard</div>
+                <div class="tagline" style="color: rgba(255,255,255,0.9);">插件化大屏课堂辅助工具</div>
               </div>
-              <div class="about-badges">
-                <span class="pill small">版本 <span id="about-version">—</span></span>
+            </div>
+          </div>
+
+          <!-- 合并卡片：版本与更新 -->
+          <div class="panel">
+            <!-- 头部概览 -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; flex-direction: column;">
+                  <div style="font-weight: 600; font-size: 16px;">OrbiBoard v<span id="about-version">—</span></div>
+                  <div id="update-status" class="muted" style="font-size: 13px;">当前已是最新版本</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button id="about-toggle-details" class="btn secondary"><i class="ri-information-line"></i> 详细信息</button>
+                <button id="about-check-update" class="btn primary"><i class="ri-refresh-line"></i> 检查更新</button>
+              </div>
+            </div>
+            
+            <!-- 详细信息区域（默认隐藏） -->
+            <div id="about-details-area" hidden style="margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 16px;">
+              <div class="about-badges" style="justify-content: flex-start; margin-bottom: 12px;">
                 <span class="pill small">Electron <span id="about-electron">—</span></span>
                 <span class="pill small">Node <span id="about-node">—</span></span>
                 <span class="pill small">Chrome <span id="about-chrome">—</span></span>
                 <span class="pill small">平台 <span id="about-platform">—</span></span>
               </div>
-            </div>
-            <div class="about-links">
-              <a href="https://github.com/OrbiBoard/OrbiBoard" target="_blank" class="btn"><i
-                  class="ri-git-repository-line"></i> 仓库</a>
-              <div class="spacer"></div>
-              <button id="about-copy" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制版本信息</button>
-              <button id="about-open-data" class="btn"><i class="ri-folder-2-line"></i> 打开数据目录</button>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="section-title"><i class="ri-refresh-line"></i> 软件更新</div>
-            <div style="padding: 12px 16px;">
-              <div class="inline" style="align-items: center; justify-content: space-between;">
-                <div>
-                  <div id="update-status" style="font-weight: 500;">当前已是最新版本</div>
-                  <div id="update-info" class="muted" style="font-size: 13px; margin-top: 4px;">最后检查时间：从未</div>
-                </div>
-                <button id="about-check-update" class="btn primary"><i class="ri-refresh-line"></i> 检查更新</button>
+              <div class="about-links" style="margin-top: 0;">
+                <a href="https://github.com/OrbiBoard/OrbiBoard" target="_blank" class="btn"><i
+                    class="ri-git-repository-line"></i> 仓库</a>
+                <button id="about-copy" class="btn secondary"><i class="ri-file-copy-2-line"></i> 复制版本信息</button>
+                <button id="about-open-data" class="btn"><i class="ri-folder-2-line"></i> 打开数据目录</button>
               </div>
-              <div id="update-details" class="update-details" hidden style="margin-top: 16px; background: var(--bg-secondary); border-radius: 8px; padding: 12px;">
-                <div class="inline" style="margin-bottom: 8px;">
-                  <span class="pill primary">新版本 v<span id="update-new-version"></span></span>
-                  <span class="muted" id="update-size"></span>
-                </div>
-                <div id="update-notes" style="font-size: 13px; line-height: 1.5; color: var(--fg-secondary); max-height: 150px; overflow-y: auto;"></div>
-                <div style="margin-top: 12px; display: flex; gap: 8px;">
-                  <button id="about-perform-update" class="btn primary"><i class="ri-download-cloud-2-line"></i> 立即更新</button>
-                  <div id="update-progress-wrap" style="flex: 1; display: none; align-items: center; gap: 8px;">
-                    <div class="progress-bar" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
-                      <div id="update-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
-                    </div>
-                    <span id="update-progress-text" class="muted" style="font-size: 12px;">0%</span>
+            </div>
+              
+            <!-- 更新详情 -->
+            <div id="update-details" class="update-details" hidden style="margin-top: 16px; background: var(--bg-secondary); border-radius: 8px; padding: 12px;">
+              <div class="inline" style="margin-bottom: 8px;">
+                <span class="pill primary">新版本 v<span id="update-new-version"></span></span>
+                <span class="muted" id="update-size"></span>
+              </div>
+              <div id="update-notes" style="font-size: 13px; line-height: 1.5; color: var(--fg-secondary); max-height: 150px; overflow-y: auto;"></div>
+              <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button id="about-perform-update" class="btn primary"><i class="ri-download-cloud-2-line"></i> 立即更新</button>
+                <div id="update-progress-wrap" style="flex: 1; display: none; align-items: center; gap: 8px;">
+                  <div class="progress-bar" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                    <div id="update-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
                   </div>
+                  <span id="update-progress-text" class="muted" style="font-size: 12px;">0%</span>
                 </div>
               </div>
             </div>
+            
+            <div id="update-info" class="muted" style="font-size: 12px; margin-top: 8px;">最后检查时间：从未</div>
           </div>
           <div class="panel">
             <div class="contributors">
